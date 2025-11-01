@@ -1,4 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { MembershipConfig, UserMembership } from '@/types/membership';
+import { Coupon, CouponStatusInfo, RedeemResult } from '@/types/coupon';
+import { MembershipAdapter, CouponAdapter } from './apiAdapter';
 
 // region: --- Interface Definitions ---
 export interface DoubanItem {
@@ -122,6 +125,23 @@ export class API {
     return response.json();
   }
 
+  public async getUserInfo(): Promise<{ id: string; username: string } | null> {
+    try {
+      const response = await this._fetch('/auth/userinfo');
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error('获取用户信息失败:', error);
+      return null;
+    }
+  }
+
+  public async validateCookie(): Promise<Response> {
+    return this._fetch('/auth/validate');
+  }
+
   async logout(): Promise<{ ok: boolean }> {
     const response = await this._fetch("/api/logout", {
       method: "POST",
@@ -200,7 +220,167 @@ export class API {
     return `${this.baseURL}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
   }
 
-  async getDoubanData(
+  // 会员系统API方法
+  async getMembershipConfig(): Promise<MembershipConfig> {
+    try {
+      // 调用LunaTV API端点
+      const response = await this._fetch("/api/membership/config", {
+        headers: {
+          'X-Platform': 'tv',  // 添加平台标识
+          'X-Client-Version': '1.0.0'
+        }
+      });
+      const lunaConfig = await response.json();
+      // 使用适配器转换数据格式
+      return MembershipAdapter.convertToOneTVMembershipConfig(lunaConfig);
+    } catch (error) {
+      console.error("获取会员配置失败:", error);
+      // 返回默认配置作为降级处理
+      return {
+        tiers: [
+          {
+            name: "default",
+            price: 0,
+            features: ["基础内容访问"],
+            duration: 0,
+            priority: 0
+          },
+          {
+            name: "basic",
+            price: 19.9,
+            features: ["高清画质", "无广告"],
+            duration: 30,
+            priority: 1
+          },
+          {
+            name: "standard",
+            price: 39.9,
+            features: ["全高清画质", "多设备登录", "无广告"],
+            duration: 30,
+            priority: 2
+          },
+          {
+            name: "premium",
+            price: 59.9,
+            features: ["4K画质", "更多设备支持", "无广告", "专属内容"],
+            duration: 30,
+            priority: 3
+          },
+          {
+            name: "vip",
+            price: 99.9,
+            features: ["全部高级功能", "无限设备", "专属客服", "独家内容"],
+            duration: 30,
+            priority: 4
+          }
+        ],
+        defaultTier: "default",
+        upgradeOptions: {}
+      };
+    }
+  }
+
+  async getUserMembership(): Promise<UserMembership> {
+    try {
+      // 获取存储的认证信息
+      const authCookies = await AsyncStorage.getItem("authCookies");
+      const response = await this._fetch("/api/membership/user", {
+        headers: {
+          'Cookie': authCookies || '',
+          'X-Platform': 'tv'
+        }
+      });
+      const lunaMembership = await response.json();
+      // 使用适配器转换数据格式
+      return MembershipAdapter.convertToOneTVMembership(lunaMembership);
+    } catch (error) {
+      console.error("获取会员信息失败:", error);
+      // 返回默认免费会员作为降级处理
+      return {
+        userId: "",
+        tier: "default",
+        startDate: Date.now(),
+        endDate: Date.now(),
+        status: "expired"
+      };
+    }
+  }
+
+  // 卡券系统API方法
+  async redeemCoupon(code: string): Promise<RedeemResult> {
+    try {
+      const authCookies = await AsyncStorage.getItem("authCookies");
+      const response = await this._fetch("/api/coupon/redeem", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          'Cookie': authCookies || '',
+          'X-Platform': 'tv'
+        },
+        body: JSON.stringify({ code, platform: 'tv' }),
+      });
+      const result = await response.json();
+      // 转换兑换结果格式
+      return {
+        success: result.success,
+        message: result.message,
+        coupon: result.coupon ? CouponAdapter.convertToOneTVCoupon(result.coupon) : undefined,
+        membershipInfo: result.membershipInfo ? {
+          tier: result.membershipInfo.tierId,
+          endDate: result.membershipInfo.endDate
+        } : undefined
+      };
+    } catch (error) {
+      console.error("兑换卡券失败:", error);
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : "兑换失败，请检查网络连接"
+      };
+    }
+  }
+
+  async getUserCoupons(): Promise<Coupon[]> {
+    try {
+      const authCookies = await AsyncStorage.getItem("authCookies");
+      const response = await this._fetch("/api/coupon/user", {
+        headers: {
+          'Cookie': authCookies || '',
+          'X-Platform': 'tv'
+        }
+      });
+      const lunaCoupons = await response.json();
+      // 转换卡券列表
+      return lunaCoupons.map((coupon: any) => CouponAdapter.convertToOneTVCoupon(coupon));
+    } catch (error) {
+      console.error("获取卡券列表失败:", error);
+      return [];
+    }
+  }
+
+  public async checkCouponStatus(code: string): Promise<CouponStatusInfo> {
+    try {
+      const authCookies = await AsyncStorage.getItem("authCookies");
+      const response = await this._fetch(`/api/coupon/status?code=${encodeURIComponent(code)}`, {
+        headers: {
+          'Cookie': authCookies || '',
+          'X-Platform': 'tv'
+        }
+      });
+      const lunaStatus = await response.json();
+      // 转换状态信息
+      return CouponAdapter.convertToOneTVCouponStatus(lunaStatus);
+    } catch (error) {
+      console.error("检查卡券状态失败:", error);
+      return {
+        code,
+        isValid: false,
+        status: 'INVALID' as const,
+        message: "卡券不存在或已失效"
+      };
+    }
+  }
+
+  public async getDoubanData(
     type: "movie" | "tv",
     tag: string,
     pageSize: number = 16,
