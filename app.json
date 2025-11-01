@@ -25,7 +25,10 @@
           "android": {
             "newArchEnabled": false,
             "enableProguardInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "hermesEnabled": true,
+            "enablePngCrunchInReleaseBuilds": true,
+            "javaMaxHeapSize": "4g"
           }
         }
       ],

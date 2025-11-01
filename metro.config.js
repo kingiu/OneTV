@@ -9,32 +9,43 @@ const projectRoot = __dirname;
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(projectRoot);
 
-// When enabled, the optional code below will allow Metro to resolve
-// and bundle source files with TV-specific extensions
-// (e.g., *.ios.tv.tsx, *.android.tv.tsx, *.tv.tsx)
-//
-// Metro will still resolve source files with standard extensions
-// as usual if TV-specific files are not found for a module.
-//
-// if (process.env?.EXPO_TV === '1') {
-//   const originalSourceExts = config.resolver.sourceExts;
-//   const tvSourceExts = [
-//     ...originalSourceExts.map((e) => `tv.${e}`),
-//     ...originalSourceExts,
-//   ];
-//   config.resolver.sourceExts = tvSourceExts;
-// }
+// Enable TV-specific extensions when EXPO_TV is set
+if (process.env?.EXPO_TV === '1') {
+  const originalSourceExts = config.resolver.sourceExts;
+  const tvSourceExts = [
+    ...originalSourceExts.map((e) => `tv.${e}`),
+    ...originalSourceExts,
+  ];
+  config.resolver.sourceExts = tvSourceExts;
+}
 
-// This can be replaced with `find-yarn-workspace-root`
-const monorepoRoot = path.resolve(projectRoot, "../..");
+// Optimize Metro for memory usage and performance
+config.transformer = {
+  ...config.transformer,
+};
 
-// 1. Watch all files within the monorepo
-config.watchFolders = [monorepoRoot];
-// 2. Let Metro know where to resolve packages and in what order
+// Fix 'Too many elements passed to Promise.all' error by limiting file processing
+config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
+config.resolver.platforms = ['android', 'ios', 'web'];
+config.resolver.useWatchman = false;
+config.maxWorkers = 4;
+
+// Only watch the current project directory to reduce memory usage
+config.watchFolders = [projectRoot];
+
+// Optimize resolver paths
 config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, "node_modules"),
-  path.resolve(monorepoRoot, "node_modules"),
+  path.resolve(projectRoot, "node_modules")
 ];
 config.resolver.disableHierarchicalLookup = true;
+
+// Add cache optimization
+config.cacheStores = [
+  new (require('metro-cache').FileStore)({
+    root: path.join(projectRoot, '.metro-cache'),
+    ttl: 86400000, // 1 day in milliseconds
+  }),
+];
+
 
 module.exports = config;
