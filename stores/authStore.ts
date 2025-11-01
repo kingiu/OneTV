@@ -21,7 +21,7 @@ interface AuthState {
   checkAuthStatus: () => Promise<boolean>;
 }
 
-const useAuthStore = create<AuthState>((set) => ({
+const useAuthStore = create<AuthState>((set, get) => ({
   isLoggedIn: false,
   isLoginModalVisible: false,
   showLoginModal: () => set({ isLoginModalVisible: true }),

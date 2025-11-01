@@ -77,10 +77,9 @@ export const RemoteInputSection: React.FC<RemoteInputSectionProps> = ({ onChange
           ) : (
             <Switch
               value={remoteInputEnabled}
-              onValueChange={() => { }} // 禁用Switch的直接交互
+              onValueChange={handleToggle}
               trackColor={{ false: "#767577", true: Colors.dark.primary }}
               thumbColor={remoteInputEnabled ? "#ffffff" : "#f4f3f4"}
-              pointerEvents="none"
             />
           )
           }
