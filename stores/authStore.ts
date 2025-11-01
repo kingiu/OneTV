@@ -2,6 +2,8 @@ import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "@/services/api";
 import { useSettingsStore } from "./settingsStore";
+import { useMembershipStore } from "./membershipStore";
+import { useCouponStore } from "./couponStore";
 import { UserMappingService } from "@/services/userMappingService";
 import Toast from "react-native-toast-message";
 import Logger from "@/utils/Logger";
@@ -123,7 +125,10 @@ const useAuthStore = create<AuthState>((set) => ({
       // 清除用户映射关系
       await UserMappingService.clearUserMappings();
       // 清除会员和卡券数据
-      await clearMembershipCouponData();
+      await Promise.all([
+        useMembershipStore.getState().clearMembershipData(),
+        useCouponStore.getState().clearCouponData()
+      ]);
       set({ isLoggedIn: false, isLoginModalVisible: false });
     } catch (error) {
       logger.error("Failed to logout:", error);
@@ -143,27 +148,30 @@ const useAuthStore = create<AuthState>((set) => ({
   },
 }));
 
-// 同步用户会员和卡券数据
+// 同步用户会员和卡券数据（完整加载，包括缓存读取和API请求）
 async function syncUserData() {
   try {
-    // 获取用户会员信息
-    await api.getUserMembership();
-    // 获取用户卡券列表
-    await api.getUserCoupons();
+    // 并行加载会员配置和用户数据
+    await Promise.all([
+      useMembershipStore.getState().loadMembershipConfig(),
+      useMembershipStore.getState().loadUserMembership(),
+      useCouponStore.getState().loadUserCoupons()
+    ]);
   } catch (error) {
     logger.error("Failed to sync user data:", error);
   }
 }
 
-// 清除会员和卡券数据
-async function clearMembershipCouponData() {
+// 刷新用户数据（仅API请求，不读取缓存）
+async function refreshUserData() {
   try {
-    // 清除本地存储的会员和卡券数据
-    await AsyncStorage.removeItem('userMembership');
-    await AsyncStorage.removeItem('userCoupons');
-    await AsyncStorage.removeItem('membershipConfig');
+    // 并行刷新会员和卡券数据
+    await Promise.all([
+      useMembershipStore.getState().refreshUserMembership(),
+      useCouponStore.getState().refreshUserCoupons()
+    ]);
   } catch (error) {
-    logger.error("Failed to clear membership coupon data:", error);
+    logger.error("Failed to refresh user data:", error);
   }
 }
 
@@ -173,7 +181,10 @@ let syncIntervalId: NodeJS.Timeout | null = null;
 function startPeriodicSync() {
   // 每10分钟同步一次数据
   stopPeriodicSync(); // 先停止现有任务
-  syncIntervalId = setInterval(syncUserData, 10 * 60 * 1000);
+  // 初始同步
+  syncUserData();
+  // 设置定时刷新（使用refresh而不是完整加载，更轻量）
+  syncIntervalId = setInterval(refreshUserData, 10 * 60 * 1000);
 }
 
 function stopPeriodicSync() {
