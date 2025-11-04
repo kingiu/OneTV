@@ -23,7 +23,16 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
 
   const handleRedeemCoupon = async () => {
     if (!couponCode.trim()) {
+      console.debug('兑换卡券: 未输入卡券码');
       setError('请输入卡券码');
+      return;
+    }
+
+    // 卡券码格式验证 (12位字母数字组合)
+    const couponPattern = /^[A-Z0-9]{12}$/;
+    if (!couponPattern.test(couponCode.trim())) {
+      console.debug('兑换卡券: 卡券码格式不正确', { code: couponCode });
+      setError('卡券码格式不正确，请输入12位字母数字组合');
       return;
     }
 
@@ -33,6 +42,15 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
       setSuccess(null);
 
       console.debug('兑换卡券: 开始兑换', { code: couponCode });
+      console.debug('兑换卡券: 检查用户登录状态');
+      
+      // 打印当前store状态
+      const currentState = membershipStore.getState();
+      console.debug('兑换卡券: 当前store状态', { 
+        hasMembershipInfo: !!currentState.membershipInfo,
+        membershipInfo: currentState.membershipInfo 
+      });
+      
       const result = await membershipStore.getState().redeemCoupon(couponCode);
       console.debug('兑换卡券: 兑换结果', JSON.stringify(result, null, 2));
       
@@ -93,7 +111,9 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
           style={styles.input}
           value={couponCode}
           onChangeText={(text) => {
-            setCouponCode(text);
+            // 自动转换为大写并移除非字母数字字符
+            const formattedText = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            setCouponCode(formattedText);
             setError(null);
           }}
           placeholder="请输入卡券码"
@@ -101,6 +121,7 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
           editable={!isRedeeming}
           autoCapitalize="characters"
           autoCorrect={false}
+          maxLength={12} // 限制最大长度为12位
         />
       </View>
       

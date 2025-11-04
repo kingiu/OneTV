@@ -48,12 +48,44 @@ export const useMembershipStore = create<MembershipStore>((set, get) => ({
       const cachedInfo = await AsyncStorage.getItem('membershipInfo');
       if (cachedInfo) {
         const parsedInfo = JSON.parse(cachedInfo);
-        console.debug('从缓存加载会员信息成功');
-        set({ membershipInfo: parsedInfo, isLoading: false });
+        console.debug('从缓存加载会员信息成功', {
+          hasCacheTimestamp: !!parsedInfo._cacheTimestamp,
+          tier: parsedInfo.tier,
+          status: parsedInfo.status
+        });
+        
+        // 检查缓存是否过期（超过24小时）
+        const cacheTimestamp = parsedInfo._cacheTimestamp || 0;
+        const now = Date.now();
+        const cacheAge = now - cacheTimestamp;
+        const cacheExpired = cacheTimestamp > 0 && cacheAge > 24 * 60 * 60 * 1000; // 24小时
+        
+        console.debug('缓存信息检查', {
+          cacheAge: `${Math.floor(cacheAge / (1000 * 60))} 分钟`,
+          cacheExpired
+        });
+        
+        // 即使缓存过期，也先加载缓存数据以提高用户体验
+        // 但设置isLoading为true，以便后台刷新最新数据
+        set({ 
+          membershipInfo: parsedInfo, 
+          isLoading: cacheExpired // 缓存过期时标记为加载中
+        });
+        
+        // 如果缓存过期，触发后台刷新
+        if (cacheExpired) {
+          console.debug('缓存已过期，触发后台刷新');
+          // 不等待刷新完成，让UI先显示缓存数据
+          get().fetchMembershipInfo().catch(err => {
+            console.debug('后台刷新会员信息失败', err);
+          });
+        }
+      } else {
+        console.debug('缓存中没有会员信息');
       }
-      console.debug('缓存中没有会员信息');
     } catch (error) {
       console.error('从缓存加载会员信息失败:', error);
+      set({ isLoading: false }); // 确保加载状态被重置
     }
   },
   
@@ -210,27 +242,107 @@ export const useMembershipStore = create<MembershipStore>((set, get) => ({
   
   // 兑换优惠券
   redeemCoupon: async (code: string) => {
+    console.debug('兑换卡券: 开始处理兑换请求', { code });
     try {
+      // 输入验证
+      if (!code || typeof code !== 'string' || code.trim().length !== 12) {
+        console.debug('兑换卡券: 无效的卡券码格式', { code, length: code?.length });
+        return { success: false, message: '卡券码格式不正确，请输入12位字母数字组合' };
+      }
+
+      console.debug('兑换卡券: 检查认证状态');
       const authCookies = await AsyncStorage.getItem('authCookies');
+      console.debug('兑换卡券: 认证状态检查结果', { hasAuthCookies: !!authCookies });
+      
       if (!authCookies) {
+        console.debug('兑换卡券: 用户未登录，兑换失败');
         return { success: false, message: '请先登录' };
       }
       
+      // 清除缓存以确保获取最新数据
+      console.debug('兑换卡券: 清除会员信息缓存');
+      try {
+        await AsyncStorage.removeItem('membershipInfo');
+        await AsyncStorage.removeItem('cached_membership');
+        console.debug('兑换卡券: 缓存清除成功');
+      } catch (cacheError) {
+        console.debug('兑换卡券: 清除缓存时出错', cacheError);
+        // 即使缓存清除失败，也继续执行兑换流程
+      }
+      
       // 使用API服务兑换优惠券
+      console.debug('兑换卡券: 调用API兑换卡券');
       const response = await api.redeemCoupon(code);
       console.debug('兑换卡券: API响应', JSON.stringify(response, null, 2));
       
       if (response.membership) {
-        // 更新会员信息
-        set({ membershipInfo: response.membership });
-        await AsyncStorage.setItem('membershipInfo', JSON.stringify(response.membership));
-        return { success: true, message: '卡券兑换成功！' };
+        console.debug('兑换卡券: API返回会员信息，更新store');
+        // 增强的会员信息验证
+        const membership = response.membership;
+        const isMembershipValid = 
+          membership && 
+          typeof membership === 'object' &&
+          membership.tier && 
+          membership.status &&
+          typeof membership.tier === 'string' &&
+          typeof membership.status === 'string';
+          
+        console.debug('兑换卡券: 会员信息验证结果', { 
+          isMembershipValid, 
+          tier: membership?.tier,
+          status: membership?.status
+        });
+        
+        if (isMembershipValid) {
+          // 规范化会员数据
+          const normalizedMembership = {
+            ...membership,
+            tier: String(membership.tier), // 确保tier是字符串
+            status: String(membership.status), // 确保status是字符串
+            isActive: membership.status.toLowerCase() === 'active' || 
+                     membership.isActive === true
+          };
+          
+          // 更新会员信息
+          set({ membershipInfo: normalizedMembership });
+          
+          // 缓存更新后的会员信息
+          try {
+            await AsyncStorage.setItem('membershipInfo', JSON.stringify(normalizedMembership));
+            console.debug('兑换卡券: 会员信息更新和缓存成功');
+          } catch (cacheError) {
+            console.error('兑换卡券: 会员信息缓存失败', cacheError);
+            // 缓存失败不影响兑换结果
+          }
+          
+          // 根据会员等级返回不同的成功消息
+          const tierText = get().getMembershipTierText();
+          const successMessage = tierText === '未激活' 
+            ? '卡券兑换成功！' 
+            : `卡券兑换成功！您现在是${tierText}。`;
+            
+          return { success: true, message: successMessage };
+        } else {
+          console.warn('兑换卡券: 返回的会员信息不完整或无效', response.membership);
+          return { success: false, message: '兑换成功，但会员信息异常，请刷新页面重试' };
+        }
       } else {
+        console.debug('兑换卡券: API未返回会员信息');
         // 检查响应中是否有错误信息
         if (response && (response as any).message) {
-          return { success: false, message: (response as any).message };
+          const errorMsg = (response as any).message;
+          console.debug('兑换卡券: API返回错误信息', errorMsg);
+          // 提供更友好的错误信息
+          if (errorMsg.includes('invalid') || errorMsg.includes('无效')) {
+            return { success: false, message: '卡券码无效，请检查后重新输入' };
+          } else if (errorMsg.includes('expired') || errorMsg.includes('过期')) {
+            return { success: false, message: '卡券已过期' };
+          } else if (errorMsg.includes('used') || errorMsg.includes('已使用')) {
+            return { success: false, message: '卡券已被使用' };
+          }
+          return { success: false, message: errorMsg };
         }
-        return { success: false, message: '卡券兑换失败' };
+        return { success: false, message: '卡券兑换失败，请稍后重试' };
       }
     } catch (error) {
       console.error('兑换卡券失败:', error);
@@ -240,6 +352,8 @@ export const useMembershipStore = create<MembershipStore>((set, get) => ({
           return { success: false, message: '网络请求失败，请检查网络连接' };
         } else if (error.message.includes('UNAUTHORIZED')) {
           return { success: false, message: '认证失败，请重新登录' };
+        } else {
+          return { success: false, message: `兑换失败: ${error.message}` };
         }
       }
       return { success: false, message: '兑换卡券失败，请稍后重试' };
