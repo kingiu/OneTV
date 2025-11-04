@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { useAuthStore } from '../stores/authStore';
 import MembershipInfoCard from '../components/membership/MembershipInfoCard';
 import CouponRedeemCard from '../components/membership/CouponRedeemCard';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
-import { validateMembershipInfo, mapLunaToStandardTier } from '../utils/membershipUtils';
+import { validateMembershipInfo, mapLunaToStandardTier, MembershipNames } from '../utils/membershipUtils';
 
 export default function MembershipScreen() {
   console.debug('MembershipScreen 渲染');
@@ -41,21 +41,184 @@ export default function MembershipScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // 用于跟踪页面是否已经初始化加载过
+  const hasInitialLoaded = useRef(false);
+
   useEffect(() => {
-    // 页面加载时获取会员信息
-    if (isLoggedIn) {
+    // 页面首次加载时获取会员信息
+    if (isLoggedIn && !hasInitialLoaded.current) {
+      hasInitialLoaded.current = true;
       loadMembershipInfo();
     }
   }, [isLoggedIn, fetchMembershipInfo]);
 
+  // 监听页面焦点变化，当页面重新获得焦点时自动核对会员信息
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const handleFocus = () => {
+      console.debug('页面获得焦点，自动核对会员信息...');
+      // 当页面获得焦点时自动核对，但不显示刷新指示器
+      checkAndUpdateMembershipInfo().catch(err => {
+        console.error('自动核对会员信息失败:', err);
+        // 自动核对失败不显示错误，避免干扰用户体验
+      });
+    };
+
+    // 添加焦点事件监听器
+    if (Platform.OS === 'web') {
+      window.addEventListener('focus', handleFocus);
+    } else {
+      // React Native 环境中使用 AppState 监听应用状态变化
+      import('react-native').then(({ AppState }) => {
+        const subscription = AppState.addEventListener('change', (nextAppState) => {
+          if (nextAppState === 'active') {
+            handleFocus();
+          }
+        });
+
+        return () => {
+          subscription.remove();
+        };
+      });
+    }
+
+    // 清理监听器
+    return () => {
+      if (Platform.OS === 'web') {
+        window.removeEventListener('focus', handleFocus);
+      }
+    };
+  }, [isLoggedIn, membershipInfo]); // 依赖 membershipInfo 以确保使用最新的信息进行比较
+
   const loadMembershipInfo = async () => {
+    console.log('加载会员信息');
     setLocalError(null);
     try {
+      // 直接调用store的fetchMembershipInfo方法，它现在包含完整的缓存清除逻辑
       await fetchMembershipInfo();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '获取会员信息失败';
       setLocalError(errorMessage);
       console.error('获取会员信息失败:', err);
+    }
+  };
+
+  // 核对会员信息并在不一致时更新的函数
+  const checkAndUpdateMembershipInfo = async () => {
+    if (!isLoggedIn || !membershipInfo) return;
+    
+    try {
+      // 在刷新前保存当前会员信息用于比较
+      const previousMembershipInfo = { ...membershipInfo };
+      // 获取当前映射后的标准化等级
+      const previousStandardTier = mapLunaToStandardTier(previousMembershipInfo.tier);
+      
+      console.debug('开始核对会员信息...');
+      await fetchMembershipInfo();
+      
+      // 核对完成后，检查是否有变更
+      if (membershipInfo && previousMembershipInfo) {
+        // 获取新的映射后的标准化等级
+        const newStandardTier = mapLunaToStandardTier(membershipInfo.tier);
+        
+        // 扩展比较字段，确保捕获所有重要变更
+        const hasTierChanged = previousMembershipInfo.tier !== membershipInfo.tier;
+        const hasStandardTierChanged = previousStandardTier !== newStandardTier; // 增加对映射后等级的比较
+        const hasStatusChanged = previousMembershipInfo.status !== membershipInfo.status;
+        const hasIsActiveChanged = previousMembershipInfo.isActive !== membershipInfo.isActive;
+        const hasExpireTimeChanged = previousMembershipInfo.expireTime !== membershipInfo.expireTime;
+        const hasDaysRemainingChanged = previousMembershipInfo.daysRemaining !== membershipInfo.daysRemaining;
+        const hasLastRenewTimeChanged = previousMembershipInfo.lastRenewTime !== membershipInfo.lastRenewTime;
+        
+        // 检查是否有任何重要字段发生变更
+        const hasAnyChange = hasTierChanged || hasStandardTierChanged || hasStatusChanged || hasIsActiveChanged || 
+                           hasExpireTimeChanged || hasDaysRemainingChanged || hasLastRenewTimeChanged;
+        
+        // 如果有重要信息变更，记录详细日志并更新数据
+        if (hasAnyChange) {
+          // 创建变更详情对象用于日志记录
+          const changes = {
+            tierChanged: hasTierChanged,
+            standardTierChanged: hasStandardTierChanged,
+            statusChanged: hasStatusChanged,
+            isActiveChanged: hasIsActiveChanged,
+            expireTimeChanged: hasExpireTimeChanged,
+            daysRemainingChanged: hasDaysRemainingChanged,
+            lastRenewTimeChanged: hasLastRenewTimeChanged,
+            previousData: {
+              tier: previousMembershipInfo.tier,
+              standardTier: previousStandardTier,
+              status: previousMembershipInfo.status,
+              isActive: previousMembershipInfo.isActive,
+              expireTime: previousMembershipInfo.expireTime,
+              daysRemaining: previousMembershipInfo.daysRemaining,
+              lastRenewTime: previousMembershipInfo.lastRenewTime
+            },
+            newData: {
+              tier: membershipInfo.tier,
+              standardTier: newStandardTier,
+              status: membershipInfo.status,
+              isActive: membershipInfo.isActive,
+              expireTime: membershipInfo.expireTime,
+              daysRemaining: membershipInfo.daysRemaining,
+              lastRenewTime: membershipInfo.lastRenewTime
+            }
+          };
+          
+          console.info('会员信息数据不一致，已自动更新:', changes);
+          
+          // 构建用户友好的变更消息
+          let changeMessage = '您的会员信息已更新:\n\n';
+          
+          // 优先显示标准化等级变化（用户友好的等级名称）
+          if (hasStandardTierChanged) {
+            const previousTierName = MembershipNames[previousStandardTier] || previousMembershipInfo.tier;
+            const newTierName = MembershipNames[newStandardTier] || membershipInfo.tier;
+            changeMessage += `会员等级: ${previousTierName} → ${newTierName}\n`;
+          } else if (hasTierChanged) {
+            // 如果标准化等级没变但原始tier变了，也显示
+            changeMessage += `会员等级: ${previousMembershipInfo.tier} → ${membershipInfo.tier}\n`;
+          }
+          if (hasStatusChanged) {
+            changeMessage += `会员状态: ${previousMembershipInfo.status} → ${membershipInfo.status}\n`;
+          }
+          if (hasIsActiveChanged) {
+            const previousActive = previousMembershipInfo.isActive ? '激活' : '未激活';
+            const newActive = membershipInfo.isActive ? '激活' : '未激活';
+            changeMessage += `激活状态: ${previousActive} → ${newActive}\n`;
+          }
+          if (hasDaysRemainingChanged) {
+            changeMessage += `剩余天数: ${previousMembershipInfo.daysRemaining || 'N/A'} → ${membershipInfo.daysRemaining || 'N/A'}\n`;
+          }
+          
+          // 在所有环境下都显示重要变更的提示，但优化用户体验
+          if (!refreshing) {
+            // 对于生产环境，在等级变更或激活状态变更时显示提示
+            const shouldShowAlert = __DEV__ || hasStandardTierChanged || hasTierChanged || hasIsActiveChanged;
+            if (shouldShowAlert) {
+              Alert.alert(
+                '会员信息已更新',
+                changeMessage,
+                [{ text: '确定', style: 'default' }],
+                { cancelable: true }
+              );
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('核对会员信息失败:', err);
+      
+      // 提供更详细的错误信息
+      if (err instanceof Error) {
+        console.error(`核对失败详情: ${err.name}: ${err.message}`);
+        if (err.stack) {
+          console.error('错误堆栈:', err.stack);
+        }
+      }
+      
+      throw err;
     }
   };
 
@@ -67,6 +230,7 @@ export default function MembershipScreen() {
     setRefreshing(true);
     setLocalError(null);
     try {
+      // 直接调用store的fetchMembershipInfo方法
       await fetchMembershipInfo();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : '刷新失败，请重试';

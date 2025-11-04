@@ -61,6 +61,16 @@ export const useMembershipStore = create<MembershipStore>((set, get) => ({
   fetchMembershipInfo: async (retryCount = 0) => {
     set({ isLoading: true, error: null });
     try {
+      // 增强: 在获取会员信息前清除所有相关缓存
+      try {
+        // 清除store的缓存
+        await AsyncStorage.removeItem('membershipInfo');
+        // 清除API层的缓存
+        await AsyncStorage.removeItem('cached_membership');
+        console.debug('已清除所有会员信息缓存');
+      } catch (cacheError) {
+        console.debug('清除缓存时出错', cacheError);
+      }
       // 检查是否已登录
       const authCookies = await AsyncStorage.getItem('authCookies');
       console.debug('获取会员信息: 检查认证状态', { hasAuthCookies: !!authCookies });
@@ -177,20 +187,19 @@ export const useMembershipStore = create<MembershipStore>((set, get) => ({
   
   // 重复定义的实现已删除
   
-  // 更新会员信息
+  // 更新会员信息 - 放宽验证，确保任何有效格式的会员信息都能被接受
   updateMembershipInfo: (info) => {
-    // 验证会员信息
     if (info) {
+      // 只检查基本完整性，不再要求tier必须是MembershipTier枚举的值
       const isComplete = !!(info.tier && info.status);
-      const isValidTier = Object.values(MembershipTier).includes(info.tier as MembershipTier);
       
-      if (isComplete && isValidTier) {
+      if (isComplete) {
         console.debug('更新会员信息', info);
         set({ membershipInfo: info });
         // 缓存到本地存储
         AsyncStorage.setItem('membershipInfo', JSON.stringify(info));
       } else {
-        console.warn('尝试更新无效的会员信息', info);
+        console.warn('尝试更新不完整的会员信息', info);
       }
     } else {
       console.debug('清除会员信息');
