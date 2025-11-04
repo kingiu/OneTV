@@ -1,8 +1,8 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import * as SplashScreen from "expo-splash-screen";
 import { Platform, View, StyleSheet } from "react-native";
 import Toast from "react-native-toast-message";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -68,8 +68,8 @@ export default function RootLayout() {
   }, [loaded, lastCheckTime, checkForUpdate]);
 
   useEffect(() => {
-    // 只有在非手机端才启动远程控制服务器
-    if (remoteInputEnabled && responsiveConfig.deviceType !== "mobile") {
+    // 只有在非手机端才启动远程控制服务器，并且只在非web平台启动
+    if (remoteInputEnabled && responsiveConfig.deviceType !== "mobile" && Platform.OS !== 'web') {
       startServer();
     } else {
       stopServer();
@@ -92,6 +92,8 @@ export default function RootLayout() {
             <Stack.Screen name="live" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
             <Stack.Screen name="favorites" options={{ headerShown: false }} />
+            <Stack.Screen name="membership" options={{ headerShown: false }} />
+            <Stack.Screen name="debug-membership" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
           </Stack>
         </View>

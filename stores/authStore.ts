@@ -1,9 +1,10 @@
 import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api } from "@/services/api";
+import { api } from "../services/api";
 import { useSettingsStore } from "./settingsStore";
 import Toast from "react-native-toast-message";
-import Logger from "@/utils/Logger";
+import Logger from "../utils/Logger";
+import { membershipStore } from "./membershipStore";
 
 const logger = Logger.withTag('AuthStore');
 
@@ -16,7 +17,8 @@ interface AuthState {
   logout: () => Promise<void>;
 }
 
-const useAuthStore = create<AuthState>((set) => ({
+// 创建认证状态store
+export const useAuthStore = create<AuthState>((set) => ({
   isLoggedIn: false,
   isLoginModalVisible: false,
   showLoginModal: () => set({ isLoginModalVisible: true }),
@@ -24,6 +26,7 @@ const useAuthStore = create<AuthState>((set) => ({
   checkLoginStatus: async (apiBaseUrl?: string) => {
     if (!apiBaseUrl) {
       set({ isLoggedIn: false, isLoginModalVisible: false });
+      membershipStore.getState().clearMembershipInfo();
       return;
     }
     try {
@@ -62,18 +65,23 @@ const useAuthStore = create<AuthState>((set) => ({
         if (serverConfig && serverConfig.StorageType === "localstorage") {
           const loginResult = await api.login().catch(() => {
             set({ isLoggedIn: false, isLoginModalVisible: true });
+            membershipStore.getState().clearMembershipInfo();
           });
           if (loginResult && loginResult.ok) {
             set({ isLoggedIn: true });
+            await membershipStore.getState().fetchMembershipInfo();
           }
         } else {
           set({ isLoggedIn: false, isLoginModalVisible: true });
+          membershipStore.getState().clearMembershipInfo();
         }
       } else {
         set({ isLoggedIn: true, isLoginModalVisible: false });
+        await membershipStore.getState().fetchMembershipInfo();
       }
     } catch (error) {
       logger.error("Failed to check login status:", error);
+      membershipStore.getState().clearMembershipInfo();
       if (error instanceof Error && error.message === "UNAUTHORIZED") {
         set({ isLoggedIn: false, isLoginModalVisible: true });
       } else {
@@ -85,6 +93,7 @@ const useAuthStore = create<AuthState>((set) => ({
     try {
       await api.logout();
       set({ isLoggedIn: false, isLoginModalVisible: true });
+      membershipStore.getState().clearMembershipInfo();
     } catch (error) {
       logger.error("Failed to logout:", error);
     }
@@ -92,3 +101,6 @@ const useAuthStore = create<AuthState>((set) => ({
 }));
 
 export default useAuthStore;
+// 为了兼容现有代码，保留旧的导出
+const authStore = useAuthStore;
+export { authStore };

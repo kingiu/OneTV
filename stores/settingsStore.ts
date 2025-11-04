@@ -3,6 +3,7 @@ import { SettingsManager } from "@/services/storage";
 import { api, ServerConfig } from "@/services/api";
 import { storageConfig } from "@/services/storageConfig";
 import Logger from "@/utils/Logger";
+import { useRemoteControlStore } from "@/stores/remoteControlStore";
 
 const logger = Logger.withTag('SettingsStore');
 
@@ -75,7 +76,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   setApiBaseUrl: (url) => set({ apiBaseUrl: url }),
   setM3uUrl: (url) => set({ m3uUrl: url }),
-  setRemoteInputEnabled: (enabled) => set({ remoteInputEnabled: enabled }),
+  setRemoteInputEnabled: (enabled) => {
+    set({ remoteInputEnabled: enabled });
+    // 根据设置启动或停止远程控制服务器
+    const remoteControlActions = useRemoteControlStore.getState();
+    if (enabled) {
+      remoteControlActions.startServer().catch(error => {
+        logger.error("Failed to start remote control server:", error);
+      });
+    } else {
+      remoteControlActions.stopServer();
+    }
+  },
   setVideoSource: (config) => set({ videoSource: config }),
   saveSettings: async () => {
     const { apiBaseUrl, m3uUrl, remoteInputEnabled, videoSource } = get();

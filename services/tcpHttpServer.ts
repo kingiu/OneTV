@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import TcpSocket from 'react-native-tcp-socket';
 import NetInfo from '@react-native-community/netinfo';
 import Logger from '@/utils/Logger';
@@ -99,6 +100,17 @@ class TCPHttpServer {
   }
 
   public async start(): Promise<string> {
+    // 确保之前的服务器实例已关闭
+    if (this.server && !this.isRunning) {
+      try {
+        this.server.close();
+        logger.debug('[TCPHttpServer] Old server instance closed');
+      } catch (error) {
+        logger.info('[TCPHttpServer] Error closing old server:', error);
+      }
+      this.server = null;
+    }
+    
     const netState = await NetInfo.fetch();
     let ipAddress: string | null = null;
     
@@ -115,8 +127,32 @@ class TCPHttpServer {
       return `http://${ipAddress}:${PORT}`;
     }
 
+    // Web平台不支持TCP服务器
+    if (Platform.OS === 'web') {
+      logger.error('[TCPHttpServer] TCP server not supported on web platform');
+      throw new Error('Web平台不支持TCP服务器');
+    }
+
     return new Promise((resolve, reject) => {
       try {
+        // 检查TcpSocket是否可用
+        if (!TcpSocket || typeof TcpSocket.createServer !== 'function') {
+          logger.error('[TCPHttpServer] TcpSocket is not available or properly initialized');
+          reject(new Error('TCP服务器初始化失败'));
+          return;
+        }
+        
+        // 确保在创建新服务器前，server为null
+        if (this.server) {
+          try {
+            this.server.close();
+          } catch (error) {
+            logger.info('[TCPHttpServer] Error closing previous server:', error);
+          }
+          this.server = null;
+        }
+        
+        // 创建服务器实例
         this.server = TcpSocket.createServer((socket: TcpSocket.Socket) => {
           logger.debug('[TCPHttpServer] Client connected');
           
@@ -166,6 +202,20 @@ class TCPHttpServer {
           });
         });
 
+        // 确保server不为null再调用listen
+        if (!this.server) {
+          logger.error('[TCPHttpServer] Server instance is null');
+          reject(new Error('服务器实例创建失败'));
+          return;
+        }
+        
+        // 添加错误处理，确保listen方法存在并且是函数
+        if (!this.server.listen || typeof this.server.listen !== 'function') {
+          logger.error('[TCPHttpServer] Server listen method is not available or not a function');
+          reject(new Error('服务器监听方法不可用'));
+          return;
+        }
+        
         this.server.listen({ port: PORT, host: '0.0.0.0' }, () => {
           logger.debug(`[TCPHttpServer] Server listening on ${ipAddress}:${PORT}`);
           this.isRunning = true;
@@ -175,7 +225,12 @@ class TCPHttpServer {
         this.server.on('error', (error: Error) => {
           logger.info('[TCPHttpServer] Server error:', error);
           this.isRunning = false;
-          reject(error);
+          // 针对端口占用的错误提供更友好的消息
+          if (error.message && error.message.includes('EADDRINUSE')) {
+            reject(new Error('端口已被占用，请稍后再试或重启应用。'));
+          } else {
+            reject(error);
+          }
         });
 
       } catch (error) {
@@ -186,11 +241,16 @@ class TCPHttpServer {
   }
 
   public stop() {
-    if (this.server && this.isRunning) {
-      this.server.close();
-      this.server = null;
+    try {
+      if (this.server) {
+        this.server.close();
+        logger.debug('[TCPHttpServer] Server stopped');
+      }
+    } catch (error) {
+      logger.info('[TCPHttpServer] Error stopping server:', error);
+    } finally {
       this.isRunning = false;
-      logger.debug('[TCPHttpServer] Server stopped');
+      this.server = null;
     }
   }
 

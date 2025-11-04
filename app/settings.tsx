@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, Alert, Platform } from "react-native";
 import { useTVEventHandler } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router"; // 在顶部导入useRouter
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { StyledButton } from "@/components/StyledButton";
@@ -35,6 +36,7 @@ function isSectionItem(
 }
 
 export default function SettingsScreen() {
+  const router = useRouter(); // 使用useRouter hook
   const { loadSettings, saveSettings, setApiBaseUrl, setM3uUrl } = useSettingsStore();
   const { lastMessage, targetPage, clearMessage } = useRemoteControlStore();
   const backgroundColor = useThemeColor({}, "background");
@@ -197,6 +199,25 @@ export default function SettingsScreen() {
         />
       ),
       key: "livestream",
+    },
+    {
+      component: (
+        <View style={{ padding: 16, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
+          <ThemedText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+            会员信息调试
+          </ThemedText>
+          <StyledButton
+            text="查看会员信息"
+            onPress={() => {
+              // 正确使用router对象，避免Invalid hook call错误
+              router.push('/debug-membership');
+            }}
+            variant="primary"
+            style={{ marginTop: 10 }}
+          />
+        </View>
+      ),
+      key: "membership-debug",
     },
     Platform.OS === "android" && {
       component: <UpdateSection />,

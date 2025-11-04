@@ -34,10 +34,12 @@ describe("ResponsiveStyles", () => {
   const mockConfig: ResponsiveConfig = {
     deviceType: "mobile",
     spacing: 16,
-    safeAreaInsets: { top: 0, bottom: 0, left: 0, right: 0 },
-    windowWidth: 375,
-    windowHeight: 812,
-    isLandscape: false,
+    columns: 2,
+    cardWidth: 120,
+    cardHeight: 160,
+    isPortrait: true,
+    screenWidth: 375,
+    screenHeight: 812,
   };
 
   beforeEach(() => {
@@ -88,6 +90,12 @@ describe("ResponsiveStyles", () => {
         ...mockConfig,
         deviceType: "mobile",
         spacing: 16,
+        columns: 2,
+        cardWidth: 120,
+        cardHeight: 160,
+        isPortrait: true,
+        screenWidth: 375,
+        screenHeight: 812,
       };
 
       mockedDeviceUtils.getMinTouchTargetSize.mockReturnValue(44);
@@ -120,6 +128,12 @@ describe("ResponsiveStyles", () => {
         ...mockConfig,
         deviceType: "tablet",
         spacing: 20,
+        columns: 3,
+        cardWidth: 140,
+        cardHeight: 180,
+        isPortrait: true,
+        screenWidth: 768,
+        screenHeight: 1024,
       };
 
       mockedDeviceUtils.getMinTouchTargetSize.mockReturnValue(48);
@@ -136,6 +150,12 @@ describe("ResponsiveStyles", () => {
         ...mockConfig,
         deviceType: "tv",
         spacing: 24,
+        columns: 6,
+        cardWidth: 160,
+        cardHeight: 200,
+        isPortrait: false,
+        screenWidth: 1920,
+        screenHeight: 1080,
       };
 
       mockedDeviceUtils.getMinTouchTargetSize.mockReturnValue(60);
@@ -152,6 +172,12 @@ describe("ResponsiveStyles", () => {
         ...mockConfig,
         deviceType: "tv",
         spacing: 24,
+        columns: 6,
+        cardWidth: 160,
+        cardHeight: 200,
+        isPortrait: false,
+        screenWidth: 1920,
+        screenHeight: 1080,
       };
 
       const styles = getCommonResponsiveStyles(tvConfig);
@@ -164,6 +190,12 @@ describe("ResponsiveStyles", () => {
         ...mockConfig,
         deviceType: "mobile",
         spacing: 16,
+        columns: 2,
+        cardWidth: 120,
+        cardHeight: 160,
+        isPortrait: true,
+        screenWidth: 375,
+        screenHeight: 812,
       };
 
       const styles = getCommonResponsiveStyles(mobileConfig);

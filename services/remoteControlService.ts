@@ -124,12 +124,19 @@ class RemoteControlService {
     logger.debug("[RemoteControl] Attempting to start server...");
 
     try {
+      // 先尝试停止可能存在的旧实例
+      if (this.httpServer && this.httpServer.getIsRunning()) {
+        logger.debug("[RemoteControl] Stopping existing server before restart...");
+        this.httpServer.stop();
+      }
+      
       const url = await this.httpServer.start();
       logger.debug(`[RemoteControl] Server started successfully at: ${url}`);
       return url;
     } catch (error) {
-      logger.info("[RemoteControl] Failed to start server:", error);
-      throw new Error(error instanceof Error ? error.message : "Failed to start server");
+      const errorMessage = error instanceof Error ? error.message : "启动失败";
+      logger.info("[RemoteControl] Failed to start server:", errorMessage);
+      throw new Error(errorMessage);
     }
   }
 

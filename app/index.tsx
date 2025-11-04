@@ -6,7 +6,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { api } from "@/services/api";
 import VideoCard from "@/components/VideoCard";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Search, Settings, LogOut, Heart } from "lucide-react-native";
+import { Search, Settings, LogOut, Heart, Diamond } from "lucide-react-native";
 import { StyledButton } from "@/components/StyledButton";
 import useHomeStore, { RowItem, Category } from "@/stores/homeStore";
 import useAuthStore from "@/stores/authStore";
@@ -16,6 +16,9 @@ import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
 import { useApiConfig, getApiConfigErrorMessage } from "@/hooks/useApiConfig";
 import { Colors } from "@/constants/Colors";
+import DebugOverlay from "@/components/DebugOverlay";
+import { DEBUG_MODE, FEATURE_FLAGS } from "@/constants/DebugConfig";
+import { debug } from "@/utils/debugUtils";
 
 const LOAD_MORE_THRESHOLD = 200;
 
@@ -220,6 +223,9 @@ export default function HomeScreen() {
           <StyledButton style={dynamicStyles.iconButton} onPress={() => router.push("/settings")} variant="ghost">
             <Settings color={colorScheme === "dark" ? "white" : "black"} size={24} />
           </StyledButton>
+          <StyledButton style={dynamicStyles.iconButton} onPress={() => router.push("/membership")} variant="ghost">
+            <Diamond color={"#FFD700"} size={24} />
+          </StyledButton>
           {isLoggedIn && (
             <StyledButton style={dynamicStyles.iconButton} onPress={logout} variant="ghost">
               <LogOut color={colorScheme === "dark" ? "white" : "black"} size={24} />
@@ -372,10 +378,30 @@ export default function HomeScreen() {
     </ThemedView>
   );
 
-  // 根据设备类型决定是否包装在响应式导航中
-  if (deviceType === "tv") {
-    return content;
-  }
+  // 在组件挂载时记录调试信息
+  useEffect(() => {
+    if (DEBUG_MODE) {
+      debug(`HomeScreen 已加载 - 设备类型: ${deviceType}`, "APP_INIT");
+      debug(`调试特性: API日志=${FEATURE_FLAGS.ENABLE_API_LOGGING}, 性能监控=${FEATURE_FLAGS.ENABLE_PERFORMANCE_MONITORING}`, "APP_INIT");
+    }
+  }, []);
 
-  return <ResponsiveNavigation>{content}</ResponsiveNavigation>;
+  // 渲染内容
+  const renderContent = () => {
+    const contentWithDebug = (
+      <>
+        {content}
+        <DebugOverlay position="top-left" />
+      </>
+    );
+
+    // 根据设备类型决定是否包装在响应式导航中
+    if (deviceType === "tv") {
+      return contentWithDebug;
+    }
+
+    return <ResponsiveNavigation>{contentWithDebug}</ResponsiveNavigation>;
+  };
+
+  return renderContent();
 }
