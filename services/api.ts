@@ -172,6 +172,14 @@ export class API {
     if (cookies) {
       await AsyncStorage.setItem("authCookies", cookies);
     }
+    
+    // 清除会员信息缓存，确保登录后获取最新会员状态
+    try {
+      await AsyncStorage.removeItem('cached_membership');
+      console.debug('API: 登录后清除会员信息缓存');
+    } catch (error) {
+      console.debug('API: 清除缓存失败', error);
+    }
 
     return response.json();
   }
@@ -181,6 +189,15 @@ export class API {
       method: "POST",
     });
     await AsyncStorage.setItem("authCookies", '');
+    
+    // 清除会员信息缓存，确保登出后清除会员状态
+    try {
+      await AsyncStorage.removeItem('cached_membership');
+      console.debug('API: 登出后清除会员信息缓存');
+    } catch (error) {
+      console.debug('API: 清除缓存失败', error);
+    }
+    
     return response.json();
   }
 
@@ -295,13 +312,25 @@ export class API {
     console.debug('API: 开始获取会员信息');
     
     try {
-      // 增强: 先尝试从缓存获取
+      // 增强: 先尝试从缓存获取，但添加过期检查
       try {
         const cached = await AsyncStorage.getItem('cached_membership');
         if (cached) {
           console.debug('API: 从缓存获取会员信息');
           const parsed = JSON.parse(cached);
-          return { membership: parsed };
+          
+          // 检查缓存是否过期（24小时）
+          const cacheTimestamp = parsed._cacheTimestamp || 0;
+          const now = Date.now();
+          const isExpired = now - cacheTimestamp > 24 * 60 * 60 * 1000; // 24小时过期
+          
+          if (!isExpired) {
+            console.debug('API: 缓存有效，返回缓存数据');
+            return { membership: parsed };
+          } else {
+            console.debug('API: 缓存已过期，需要重新获取');
+            await AsyncStorage.removeItem('cached_membership');
+          }
         }
       } catch (cacheError) {
         console.debug('API: 缓存读取失败，继续API调用', cacheError);
@@ -356,10 +385,15 @@ export class API {
         // 如果存在LunaTV会员数据，进行类型映射
         if (lunaMembership) {
           const result = await this._mapLunaTVMembership(lunaMembership);
-          // 缓存结果
+          // 缓存结果，添加时间戳
           if (result.membership) {
             try {
-              await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
+              // 添加缓存时间戳，用于后续过期检查
+              const cachedWithTimestamp = {
+                ...result.membership,
+                _cacheTimestamp: Date.now()
+              };
+              await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
             } catch (cacheError) {
               console.debug('API: 缓存写入失败', cacheError);
             }
@@ -375,10 +409,15 @@ export class API {
       if (data.tierId || data.tier || data.level || data.memberLevel) {
         console.debug('API: 检测到直接会员数据格式');
         const result = await this._mapLunaTVMembership(data);
-        // 缓存结果
+        // 缓存结果，添加时间戳
         if (result.membership) {
           try {
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
+            // 添加缓存时间戳，用于后续过期检查
+            const cachedWithTimestamp = {
+              ...result.membership,
+              _cacheTimestamp: Date.now()
+            };
+            await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
           } catch (cacheError) {
             console.debug('API: 缓存写入失败', cacheError);
           }
@@ -390,10 +429,15 @@ export class API {
       if (data.data && data.data.user) {
         console.debug('API: 检测到data.user格式');
         const result = await this._mapLunaTVMembership(data.data.user);
-        // 缓存结果
+        // 缓存结果，添加时间戳
         if (result.membership) {
           try {
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
+            // 添加缓存时间戳，用于后续过期检查
+            const cachedWithTimestamp = {
+              ...result.membership,
+              _cacheTimestamp: Date.now()
+            };
+            await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
           } catch (cacheError) {
             console.debug('API: 缓存写入失败', cacheError);
           }
@@ -405,10 +449,15 @@ export class API {
       if (data.membership) {
         console.debug('API: 检测到直接的membership字段');
         const result = await this._mapLunaTVMembership(data.membership);
-        // 缓存结果
+        // 缓存结果，添加时间戳
         if (result.membership) {
           try {
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
+            // 添加缓存时间戳，用于后续过期检查
+            const cachedWithTimestamp = {
+              ...result.membership,
+              _cacheTimestamp: Date.now()
+            };
+            await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
           } catch (cacheError) {
             console.debug('API: 缓存写入失败', cacheError);
           }
@@ -919,10 +968,15 @@ export class API {
         // 使用统一的映射方法处理会员数据
         const result = await this._mapLunaTVMembership(membershipData);
         
-        // 缓存结果
+        // 缓存结果，添加时间戳
         if (result.membership) {
           try {
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
+            // 添加缓存时间戳，用于后续过期检查
+            const cachedWithTimestamp = {
+              ...result.membership,
+              _cacheTimestamp: Date.now()
+            };
+            await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
             console.debug('API: 卡券兑换后缓存会员信息');
           } catch (cacheError) {
             console.debug('API: 缓存写入失败', cacheError);
