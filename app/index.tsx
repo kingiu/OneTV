@@ -6,7 +6,8 @@ import { ThemedText } from "@/components/ThemedText";
 import { api } from "@/services/api";
 import VideoCard from "@/components/VideoCard";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Search, Settings, LogOut, Heart, Diamond } from "lucide-react-native";
+import { Search, Settings, LogOut, Heart, Crown } from "lucide-react-native";
+import MembershipIcon from "../assets/images/membership-icon.svg";
 import { StyledButton } from "@/components/StyledButton";
 import useHomeStore, { RowItem, Category } from "@/stores/homeStore";
 import useAuthStore from "@/stores/authStore";
@@ -224,7 +225,8 @@ export default function HomeScreen() {
             <Settings color={colorScheme === "dark" ? "white" : "black"} size={24} />
           </StyledButton>
           <StyledButton style={dynamicStyles.iconButton} onPress={() => router.push("/membership")} variant="ghost">
-            <Diamond color={"#FFD700"} size={24} />
+            {/* 使用Crown图标替代SVG图标，避免渲染错误 */}
+            <Crown color={colorScheme === "dark" ? "gold" : "goldenrod"} size={24} />
           </StyledButton>
           {isLoggedIn && (
             <StyledButton style={dynamicStyles.iconButton} onPress={logout} variant="ghost">
