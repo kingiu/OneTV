@@ -1074,4 +1074,4 @@ export class API {
 }
 
 // 默认实例
-export let api = new API();
+export let api = new API('https://onetv.aisxuexi.com');
