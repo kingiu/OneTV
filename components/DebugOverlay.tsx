@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, Platform, Animated } from 'react-native';
 import { FEATURE_FLAGS, DEBUG_TOOLS_CONFIG } from '@/constants/DebugConfig';
 import { debug } from '@/utils/debugUtils';
+import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 
 interface DebugOverlayProps {
   visible?: boolean;
@@ -26,6 +27,7 @@ const DebugOverlay: React.FC<DebugOverlayProps> = ({
   visible = FEATURE_FLAGS.ENABLE_DEBUG_UI && __DEV__, 
   position = 'top-left' 
 }) => {
+  const responsiveConfig = useResponsiveLayout();
   const [performanceData, setPerformanceData] = useState<PerformanceData>({
     fps: 0,
     memory: 0,
@@ -270,6 +272,30 @@ const DebugOverlay: React.FC<DebugOverlayProps> = ({
         <View style={styles.statsRow}>
           <Text style={styles.label}>平台:</Text>
           <Text style={styles.value}>{Platform.OS}</Text>
+        </View>
+        
+        <View style={styles.statsRow}>
+          <Text style={styles.label}>设备类型:</Text>
+          <Text style={styles.value}>{responsiveConfig.deviceType}</Text>
+        </View>
+        
+        <View style={styles.statsRow}>
+          <Text style={styles.label}>逻辑尺寸:</Text>
+          <Text style={styles.value}>
+            {responsiveConfig.screenWidth}x{responsiveConfig.screenHeight}
+          </Text>
+        </View>
+        <View style={styles.statsRow}>
+          <Text style={styles.label}>物理尺寸:</Text>
+          <Text style={styles.value}>
+            {Math.round(responsiveConfig.physicalWidth)}x{Math.round(responsiveConfig.physicalHeight)}
+          </Text>
+        </View>
+        <View style={styles.statsRow}>
+          <Text style={styles.label}>像素密度:</Text>
+          <Text style={styles.value}>
+            {responsiveConfig.pixelRatio}x
+          </Text>
         </View>
       </View>
     </Animated.View>

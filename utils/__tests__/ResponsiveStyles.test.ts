@@ -40,6 +40,10 @@ describe("ResponsiveStyles", () => {
     isPortrait: true,
     screenWidth: 375,
     screenHeight: 812,
+    // 添加物理分辨率相关字段
+    physicalWidth: 750, // 假设像素密度为2
+    physicalHeight: 1624,
+    pixelRatio: 2,
   };
 
   beforeEach(() => {

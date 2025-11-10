@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dimensions, Platform } from "react-native";
+import { Dimensions, Platform, PixelRatio } from "react-native";
 
 export type DeviceType = "mobile" | "tablet" | "tv";
 
@@ -12,6 +12,9 @@ export interface ResponsiveConfig {
   isPortrait: boolean;
   screenWidth: number;
   screenHeight: number;
+  physicalWidth: number;
+  physicalHeight: number;
+  pixelRatio: number;
 }
 
 const BREAKPOINTS = {
@@ -23,8 +26,9 @@ const BREAKPOINTS = {
 const getDeviceType = (width: number): DeviceType => {
   if (Platform.isTV) return "tv";
 
-  if (width >= BREAKPOINTS.tv.min) return "tv";
-  if (width >= BREAKPOINTS.tablet.min) return "tablet";
+  // 降低TV模式的阈值，确保高分辨率屏幕能被正确识别
+  if (width >= 960) return "tv"; // 修改为960以适配960x540的逻辑分辨率
+  if (width >= 768) return "tablet";
   return "mobile";
 };
 
@@ -62,6 +66,11 @@ const getLayoutConfig = (
       break;
   }
 
+  // 计算物理分辨率
+  const pixelRatio = PixelRatio.get();
+  const physicalWidth = width * pixelRatio;
+  const physicalHeight = height * pixelRatio;
+
   return {
     deviceType,
     columns,
@@ -71,6 +80,9 @@ const getLayoutConfig = (
     isPortrait,
     screenWidth: width,
     screenHeight: height,
+    physicalWidth,
+    physicalHeight,
+    pixelRatio,
   };
 };
 
@@ -81,8 +93,8 @@ export const useResponsiveLayout = (): ResponsiveConfig => {
   });
 
   useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", ({ window }) => {
-      setDimensions({ width: window.width, height: window.height });
+    const subscription = Dimensions.addEventListener("change", (event) => {
+      setDimensions({ width: event.window.width, height: event.window.height });
     });
 
     return () => subscription?.remove();
