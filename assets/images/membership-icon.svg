@@ -1,0 +1,18 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="12" cy="12" r="11" fill="#FFD700" fill-opacity="0.2"/>
+  
+  <!-- 皇冠主体 -->
+  <path d="M12 4L14 9H19L15 12L16 17L12 14.5L8 17L9 12L5 9H10L12 4Z" fill="#FFD700"/>
+  
+  <!-- 皇冠细节 - 强调高光 -->
+  <path d="M12 5.5L13.2 8.5H16.8L14.5 10.5L15.2 13.5L12 11.8L8.8 13.5L9.5 10.5L7.2 8.5H10.8L12 5.5Z" fill="#FFF8DC" fill-opacity="0.7"/>
+  
+  <!-- 皇冠装饰 -->
+  <path d="M12 8.5V11.5L14 13.5" stroke="#FFF8DC" stroke-width="1"/>
+  <path d="M12 8.5V11.5L10 13.5" stroke="#FFF8DC" stroke-width="1"/>
+  
+  <!-- 星星点缀 -->
+  <path d="M8 8L8.4 9.2L9.8 9.3L8.7 10.2L9 11.5L8 10.8L7 11.5L7.3 10.2L6.2 9.3L7.6 9.2L8 8Z" fill="#FFFFFF" fill-opacity="0.8"/>
+  <path d="M16 8L16.4 9.2L17.8 9.3L16.7 10.2L17 11.5L16 10.8L15 11.5L15.3 10.2L14.2 9.3L15.6 9.2L16 8Z" fill="#FFFFFF" fill-opacity="0.8"/>
+</svg>

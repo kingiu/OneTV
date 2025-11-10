@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { remoteControlService } from '@/services/remoteControlService';
-import Logger from '@/utils/Logger';
+import { remoteControlService } from '../services/remoteControlService';
+import Logger from '../utils/Logger';
 import { Platform } from 'react-native';
 
 const logger = Logger.withTag('RemoteControlStore');

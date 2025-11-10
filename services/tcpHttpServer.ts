@@ -1,29 +1,31 @@
 import { Platform } from 'react-native';
-import TcpSocket from 'react-native-tcp-socket';
+// 直接使用require并忽略类型检查
+// @ts-ignore
+const TcpSocket = require('react-native-tcp-socket');
 import NetInfo from '@react-native-community/netinfo';
-import Logger from '@/utils/Logger';
+import Logger from '../utils/Logger';
 
 const logger = Logger.withTag('TCPHttpServer');
-
 const PORT = 12346;
 
-interface HttpRequest {
+// 类型定义
+type HttpRequest = {
   method: string;
   url: string;
-  headers: { [key: string]: string };
+  headers: Record<string, string>;
   body: string;
-}
+};
 
-interface HttpResponse {
+type HttpResponse = {
   statusCode: number;
-  headers: { [key: string]: string };
-  body: string;
-}
+  headers?: Record<string, string>;
+  body?: string;
+};
 
 type RequestHandler = (request: HttpRequest) => HttpResponse | Promise<HttpResponse>;
 
 class TCPHttpServer {
-  private server: TcpSocket.Server | null = null;
+  private server: any | null = null;
   private isRunning = false;
   private requestHandler: RequestHandler | null = null;
 
@@ -42,7 +44,7 @@ class TCPHttpServer {
 
       const method = requestLine[0];
       const url = requestLine[1];
-      const headers: { [key: string]: string } = {};
+      const headers: Record<string, string> = {};
       
       let bodyStartIndex = -1;
       for (let i = 1; i < lines.length; i++) {
@@ -69,7 +71,7 @@ class TCPHttpServer {
   }
 
   private formatHttpResponse(response: HttpResponse): string {
-    const statusTexts: { [key: number]: string } = {
+    const statusTexts: Record<number, string> = {
       200: 'OK',
       400: 'Bad Request',
       404: 'Not Found',
@@ -78,7 +80,7 @@ class TCPHttpServer {
 
     const statusText = statusTexts[response.statusCode] || 'Unknown';
     const headers = {
-      'Content-Length': new TextEncoder().encode(response.body).length.toString(),
+      'Content-Length': new TextEncoder().encode(response.body || '').length.toString(),
       'Connection': 'close',
       ...response.headers
     };
@@ -90,9 +92,58 @@ class TCPHttpServer {
     }
     
     httpResponse += '\r\n';
-    httpResponse += response.body;
+    httpResponse += response.body || '';
 
     return httpResponse;
+  }
+
+  private handleConnection(socket: any) {
+    logger.debug('[TCPHttpServer] Client connected');
+    
+    let requestData = '';
+    
+    socket.on('data', async (data: any) => {
+      requestData += data.toString();
+      
+      // Check if we have a complete HTTP request
+      if (requestData.includes('\r\n\r\n')) {
+        try {
+          const request = this.parseHttpRequest(requestData);
+          if (request && this.requestHandler) {
+            const response = await this.requestHandler(request);
+            const httpResponse = this.formatHttpResponse(response);
+            socket.write(httpResponse);
+          } else {
+            // Send 400 Bad Request for malformed requests
+            const errorResponse = this.formatHttpResponse({
+              statusCode: 400,
+              headers: { 'Content-Type': 'text/plain' },
+              body: 'Bad Request'
+            });
+            socket.write(errorResponse);
+          }
+        } catch (error) {
+          logger.info('[TCPHttpServer] Error handling request:', error);
+          const errorResponse = this.formatHttpResponse({
+            statusCode: 500,
+            headers: { 'Content-Type': 'text/plain' },
+            body: 'Internal Server Error'
+          });
+          socket.write(errorResponse);
+        }
+        
+        socket.end();
+        requestData = '';
+      }
+    });
+
+    socket.on('error', (error: Error) => {
+      logger.info('[TCPHttpServer] Socket error:', error);
+    });
+
+    socket.on('close', () => {
+      logger.debug('[TCPHttpServer] Client disconnected');
+    });
   }
 
   public setRequestHandler(handler: RequestHandler) {
@@ -153,54 +204,15 @@ class TCPHttpServer {
         }
         
         // 创建服务器实例
-        this.server = TcpSocket.createServer((socket: TcpSocket.Socket) => {
-          logger.debug('[TCPHttpServer] Client connected');
-          
-          let requestData = '';
-          
-          socket.on('data', async (data: string | Buffer) => {
-            requestData += data.toString();
-            
-            // Check if we have a complete HTTP request
-            if (requestData.includes('\r\n\r\n')) {
-              try {
-                const request = this.parseHttpRequest(requestData);
-                if (request && this.requestHandler) {
-                  const response = await this.requestHandler(request);
-                  const httpResponse = this.formatHttpResponse(response);
-                  socket.write(httpResponse);
-                } else {
-                  // Send 400 Bad Request for malformed requests
-                  const errorResponse = this.formatHttpResponse({
-                    statusCode: 400,
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: 'Bad Request'
-                  });
-                  socket.write(errorResponse);
-                }
-              } catch (error) {
-                logger.info('[TCPHttpServer] Error handling request:', error);
-                const errorResponse = this.formatHttpResponse({
-                  statusCode: 500,
-                  headers: { 'Content-Type': 'text/plain' },
-                  body: 'Internal Server Error'
-                });
-                socket.write(errorResponse);
-              }
-              
-              socket.end();
-              requestData = '';
-            }
+        try {
+          this.server = TcpSocket.createServer((socket: any) => {
+            this.handleConnection(socket);
           });
-
-          socket.on('error', (error: Error) => {
-            logger.info('[TCPHttpServer] Socket error:', error);
-          });
-
-          socket.on('close', () => {
-            logger.debug('[TCPHttpServer] Client disconnected');
-          });
-        });
+        } catch (createError) {
+          logger.error('[TCPHttpServer] Failed to create server instance:', createError);
+          reject(new Error('服务器实例创建失败'));
+          return;
+        }
 
         // 确保server不为null再调用listen
         if (!this.server) {
@@ -212,6 +224,8 @@ class TCPHttpServer {
         // 添加错误处理，确保listen方法存在并且是函数
         if (!this.server.listen || typeof this.server.listen !== 'function') {
           logger.error('[TCPHttpServer] Server listen method is not available or not a function');
+          // 清理server实例
+          this.server = null;
           reject(new Error('服务器监听方法不可用'));
           return;
         }

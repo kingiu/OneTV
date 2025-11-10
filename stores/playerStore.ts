@@ -2,9 +2,9 @@ import { create } from "zustand";
 import Toast from "react-native-toast-message";
 import { AVPlaybackStatus, Video } from "expo-av";
 import { RefObject } from "react";
-import { PlayRecord, PlayRecordManager, PlayerSettingsManager } from "@/services/storage";
+import { PlayRecord, PlayRecordManager, PlayerSettingsManager } from "../services/storage";
 import useDetailStore, { episodesSelectorBySource } from "./detailStore";
-import Logger from '@/utils/Logger';
+import Logger from "../utils/Logger";
 
 const logger = Logger.withTag('PlayerStore');
 
@@ -88,15 +88,21 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     logger.info(`[PERF] PlayerStore.loadVideo START - source: ${source}, id: ${id}, title: ${title}`);
     
     let detail = useDetailStore.getState().detail;
-    let episodes: string[] = [];
+    let episodes: Episode[] = [];
     
     // 如果有detail，使用detail的source获取episodes；否则使用传入的source
     if (detail && detail.source) {
       logger.info(`[INFO] Using existing detail source "${detail.source}" to get episodes`);
-      episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+      episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState()).map((ep, index) => ({
+        url: ep,
+        title: `第 ${index + 1} 集`,
+      }));
     } else {
       logger.info(`[INFO] No existing detail, using provided source "${source}" to get episodes`);
-      episodes = episodesSelectorBySource(source)(useDetailStore.getState());
+      episodes = episodesSelectorBySource(source)(useDetailStore.getState()).map((ep, index) => ({
+        url: ep,
+        title: `第 ${index + 1} 集`,
+      }));
     }
 
     set({
@@ -137,7 +143,10 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       
       // 使用DetailStore找到的实际source来获取episodes，而不是原始的preferredSource
       logger.info(`[INFO] Using actual source "${detail.source}" instead of preferred source "${source}"`);  
-      episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+      episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState()).map((ep, index) => ({
+        url: ep,
+        title: `第 ${index + 1} 集`,
+      }));
       
       if (!episodes || episodes.length === 0) {
         logger.error(`[ERROR] No episodes found for "${title}" from source "${detail.source}" (${detail.source_name})`);
@@ -150,7 +159,10 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         const sourceWithEpisodes = detailStoreState.searchResults.find(r => r.episodes && r.episodes.length > 0);
         if (sourceWithEpisodes) {
           logger.info(`[FALLBACK] Using alternative source "${sourceWithEpisodes.source}" with ${sourceWithEpisodes.episodes.length} episodes`);
-          episodes = sourceWithEpisodes.episodes;
+          episodes = sourceWithEpisodes.episodes.map((ep, index) => ({
+            url: ep,
+            title: `第 ${index + 1} 集`,
+          }));
           // 更新detail为有episodes的source
           detail = sourceWithEpisodes;
         } else {
@@ -167,11 +179,17 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       // 即使是缓存的数据，也要确保使用正确的source获取episodes
       if (detail && detail.source && detail.source !== source) {
         logger.info(`[INFO] Cached detail source "${detail.source}" differs from provided source "${source}", updating episodes`);
-        episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+        episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState()).map((ep, index) => ({
+          url: ep,
+          title: `第 ${index + 1} 集`,
+        }));
         
         if (!episodes || episodes.length === 0) {
           logger.warn(`[WARN] Cached detail source "${detail.source}" has no episodes, trying provided source "${source}"`);
-          episodes = episodesSelectorBySource(source)(useDetailStore.getState());
+          episodes = episodesSelectorBySource(source)(useDetailStore.getState()).map((ep, index) => ({
+            url: ep,
+            title: `第 ${index + 1} 集`,
+          }));
         }
       }
     }
@@ -209,8 +227,8 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       
       const episodesMappingStart = performance.now();
       const mappedEpisodes = episodes.map((ep, index) => ({
-        url: ep,
-        title: `第 ${index + 1} 集`,
+        url: typeof ep === 'string' ? ep : ep.url,
+        title: typeof ep === 'string' ? `第 ${index + 1} 集` : ep.title || `第 ${index + 1} 集`,
       }));
       const episodesMappingEnd = performance.now();
       logger.info(`[PERF] Episodes mapping (${episodes.length} episodes) took ${(episodesMappingEnd - episodesMappingStart).toFixed(2)}ms`);
@@ -385,8 +403,8 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
   handlePlaybackStatusUpdate: (newStatus) => {
     if (!newStatus.isLoaded) {
-      if (newStatus.error) {
-        logger.debug(`Playback Error: ${newStatus.error}`);
+      if (!newStatus.isLoaded && 'error' in newStatus) {
+        logger.debug(`Playback Error: ${String(newStatus.error || 'Unknown error')}`);
       }
       set({ status: newStatus });
       return;

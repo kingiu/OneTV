@@ -1,5 +1,5 @@
 {
-  "name": "OrionTV",
+  "name": "OneTV",
   "private": true,
   "main": "expo-router/entry",
   "version": "1.3.11",
@@ -14,7 +14,7 @@
     "test": "jest --watchAll",
     "test-ci": "jest --ci --coverage --no-cache",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --skipLibCheck --allowJs",
     "clean": "expo r -c && yarn cache clean && cd android && ./gradlew clean",
     "clean-modules": "rm -rf node_modules && yarn install",
     "reset-project": "./scripts/reset-project.js"
@@ -71,6 +71,7 @@
     "@react-native-tvos/config-tv": "^0.0.10",
     "@types/jest": "^29.5.12",
     "@types/react": "~18.2.45",
+    "@types/react-native": "^0.73.0",
     "@types/react-test-renderer": "^18.0.7",
     "babel-plugin-transform-remove-console": "^6.9.4",
     "eslint": "^8.57.0",

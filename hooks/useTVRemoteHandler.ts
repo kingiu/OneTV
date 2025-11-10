@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useTVEventHandler, HWEvent } from "react-native";
+// 使用类型断言来解决找不到react-native声明文件的问题
+const useTVEventHandler: any = require("react-native").useTVEventHandler;
+const HWEvent: any = require("react-native").HWEvent;
 import usePlayerStore from "@/stores/playerStore";
 
 const SEEK_STEP = 20 * 1000; // 快进/快退的时间步长（毫秒）

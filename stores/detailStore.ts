@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { SearchResult, api } from "@/services/api";
-import { getResolutionFromM3U8 } from "@/services/m3u8";
-import { useSettingsStore } from "@/stores/settingsStore";
-import { FavoriteManager } from "@/services/storage";
-import Logger from "@/utils/Logger";
+import { SearchResult, api } from "../services/api";
+import { getResolutionFromM3U8 } from "../services/m3u8";
+import { useSettingsStore } from "./settingsStore";
+import { FavoriteManager } from "../services/storage";
+import Logger from "../utils/Logger";
 
 const logger = Logger.withTag('DetailStore');
 
@@ -39,7 +39,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
   allSourcesLoaded: false,
   controller: null,
   isFavorited: false,
-  failedSources: new Set(),
+  failedSources: new Set<string>(),
 
   init: async (q, preferredSource, id) => {
     const perfStart = performance.now();
@@ -405,5 +405,9 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
 export const sourcesSelector = (state: DetailState) => state.sources;
 export default useDetailStore;
-export const episodesSelectorBySource = (source: string) => (state: DetailState) =>
-  state.searchResults.find((r) => r.source === source)?.episodes || [];
+
+// 导出episodesSelectorBySource函数，供playerStore使用
+export const episodesSelectorBySource = (source: string) => (state: DetailState) => {
+  const searchResult = state.searchResults.find(r => r.source === source);
+  return searchResult?.episodes || [];
+};

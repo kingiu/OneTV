@@ -2,7 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Dimensions, Platform, Animated } from 'react-native';
 import { FEATURE_FLAGS, DEBUG_TOOLS_CONFIG } from '@/constants/DebugConfig';
 import { debug } from '@/utils/debugUtils';
-import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
+import { useResponsiveLayout, ResponsiveConfig } from '@/hooks/useResponsiveLayout';
+import { Colors } from '@/constants/Colors';
+import { useResponsiveStyles } from '@/utils/ResponsiveStyles';
 
 interface DebugOverlayProps {
   visible?: boolean;
@@ -23,11 +25,86 @@ interface PerformanceData {
   cpu?: number;
 }
 
+// 创建响应式样式
+const createDebugOverlayStyles = (config: ResponsiveConfig) => {
+  const { deviceType } = config;
+  const fontSize = deviceType === 'mobile' ? 10 : deviceType === 'tablet' ? 11 : 12;
+  const titleSize = deviceType === 'mobile' ? 11 : deviceType === 'tablet' ? 12 : 13;
+  
+  return StyleSheet.create({
+    container: {
+      position: 'absolute',
+      zIndex: 9999,
+      padding: deviceType === 'mobile' ? 6 : deviceType === 'tablet' ? 8 : 10,
+    },
+    topLeft: {
+      top: deviceType === 'mobile' ? 30 : deviceType === 'tablet' ? 40 : 50,
+      left: deviceType === 'mobile' ? 8 : deviceType === 'tablet' ? 10 : 15,
+    },
+    topRight: {
+      top: deviceType === 'mobile' ? 30 : deviceType === 'tablet' ? 40 : 50,
+      right: deviceType === 'mobile' ? 8 : deviceType === 'tablet' ? 10 : 15,
+    },
+    bottomLeft: {
+      bottom: deviceType === 'mobile' ? 30 : deviceType === 'tablet' ? 40 : 50,
+      left: deviceType === 'mobile' ? 8 : deviceType === 'tablet' ? 10 : 15,
+    },
+    bottomRight: {
+      bottom: deviceType === 'mobile' ? 30 : deviceType === 'tablet' ? 40 : 50,
+      right: deviceType === 'mobile' ? 8 : deviceType === 'tablet' ? 10 : 15,
+    },
+    debugPanel: {
+      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+      borderRadius: deviceType === 'mobile' ? 6 : deviceType === 'tablet' ? 8 : 10,
+      padding: deviceType === 'mobile' ? 8 : deviceType === 'tablet' ? 10 : 12,
+      borderWidth: 1,
+      borderColor: Colors.dark.border,
+      minWidth: deviceType === 'mobile' ? 120 : deviceType === 'tablet' ? 140 : 160,
+    },
+    panelHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 6,
+      paddingBottom: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.dark.border,
+    },
+    debugDot: {
+      width: deviceType === 'mobile' ? 6 : deviceType === 'tablet' ? 8 : 10,
+      height: deviceType === 'mobile' ? 6 : deviceType === 'tablet' ? 8 : 10,
+      borderRadius: deviceType === 'mobile' ? 3 : deviceType === 'tablet' ? 4 : 5,
+      backgroundColor: Colors.dark.primary,
+      marginRight: deviceType === 'mobile' ? 4 : deviceType === 'tablet' ? 6 : 8,
+    },
+    debugTitle: {
+      color: Colors.dark.text,
+      fontSize: titleSize,
+      fontWeight: 'bold',
+      letterSpacing: 0.8,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 3,
+    },
+    label: {
+      color: 'rgba(255, 255, 255, 0.7)',
+      fontSize: fontSize,
+    },
+    value: {
+      color: Colors.dark.text,
+      fontSize: fontSize,
+      fontWeight: 'bold',
+    },
+  });
+};
+
 const DebugOverlay: React.FC<DebugOverlayProps> = ({ 
   visible = FEATURE_FLAGS.ENABLE_DEBUG_UI && __DEV__, 
   position = 'top-left' 
 }) => {
   const responsiveConfig = useResponsiveLayout();
+  const styles = useResponsiveStyles(createDebugOverlayStyles);
   const [performanceData, setPerformanceData] = useState<PerformanceData>({
     fps: 0,
     memory: 0,
@@ -302,72 +379,7 @@ const DebugOverlay: React.FC<DebugOverlayProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    zIndex: 9999,
-    padding: 8,
-  },
-  topLeft: {
-    top: 40,
-    left: 10,
-  },
-  topRight: {
-    top: 40,
-    right: 10,
-  },
-  bottomLeft: {
-    bottom: 40,
-    left: 10,
-  },
-  bottomRight: {
-    bottom: 40,
-    right: 10,
-  },
-  debugPanel: {
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    minWidth: 140,
-  },
-  panelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  debugDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4CAF50',
-    marginRight: 6,
-  },
-  debugTitle: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  label: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 11,
-  },
-  value: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-});
+
 
 export default DebugOverlay;
 

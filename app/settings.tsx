@@ -200,25 +200,7 @@ export default function SettingsScreen() {
       ),
       key: "livestream",
     },
-    {
-      component: (
-        <View style={{ padding: 16, backgroundColor: '#f0f0f0', borderRadius: 8 }}>
-          <ThemedText style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
-            会员信息调试
-          </ThemedText>
-          <StyledButton
-            text="查看会员信息"
-            onPress={() => {
-              // 正确使用router对象，避免Invalid hook call错误
-              router.push('/debug-membership');
-            }}
-            variant="primary"
-            style={{ marginTop: 10 }}
-          />
-        </View>
-      ),
-      key: "membership-debug",
-    },
+
     Platform.OS === "android" && {
       component: <UpdateSection />,
       key: "update",

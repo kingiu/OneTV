@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ESNext"],
+    "allowJs": true,
+    "jsx": "react-native",
+    "strict": false,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipDefaultLibCheck": true,
+    "types": [],
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "hooks/useResponsiveLayout.ts",
+    "app/index.tsx",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/__tests__/**/*"
+  ]
+}

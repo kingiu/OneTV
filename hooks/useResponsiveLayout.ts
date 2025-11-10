@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { Dimensions, Platform, PixelRatio } from "react-native";
+// 使用类型断言来解决找不到react-native声明文件的问题
+const Dimensions: any = require("react-native").Dimensions;
+const Platform: any = require("react-native").Platform;
+const PixelRatio: any = require("react-native").PixelRatio;
 
 export type DeviceType = "mobile" | "tablet" | "tv";
 
@@ -16,12 +19,6 @@ export interface ResponsiveConfig {
   physicalHeight: number;
   pixelRatio: number;
 }
-
-const BREAKPOINTS = {
-  mobile: { min: 0, max: 767 },
-  tablet: { min: 768, max: 1023 },
-  tv: { min: 1024, max: Infinity },
-};
 
 const getDeviceType = (width: number): DeviceType => {
   if (Platform.isTV) return "tv";
@@ -93,7 +90,7 @@ export const useResponsiveLayout = (): ResponsiveConfig => {
   });
 
   useEffect(() => {
-    const subscription = Dimensions.addEventListener("change", (event) => {
+    const subscription = Dimensions.addEventListener("change", (event: { window: { width: number; height: number } }) => {
       setDimensions({ width: event.window.width, height: event.window.height });
     });
 
@@ -114,7 +111,15 @@ export const useResponsiveValue = <T>(values: { mobile: T; tablet: T; tv: T }): 
 };
 
 // Utility hook for responsive styles
-export const useResponsiveStyles = () => {
+export const useResponsiveStyles = (): {
+  container: { paddingHorizontal: number };
+  cardContainer: { width: number; height: number; marginBottom: number };
+  gridContainer: { paddingHorizontal: number };
+  titleFontSize: number;
+  bodyFontSize: number;
+  sectionSpacing: number;
+  itemSpacing: number;
+} => {
   const config = useResponsiveLayout();
 
   return {

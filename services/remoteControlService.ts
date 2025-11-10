@@ -1,5 +1,5 @@
 import TCPHttpServer from "./tcpHttpServer";
-import Logger from '@/utils/Logger';
+import Logger from '../utils/Logger';
 
 const logger = Logger.withTag('RemoteControl');
 

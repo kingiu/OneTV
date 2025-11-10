@@ -9,6 +9,7 @@ import {
   Platform,
   Alert
 } from 'react-native';
+import { Colors } from '@/constants/Colors';
 import { membershipStore } from '../../stores/membershipStore';
 
 interface CouponRedeemCardProps {
@@ -166,57 +167,48 @@ const BenefitItem: React.FC<{ text: string }> = ({ text }) => (
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#2c2c2e',
+    borderRadius: 16,
+    padding: 20,
     marginHorizontal: 16,
     marginVertical: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
+    color: Colors.dark.text,
     marginBottom: 16,
-    color: '#1F2937',
   },
   errorContainer: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: 'rgba(220, 38, 38, 0.1)',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   errorText: {
-    color: '#EF4444',
+    color: '#DC2626',
     fontSize: 14,
     flex: 1,
   },
   clearErrorText: {
-    color: '#EF4444',
+    color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 18,
     fontWeight: '500',
     marginLeft: 8,
   },
   successContainer: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   successText: {
-    color: '#16A34A',
+    color: '#22C55E',
     fontSize: 14,
     textAlign: 'center',
   },
@@ -226,17 +218,19 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#4B5563',
+    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 8,
   },
   input: {
+    height: 48,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: Colors.dark.border,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#1F2937',
+    color: Colors.dark.text,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     ...Platform.select({
       ios: {
         paddingVertical: 12,
@@ -244,15 +238,15 @@ const styles = StyleSheet.create({
     }),
   },
   redeemButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: Colors.dark.primary,
+    height: 48,
     borderRadius: 8,
-    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
   },
   redeemButtonDisabled: {
-    backgroundColor: '#93C5FD',
+    backgroundColor: 'rgba(0, 187, 94, 0.5)',
   },
   redeemButtonText: {
     color: '#FFFFFF',
@@ -261,13 +255,13 @@ const styles = StyleSheet.create({
   },
   benefitsContainer: {
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: Colors.dark.border,
     paddingTop: 16,
   },
   benefitsTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#4B5563',
+    color: Colors.dark.text,
     marginBottom: 12,
   },
   benefitsList: {
@@ -282,7 +276,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#22C55E',
+    backgroundColor: Colors.dark.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,
@@ -294,7 +288,7 @@ const styles = StyleSheet.create({
   },
   benefitText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     flex: 1,
   },
 });

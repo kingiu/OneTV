@@ -7,6 +7,7 @@ import {
   Platform,
   ActivityIndicator
 } from 'react-native';
+import { Colors } from '@/constants/Colors';
 import { UserMembershipInfo } from '../../stores/membershipStore';
 import {
   getMembershipTierText,
@@ -231,22 +232,13 @@ const MembershipInfoCard: React.FC<MembershipInfoCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#2c2c2e',
+    borderRadius: 16,
+    padding: 20,
     marginHorizontal: 16,
     marginVertical: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 3,
-      },
-    }),
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   loadingContainer: {
     alignItems: 'center',
@@ -256,7 +248,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   validationBanner: {
     padding: 8,
@@ -282,10 +274,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.dark.text,
     marginBottom: 16,
-    color: '#1F2937',
   },
   infoContainer: {
     gap: 12,
@@ -297,12 +289,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   value: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#1F2937',
+    color: Colors.dark.text,
   },
   tierContainer: {
     flexDirection: 'row',
@@ -330,7 +322,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: Colors.dark.border,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -340,15 +332,15 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: 12,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   progressDays: {
     fontSize: 12,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.5)',
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -362,16 +354,16 @@ const styles = StyleSheet.create({
   },
   noMembershipText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: 'rgba(255, 255, 255, 0.7)',
     marginBottom: 8,
   },
   noMembershipSubtext: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: 'rgba(255, 255, 255, 0.5)',
     marginBottom: 16,
   },
   redeemButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: Colors.dark.primary,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,

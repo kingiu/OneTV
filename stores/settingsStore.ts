@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { SettingsManager } from "@/services/storage";
-import { api, ServerConfig } from "@/services/api";
-import { storageConfig } from "@/services/storageConfig";
-import Logger from "@/utils/Logger";
-import { useRemoteControlStore } from "@/stores/remoteControlStore";
+import { SettingsManager } from "../services/storage";
+import { api, ServerConfig } from "../services/api";
+import { storageConfig } from "../services/storageConfig";
+import Logger from "../utils/Logger";
+import { useRemoteControlStore } from "./remoteControlStore";
 
 const logger = Logger.withTag('SettingsStore');
 
