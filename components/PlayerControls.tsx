@@ -1,8 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
-import { Pause, Play, SkipForward, List, Tv, ArrowDownToDot, ArrowUpFromDot, Gauge } from "lucide-react-native";
+import { View, Text, StyleSheet, Pressable, TouchableOpacity } from "react-native";
+import Icon from "@/components/Icon";
 import { ThemedText } from "@/components/ThemedText";
-import { MediaButton } from "@/components/MediaButton";
 
 import usePlayerStore from "@/stores/playerStore";
 import useDetailStore from "@/stores/detailStore";
@@ -87,38 +86,37 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
         </ThemedText>
 
         <View style={styles.bottomControls}>
-          <MediaButton onPress={setIntroEndTime} timeLabel={introEndTime ? formatTime(introEndTime) : undefined}>
-            <ArrowDownToDot color="white" size={24} />
-          </MediaButton>
+            <TouchableOpacity onPress={setIntroEndTime} style={styles.controlButton}>
+              <Icon name="search" color="white" size={24} />
+              {introEndTime && <Text style={styles.timeLabel}>{formatTime(introEndTime)}</Text>}
+            </TouchableOpacity>
 
-          <MediaButton onPress={togglePlayPause} hasTVPreferredFocus={showControls}>
-            {status?.isLoaded && status.isPlaying ? (
-              <Pause color="white" size={24} />
-            ) : (
-              <Play color="white" size={24} />
-            )}
-          </MediaButton>
+            <TouchableOpacity onPress={togglePlayPause} style={styles.controlButton}>
+              <Text style={{color: "white", fontSize: 24}}>{status?.isLoaded && status.isPlaying ? "||" : "▶"}</Text>
+            </TouchableOpacity>
 
-          <MediaButton onPress={onPlayNextEpisode} disabled={!hasNextEpisode}>
-            <SkipForward color={hasNextEpisode ? "white" : "#666"} size={24} />
-          </MediaButton>
+            <TouchableOpacity onPress={onPlayNextEpisode} style={styles.controlButton} disabled={!hasNextEpisode}>
+              <Text style={{color: hasNextEpisode ? "white" : "#666", fontSize: 24}}>▶▶</Text>
+            </TouchableOpacity>
 
-          <MediaButton onPress={setOutroStartTime} timeLabel={outroStartTime ? formatTime(outroStartTime) : undefined}>
-            <ArrowUpFromDot color="white" size={24} />
-          </MediaButton>
+            <TouchableOpacity onPress={setOutroStartTime} style={styles.controlButton}>
+              <Icon name="search" color="white" size={24} />
+              {outroStartTime && <Text style={styles.timeLabel}>{formatTime(outroStartTime)}</Text>}
+            </TouchableOpacity>
 
-          <MediaButton onPress={() => setShowEpisodeModal(true)}>
-            <List color="white" size={24} />
-          </MediaButton>
+            <TouchableOpacity onPress={() => setShowEpisodeModal(true)} style={styles.controlButton}>
+              <Icon name="menu" color="white" size={24} />
+            </TouchableOpacity>
 
-          <MediaButton onPress={() => setShowSpeedModal(true)} timeLabel={playbackRate !== 1.0 ? `${playbackRate}x` : undefined}>
-            <Gauge color="white" size={24} />
-          </MediaButton>
+            <TouchableOpacity onPress={() => setShowSpeedModal(true)} style={styles.controlButton}>
+              <Icon name="settings" color="white" size={24} />
+              {playbackRate !== 1.0 && <Text style={styles.timeLabel}>{playbackRate}x</Text>}
+            </TouchableOpacity>
 
-          <MediaButton onPress={() => setShowSourceModal(true)}>
-            <Tv color="white" size={24} />
-          </MediaButton>
-        </View>
+            <TouchableOpacity onPress={() => setShowSourceModal(true)} style={styles.controlButton}>
+              <Icon name="settings" color="white" size={24} />
+            </TouchableOpacity>
+          </View>
       </View>
     </View>
   );
@@ -189,12 +187,19 @@ const styles = StyleSheet.create({
     padding: 10,
     flexDirection: "row",
     alignItems: "center",
+    minWidth: 44,
+    justifyContent: "center",
+  },
+  timeLabel: {
+    color: "white",
+    fontSize: 12,
+    marginLeft: 4,
   },
   topRightContainer: {
     padding: 10,
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 44, // Match TouchableOpacity default size for alignment
+    minWidth: 44,
   },
   resolutionText: {
     color: "white",

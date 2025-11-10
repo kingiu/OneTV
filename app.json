@@ -43,7 +43,9 @@
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "assetBundlePatterns": [
-      "**/*"
+      "assets/fonts/**/*",
+      "assets/images/icon.png",
+      "assets/tv_icons/*.png"
     ],
     "android": {
       "package": "com.onetv",

@@ -29,8 +29,8 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
   emptyMessage = "暂无内容",
   ListFooterComponent,
 }) => {
-  const scrollViewRef = useRef<ScrollView>(null);
-  const firstCardRef = useRef<any>(null); // <--- 新增
+  const scrollViewRef = useRef<any>(null);
+  const firstCardRef = useRef<any>(null);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const responsiveConfig = useResponsiveLayout();
   const commonStyles = getCommonResponsiveStyles(responsiveConfig);

@@ -53,7 +53,7 @@ interface PlayerState {
   setIntroEndTime: () => void;
   setOutroStartTime: () => void;
   reset: () => void;
-  _seekTimeout?: NodeJS.Timeout;
+  _seekTimeout?: ReturnType<typeof setTimeout>;
   _isRecordSaveThrottled: boolean;
   // Internal helper
   _savePlayRecord: (updates?: Partial<PlayRecord>, options?: { immediate?: boolean }) => void;

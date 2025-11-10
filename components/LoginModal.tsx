@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Modal, View, TextInput, StyleSheet, ActivityIndicator, Alert, Keyboard, InteractionManager } from "react-native";
+import { Modal, View, TextInput, StyleSheet, ActivityIndicator, Alert, Keyboard, InteractionManager, TouchableOpacity } from "react-native";
 import { usePathname } from "expo-router";
 import Toast from "react-native-toast-message";
 import useAuthStore from "@/stores/authStore";
@@ -9,7 +9,6 @@ import { api } from "@/services/api";
 import { LoginCredentialsManager } from "@/services/storage";
 import { ThemedView } from "./ThemedView";
 import { ThemedText } from "./ThemedText";
-import { StyledButton } from "./StyledButton";
 
 const LoginModal = () => {
   const { isLoginModalVisible, hideLoginModal, checkLoginStatus } = useAuthStore();
@@ -172,15 +171,17 @@ const LoginModal = () => {
             returnKeyType="go"
             onSubmitEditing={handleLogin}
           />
-          <StyledButton
-            text={isLoading ? "" : "登录"}
+          <TouchableOpacity
             onPress={handleLogin}
             disabled={isLoading}
-            style={styles.button}
-            hasTVPreferredFocus={!serverConfig || serverConfig.StorageType === "localstorage"}
+            style={[styles.button, isLoading && styles.buttonDisabled]}
           >
-            {isLoading && <ActivityIndicator color="#fff" />}
-          </StyledButton>
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ThemedText style={styles.buttonText}>登录</ThemedText>
+            )}
+          </TouchableOpacity>
         </ThemedView>
       </View>
     </Modal>
@@ -227,6 +228,18 @@ const styles = StyleSheet.create({
   button: {
     width: "100%",
     height: 50,
+    backgroundColor: "#00bb5e",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
 

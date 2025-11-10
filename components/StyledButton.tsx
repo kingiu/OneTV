@@ -12,9 +12,12 @@ interface StyledButtonProps extends PressableProps {
   isSelected?: boolean;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  onPress?: () => void;
+  hasTVPreferredFocus?: boolean;
+  disabled?: boolean;
 }
 
-export const StyledButton = forwardRef<View, StyledButtonProps>(
+export const StyledButton = forwardRef<Pressable, StyledButtonProps>(
   ({ children, text, variant = "default", isSelected = false, style, textStyle, ...rest }, ref) => {
     const colorScheme = "dark";
     const colors = Colors[colorScheme];
@@ -110,7 +113,7 @@ export const StyledButton = forwardRef<View, StyledButtonProps>(
     return (
       <Animated.View style={[animationStyle, style]}>
         <Pressable
-          android_ripple={Platform.isTV || deviceType !== 'tv'? { color: 'transparent' } : { color: Colors.dark.link }}
+          android_ripple={(Platform as any).isTV || deviceType !== 'tv' ? { color: 'transparent' } : { color: Colors.dark.link }}
           ref={ref}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}

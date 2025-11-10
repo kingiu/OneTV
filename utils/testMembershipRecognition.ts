@@ -140,11 +140,12 @@ export const testMembershipRecognition = () => {
   // 运行测试用例
   testCases.forEach((testCase, index) => {
     try {
-      // 测试文本映射
-      const textResult = getMembershipTierText(testCase.tier as string);
+      // 测试文本映射 - 修复类型错误
+      const tierStr = testCase.tier !== null ? String(testCase.tier) : '';
+      const textResult = getMembershipTierText(tierStr);
       
-      // 测试等级映射
-      const tierResult = mapLunaToStandardTier(testCase.tier as string);
+      // 测试等级映射 - 修复类型错误
+      const tierResult = mapLunaToStandardTier(tierStr);
       
       // 同时使用模拟的membershipStore进行交叉验证
       const isVip = membershipStore.isVip(testCase.tier);
@@ -193,11 +194,13 @@ export const testMembershipRecognition = () => {
   };
 };
 
-// 导出为CommonJS兼容格式
+// 导出为CommonJS兼容格式 - 完全修复类型错误
+declare const module: any;
+declare const require: any;
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
   module.exports = { testMembershipRecognition };
   // 如果直接运行此脚本，则执行测试
-  if (require.main === module) {
+  if (typeof require !== 'undefined' && require.main === module) {
     testMembershipRecognition();
   }
 }

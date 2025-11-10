@@ -1,8 +1,7 @@
 import React from "react";
-import { Modal, View, StyleSheet, ActivityIndicator, Platform } from "react-native";
+import { Modal, View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity } from "react-native";
 import { useUpdateStore } from "../stores/updateStore";
 import { Colors } from "../constants/Colors";
-import { StyledButton } from "./StyledButton";
 import { ThemedText } from "./ThemedText";
 
 export function UpdateModal() {
@@ -43,10 +42,11 @@ export function UpdateModal() {
   }
 
   React.useEffect(() => {
-    if (showUpdateModal && Platform.isTV) {
+    if (showUpdateModal && (Platform as any).isTV) {
       // TV平台自动聚焦到更新按钮
       setTimeout(() => {
-        updateButtonRef.current?.focus();
+        // @ts-ignore - focus方法可能不存在，但在TV平台上需要
+        updateButtonRef.current?.focus?.();
       }, 100);
     }
   }, [showUpdateModal]);
@@ -85,29 +85,28 @@ export function UpdateModal() {
           {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
           <View style={styles.buttonContainer}>
-            <StyledButton
+            <TouchableOpacity
               ref={updateButtonRef}
               onPress={handleUpdate}
               disabled={downloading && !downloadedPath}
-              variant="primary"
-              style={styles.button}
+              style={[styles.button, downloading && !downloadedPath && styles.buttonDisabled]}
             >
               {downloading && !downloadedPath ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <ThemedText style={styles.buttonText}>{getButtonText()}</ThemedText>
               )}
-            </StyledButton>
+            </TouchableOpacity>
 
             {!downloading && !downloadedPath && (
               <>
-                <StyledButton ref={laterButtonRef} onPress={handleLater} variant="primary" style={styles.button}>
+                <TouchableOpacity ref={laterButtonRef} onPress={handleLater} style={styles.button}>
                   <ThemedText style={[styles.buttonText]}>稍后再说</ThemedText>
-                </StyledButton>
+                </TouchableOpacity>
 
-                <StyledButton ref={skipButtonRef} onPress={handleSkip} variant="primary" style={styles.button}>
+                <TouchableOpacity ref={skipButtonRef} onPress={handleSkip} style={styles.button}>
                   <ThemedText style={[styles.buttonText]}>跳过此版本</ThemedText>
-                </StyledButton>
+                </TouchableOpacity>
               </>
             )}
           </View>
@@ -125,17 +124,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   container: {
-    backgroundColor: Colors.dark.background,
+    backgroundColor: Colors.dark?.background || "#121212",
     borderRadius: 12,
     padding: 24,
-    width: Platform.isTV ? 500 : "90%",
+    width: (Platform as any).isTV ? 500 : "90%",
     maxWidth: 500,
     alignItems: "center",
   },
   title: {
-    fontSize: Platform.isTV ? 28 : 24,
+    fontSize: (Platform as any).isTV ? 28 : 24,
     fontWeight: "bold",
-    color: Colors.dark.text,
+    color: Colors.dark?.text || "#ffffff",
     marginBottom: 20,
     paddingTop: 12,
   },
@@ -145,16 +144,16 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   versionText: {
-    fontSize: Platform.isTV ? 18 : 16,
-    color: Colors.dark.text,
+    fontSize: (Platform as any).isTV ? 18 : 16,
+    color: Colors.dark?.text || "#ffffff",
   },
   newVersion: {
     color: Colors.dark.primary || "#00bb5e",
     fontWeight: "bold",
   },
   arrow: {
-    fontSize: Platform.isTV ? 20 : 18,
-    color: Colors.dark.text,
+    fontSize: (Platform as any).isTV ? 20 : 18,
+    color: Colors.dark?.text || "#ffffff",
     marginHorizontal: 12,
   },
   progressContainer: {
@@ -163,22 +162,22 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: Colors.dark?.border || "#333333",
     borderRadius: 3,
     overflow: "hidden",
     marginBottom: 8,
   },
   progressFill: {
     height: "100%",
-    backgroundColor: Colors.dark.primary || "#00bb5e",
+    backgroundColor: Colors.dark?.primary || "#00bb5e",
   },
   progressText: {
-    fontSize: Platform.isTV ? 16 : 14,
-    color: Colors.dark.text,
+    fontSize: (Platform as any).isTV ? 16 : 14,
+    color: Colors.dark?.text || "#ffffff",
     textAlign: "center",
   },
   errorText: {
-    fontSize: Platform.isTV ? 16 : 14,
+    fontSize: (Platform as any).isTV ? 16 : 14,
     color: "#ff4444",
     marginBottom: 16,
     textAlign: "center",
@@ -191,10 +190,18 @@ const styles = StyleSheet.create({
   },
   button: {
     width: "80%",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: Colors.dark?.primary || "#00bb5e",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
-
+  buttonDisabled: {
+    opacity: 0.6,
+  },
   buttonText: {
-    fontSize: Platform.isTV ? 18 : 16,
+    fontSize: (Platform as any).isTV ? 18 : 16,
     fontWeight: "600",
     color: "#fff",
   },

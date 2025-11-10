@@ -1,13 +1,17 @@
 import { useEffect, useRef, useCallback } from "react";
-// 使用类型断言来解决找不到react-native声明文件的问题
-const useTVEventHandler: any = require("react-native").useTVEventHandler;
-const HWEvent: any = require("react-native").HWEvent;
+import { useTVEventHandler } from "react-native";
 import usePlayerStore from "@/stores/playerStore";
 
 const SEEK_STEP = 20 * 1000; // 快进/快退的时间步长（毫秒）
 
 // 定时器延迟时间（毫秒）
 const CONTROLS_TIMEOUT = 5000;
+
+// 定义遥控器事件类型
+interface RemoteEvent {
+  eventType: string;
+  eventKeyAction?: number;
+}
 
 /**
  * 管理播放器控件的显示/隐藏、遥控器事件和自动隐藏定时器。
@@ -16,8 +20,8 @@ const CONTROLS_TIMEOUT = 5000;
 export const useTVRemoteHandler = () => {
   const { showControls, setShowControls, showEpisodeModal, togglePlayPause, seek } = usePlayerStore();
 
-  const controlsTimer = useRef<NodeJS.Timeout | null>(null);
-  const fastForwardIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fastForwardIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // 重置或启动隐藏控件的定时器
   const resetTimer = useCallback(() => {
@@ -61,7 +65,7 @@ export const useTVRemoteHandler = () => {
 
   // 处理遥控器事件
   const handleTVEvent = useCallback(
-    (event: HWEvent) => {
+    (event: RemoteEvent) => {
       if (showEpisodeModal) {
         return;
       }
@@ -117,7 +121,8 @@ export const useTVRemoteHandler = () => {
     [showControls, showEpisodeModal, setShowControls, resetTimer, togglePlayPause, seek]
   );
 
-  useTVEventHandler(handleTVEvent);
+  // 使用类型断言确保兼容性
+  useTVEventHandler(handleTVEvent as any);
 
   // 处理屏幕点击事件
   const onScreenPress = () => {

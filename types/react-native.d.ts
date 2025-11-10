@@ -27,4 +27,11 @@ declare module 'react-native-tvos' {
 // 确保react-native模块正确引用react-native-tvos
 declare module 'react-native' {
   export * from 'react-native-tvos';
+  
+  // 确保Platform接口扩展包含TV特定属性
+  namespace Platform {
+    export const isTV: boolean;
+    export const isTVOS: boolean;
+    export const isAndroidTV: boolean;
+  }
 }

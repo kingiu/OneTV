@@ -1,0 +1,19 @@
+{
+  "presets": ["babel-preset-expo"],
+  "plugins": [
+    "react-native-reanimated/plugin",
+    [
+      "module-resolver",
+      {
+        "alias": {
+          "@": "."
+        }
+      }
+    ]
+  ],
+  "env": {
+    "production": {
+      "plugins": ["transform-remove-console"]
+    }
+  }
+}
