@@ -45,8 +45,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
   loadSettings: async () => {
     const settings = await SettingsManager.get();
+    // 如果本地设置中没有API地址，则使用api实例的默认地址
+    const apiUrl = settings.apiBaseUrl || api.baseURL;
     set({
-      apiBaseUrl: settings.apiBaseUrl,
+      apiBaseUrl: apiUrl,
       m3uUrl: settings.m3uUrl,
       remoteInputEnabled: settings.remoteInputEnabled || false,
       videoSource: settings.videoSource || {
@@ -54,8 +56,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         sources: {},
       },
     });
-    if (settings.apiBaseUrl) {
-      api.setBaseUrl(settings.apiBaseUrl);
+    // 确保api实例使用正确的地址
+    api.setBaseUrl(apiUrl);
+    // 无论API地址来自哪里，都尝试获取服务器配置
+    if (apiUrl) {
       await get().fetchServerConfig();
     }
   },
