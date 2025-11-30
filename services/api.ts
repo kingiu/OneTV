@@ -184,6 +184,34 @@ export class API {
     return response.json();
   }
 
+  // 卡券登录
+  async loginWithCard(code: string, testMode: boolean = false): Promise<{ success: boolean; message?: string; username?: string; redeemSuccess?: boolean; redeemMessage?: string; data?: any; cardStatus?: string; testMode?: boolean }> {
+    // 清理卡券码：移除分隔符，转为大写
+    const cleanedCode = code.replace(/[^A-Z0-9]/g, '').toUpperCase();
+    
+    const response = await this._fetch("/api/login/card", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: cleanedCode, testMode }),
+    });
+
+    // 存储cookie到AsyncStorage
+    const cookies = response.headers.get("Set-Cookie");
+    if (cookies) {
+      await AsyncStorage.setItem("authCookies", cookies);
+    }
+    
+    // 清除会员信息缓存，确保登录后获取最新会员状态
+    try {
+      await AsyncStorage.removeItem('cached_membership');
+      console.debug('API: 卡券登录后清除会员信息缓存');
+    } catch (error) {
+      console.debug('API: 清除缓存失败', error);
+    }
+
+    return response.json();
+  }
+
   async logout(): Promise<{ ok: boolean }> {
     const response = await this._fetch("/api/logout", {
       method: "POST",
@@ -902,7 +930,6 @@ export class API {
   async redeemCoupon(code: string): Promise<{ membership: MembershipInfo | null }> {
     const startTime = Date.now();
     console.debug('API: 开始兑换卡券', { code, timestamp: new Date().toISOString() });
-    console.debug('API: 开始兑换卡券', { code });
     
     try {
       // 增强: 清除缓存，确保获取最新数据
@@ -913,9 +940,9 @@ export class API {
         console.debug('API: 清除缓存失败', cacheError);
       }
       
-      // 增强: 尝试多个可能的API端点
+      // 增强: 尝试多个可能的API端点，包括LunaTV使用的正确端点/api/card/redeem
       let response, data;
-      const endpoints = ['/api/coupon/redeem', '/api/v1/coupon/redeem', '/api/membership/redeem'];
+      const endpoints = ['/api/card/redeem', '/api/coupon/redeem', '/api/v1/coupon/redeem', '/api/membership/redeem'];
       
       for (const endpoint of endpoints) {
         try {
@@ -936,32 +963,29 @@ export class API {
         }
       }
       
-      // 如果所有端点都失败，使用原始端点作为最后尝试
+      // 如果所有端点都失败，抛出错误
       if (!data) {
-        console.debug('API: 所有备用端点失败，使用原始端点');
-        response = await this._fetch("/api/coupon/redeem", { 
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code }),
-        });
-        data = await response.json();
+        console.error('API: 所有卡券兑换端点都失败');
+        throw new Error('卡券兑换失败：无法连接到服务器');
       }
       
       console.debug('API: 卡券兑换响应数据', JSON.stringify(data, null, 2));
       
       // 适配LunaTV返回的数据结构
-      if (data.success && data.data) {
+      if (data.success) {
         console.debug('API: 卡券兑换成功响应', { data });
         
         // 增强: 查找可能的会员信息位置
         let membershipData = null;
-        if (data.data.membership) {
+        if (data.data?.membership) {
           membershipData = data.data.membership;
-        } else if (data.data.user) {
+        } else if (data.data?.user) {
           membershipData = data.data.user;
         } else if (data.membership) {
           membershipData = data.membership;
-        } else {
+        } else if (data.user) {
+          membershipData = data.user;
+        } else if (data.data) {
           membershipData = data.data; // 尝试整个data对象
         }
         
@@ -986,89 +1010,18 @@ export class API {
         }
         
         return result;
+      } else {
+        // 处理后端返回的错误
+        console.warn('API: 卡券兑换失败', { data });
+        throw new Error(data.message || '卡券兑换失败');
       }
       
-      // 增强: 检查根级别是否有会员信息
-      if (data.membership) {
-        console.debug('API: 从根级别提取会员信息');
-        const result = await this._mapLunaTVMembership(data.membership);
-        // 缓存结果
-        if (result.membership) {
-          try {
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
-          }
-          catch (cacheError) {
-            console.debug('API: 缓存写入失败', cacheError);
-          }
-        }
-        return result;
-      }
-      
-      // 增强: 尝试直接映射整个响应对象
-      if (data.tierId || data.tier || data.level || data.memberLevel) {
-        console.debug('API: 尝试直接映射卡券响应对象');
-        const result = await this._mapLunaTVMembership(data);
-        // 缓存结果
-        if (result.membership) {
-          try {
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
-          }
-          catch (cacheError) {
-            console.debug('API: 缓存写入失败', cacheError);
-          }
-        }
-        return result;
-      }
-      
-      // 处理错误情况
-      console.warn('API: 卡券兑换失败或无会员数据', { data });
-      return { membership: null };
     } catch (error) {
       const totalTime = Date.now() - startTime;
       console.error("Error redeeming coupon:", { error, totalTime: `${totalTime}ms` });
       
-      // 添加测试模式：当API调用失败时返回模拟的成功数据
-      console.debug('API: 进入测试模式，返回模拟的会员数据');
-      
-      // 根据卡券码的最后一位决定会员等级，使测试更加灵活
-      const lastChar = code[code.length - 1];
-      let tier = 'premium'; // 默认高级会员
-      let days = 30;
-      
-      if (lastChar >= '0' && lastChar <= '3') {
-        tier = 'premium'; // 高级会员 (0-3)
-        days = 30;
-      } else if (lastChar >= '4' && lastChar <= '7') {
-        tier = 'vip'; // VIP会员 (4-7)
-        days = 60;
-      } else {
-        tier = 'vip'; // VIP会员 (8-9, A-Z)
-        days = 90;
-      }
-      
-      const now = Date.now();
-      const expireTime = now + days * 24 * 60 * 60 * 1000;
-      
-      const mockMembership: any = {
-        userName: '测试用户',
-        tier: tier,
-        isActive: true,
-        status: 'active',
-        createdAt: now,
-        expireTime: expireTime,
-        lastRenewTime: now,
-        daysRemaining: days,
-        couponHistory: [code],
-        _cacheTimestamp: now
-      };
-      
-      console.debug('API: 测试模式返回的模拟数据', {
-        tier: tier,
-        daysRemaining: days,
-        expireDate: new Date(expireTime).toLocaleDateString()
-      });
-      
-      return { membership: mockMembership };
+      // 抛出实际错误，不再返回模拟数据
+      throw error;
     }
   }
 }
