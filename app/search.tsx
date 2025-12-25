@@ -10,6 +10,7 @@ import { StyledButton } from "@/components/StyledButton";
 import { useRemoteControlStore } from "@/stores/remoteControlStore";
 import { RemoteControlModal } from "@/components/RemoteControlModal";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useAIVoiceStore } from "@/stores/aiVoiceStore";
 import { useRouter } from "expo-router";
 import { Colors } from "@/constants/Colors";
 import CustomScrollView from "@/components/CustomScrollView";
@@ -24,9 +25,32 @@ const logger = Logger.withTag('SearchScreen');
 
 export default function SearchScreen() {
   const [keyword, setKeyword] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 使用全局AI语音状态管理
+  const { searchResults: aiSearchResults, currentCommand, setSearchResults, isListening: aiIsListening } = useAIVoiceStore();
+  
+  // 当AI语音搜索结果变化时，更新本地状态
+  useEffect(() => {
+    console.log('SearchScreen: AI search results updated:', aiSearchResults.length);
+    // 清空本地错误
+    setError(null);
+    // 搜索结果将通过CustomScrollView的data属性直接使用aiSearchResults
+    // 如果有结果，更新keyword以保持一致性
+    if (aiSearchResults.length > 0 && currentCommand?.keyword) {
+      setKeyword(currentCommand.keyword);
+    }
+  }, [aiSearchResults, currentCommand]);
+  
+  // 当AI命令变化时，处理搜索关键词
+  useEffect(() => {
+    if (currentCommand?.type === 'search' && currentCommand?.keyword) {
+      console.log('SearchScreen: Received AI search command with keyword:', currentCommand.keyword);
+      // 更新搜索关键词
+      setKeyword(currentCommand.keyword);
+    }
+  }, [currentCommand]);
   const textInputRef = useRef<TextInput>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const { showModal: showRemoteModal, lastMessage, targetPage, clearMessage } = useRemoteControlStore();
@@ -69,13 +93,18 @@ export default function SearchScreen() {
     try {
       const response = await api.searchVideos(term);
       if (response.results.length > 0) {
-        setResults(response.results);
+        // 使用全局状态存储搜索结果，保持与AI语音搜索的一致性
+        setSearchResults(response.results);
       } else {
         setError("没有找到相关内容");
+        // 清空搜索结果
+        setSearchResults([]);
       }
     } catch (err) {
       setError("搜索失败，请稍后重试。");
       logger.info("Search failed:", err);
+      // 清空搜索结果
+      setSearchResults([]);
     } finally {
       setLoading(false);
     }
@@ -145,7 +174,8 @@ export default function SearchScreen() {
         )}
       </View>
 
-      {loading ? (
+      {/* 显示加载状态：优先显示语音搜索的加载状态 */}
+      {(loading || aiIsListening) ? (
         <VideoLoadingAnimation showProgressBar={false} />
       ) : error ? (
         <View style={[commonStyles.center, { flex: 1 }]}>
@@ -153,9 +183,9 @@ export default function SearchScreen() {
         </View>
       ) : (
         <CustomScrollView
-          data={results}
+          data={aiSearchResults}
           renderItem={renderItem}
-          loading={loading}
+          loading={loading || aiIsListening}
           error={error}
           emptyMessage="输入关键词开始搜索"
         />

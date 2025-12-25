@@ -15,12 +15,13 @@ import { useUpdateStore, initUpdateStore } from "@/stores/updateStore";
 import { UpdateModal } from "@/components/UpdateModal";
 import { UPDATE_CONFIG } from "@/constants/UpdateConfig";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import useAIVoiceHook from "@/hooks/useAIVoiceHook";
 import Logger from '@/utils/Logger';
 
 const logger = Logger.withTag('RootLayout');
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync?.();
 
 export default function RootLayout() {
   const colorScheme = "dark";
@@ -32,6 +33,14 @@ export default function RootLayout() {
   const { checkLoginStatus } = useAuthStore();
   const { checkForUpdate, lastCheckTime } = useUpdateStore();
   const responsiveConfig = useResponsiveLayout();
+  
+  // 使用AI语音hook，这样它的useEffect会执行，事件监听器会被注册
+  const aiVoiceState = useAIVoiceHook();
+  
+  // 添加日志，确认AI语音hook已经被使用
+  useEffect(() => {
+    console.log('RootLayout: AI Voice Hook initialized', aiVoiceState);
+  }, [aiVoiceState]);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -49,7 +58,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded || error) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync?.();
       if (error) {
         logger.warn(`Error in loading fonts: ${error}`);
       }

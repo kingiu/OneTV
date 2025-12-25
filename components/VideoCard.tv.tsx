@@ -106,7 +106,13 @@ const VideoCard = forwardRef<View, VideoCardProps>(
         delay: Math.random() * 200, // 随机延迟创造交错效果
         useNativeDriver: true,
       }).start();
-    }, [fadeAnim]);
+
+      // 组件卸载时清理动画
+      return () => {
+        fadeAnim.stopAnimation();
+        scale.stopAnimation();
+      };
+    }, [fadeAnim, scale]);
 
     const handleLongPress = () => {
       // Only allow long press for items with progress (play records)

@@ -165,12 +165,15 @@ class TCPHttpServer {
     const netState = await NetInfo.fetch();
     let ipAddress: string | null = null;
     
-    if (netState.type === 'wifi' || netState.type === 'ethernet') {
+    // 尝试从多种网络类型获取IP地址
+    if (netState.isConnected && netState.details) {
       ipAddress = (netState.details as any)?.ipAddress ?? null;
     }
 
     if (!ipAddress) {
-      throw new Error('无法获取IP地址，请确认设备已连接到WiFi或以太网。');
+      // 如果无法获取IP地址，使用默认的localhost地址
+      logger.warn('[TCPHttpServer] 无法获取设备IP地址，使用localhost作为替代');
+      ipAddress = '127.0.0.1';
     }
 
     if (this.isRunning) {
