@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import AIVoiceService from '../services/AIVoiceModule';
 import { api } from '../services/api';
 import { useAIVoiceStore } from '../stores/aiVoiceStore';
+import performanceMonitor from '../utils/PerformanceMonitor';
 
 // 定义命令类型
 export type AICommandType = 'search' | 'control';
@@ -120,103 +121,117 @@ export const useAIVoiceHook = (): UseAIVoiceHookReturn => {
   }, [setIsRegistered, setCurrentCommand, setError, clearError, clearSearchResults]);
 
   // 处理接收到的命令
-  const handleCommand = useCallback((command: AICommand) => {
+  const handleCommand = useCallback(async (command: AICommand) => {
     try {
       console.log('useAIVoiceHook: Received AI command:', command);
       setCurrentCommand(command);
       setIsListening(true);
       
-      // 处理中文语音命令
-      if (command.type === 'search' && command.keyword) {
-        console.log('useAIVoiceHook: Handling Chinese search command:', command.keyword);
-        // 确保关键词是中文
-        const isChinese = /[\u4e00-\u9fa5]/.test(command.keyword);
-        console.log('useAIVoiceHook: Is Chinese keyword:', isChinese);
+      // 使用PerformanceMonitor跟踪整个语音命令到详情页的流程
+      const flow = performanceMonitor.trackVoiceCommandToDetailFlow();
+      
+      // 处理所有类型的命令
+      let keyword = String(command.keyword || '').trim();
+      
+      if (command.type === 'search' && keyword) {
+        console.log('useAIVoiceHook: Handling search command with keyword:', keyword);
         
         // 检查命令是否包含"搜索"关键词
-        const hasSearchKeyword = command.keyword.includes('搜索');
-        // 提取实际的影视名称
-        const actualKeyword = hasSearchKeyword ? command.keyword.replace(/搜索/g, '').trim() : command.keyword;
+        const hasSearchKeyword = keyword.includes('搜索');
         
-        console.log('useAIVoiceHook: Actual keyword after processing:', actualKeyword);
+        // 提取实际的影视名称
+        const actualKeyword = hasSearchKeyword ? keyword.replace(/搜索/g, '').trim() : keyword;
+        
+        console.log('useAIVoiceHook: Processed keyword:', actualKeyword);
+        
+        // 确保实际关键词不为空
+        if (!actualKeyword) {
+          console.log('useAIVoiceHook: Empty keyword after processing, ignoring command');
+          setIsListening(false);
+          return;
+        }
         
         // 更新当前命令到全局状态
         setCurrentCommand({ ...command, keyword: actualKeyword });
         
-        // 执行搜索
-        api.searchVideos(actualKeyword)
-          .then(({ results }) => {
-            console.log('useAIVoiceHook: Search results received:', results.length);
-            // 存储搜索结果到全局状态
-            setSearchResults(results);
-            
-            if (results.length > 0) {
-              // 如果不包含"搜索"关键词，直接跳转到第一个结果的详情页
-              if (!hasSearchKeyword) {
-                console.log('useAIVoiceHook: No "search" keyword, navigating directly to first detail page');
-                router.push({
-                  pathname: '/detail',
-                  params: { 
-                    source: results[0].source, 
-                    q: results[0].title 
-                  }
-                });
-              } else if (results.length === 1) {
-                // 如果包含"搜索"关键词且只有一个结果，直接跳转到详情页
-                console.log('useAIVoiceHook: With "search" keyword and only one result, navigating directly to detail page');
-                router.push({
-                  pathname: '/detail',
-                  params: { 
-                    source: results[0].source, 
-                    q: results[0].title 
-                  }
-                });
-              } else {
-                // 如果包含"搜索"关键词且有多个结果，导航到搜索页面
-                console.log('useAIVoiceHook: With "search" keyword and multiple results, navigating to search page');
-                router.push('/search');
+        try {
+          // 开始搜索性能监控
+          flow.startSearch();
+          
+          // 执行搜索
+          console.log('useAIVoiceHook: Executing search for:', actualKeyword);
+          const { results } = await api.searchVideos(actualKeyword);
+          
+          // 结束搜索性能监控
+          flow.endSearch(results.length);
+          
+          console.log('useAIVoiceHook: Search results received:', results.length);
+          
+          // 存储搜索结果到全局状态
+          setSearchResults(results);
+          
+          if (hasSearchKeyword) {
+            // 如果包含"搜索"关键词，跳转到搜索页面显示所有结果
+            console.log('useAIVoiceHook: Navigating to search page with results');
+            router.push({
+              pathname: '/search',
+              params: {
+                q: actualKeyword
               }
+            });
+          } else {
+            // 不包含"搜索"关键词，直接跳转到第一个结果的详情页
+            if (results.length > 0) {
+              console.log('useAIVoiceHook: Navigating to detail page for:', results[0].title);
+              
+              // 开始详情页加载性能监控
+              flow.startDetailLoad();
+              
+              router.push({
+                pathname: '/detail',
+                params: { 
+                  source: results[0].source, 
+                  q: results[0].title,
+                  preLoaded: 'true'
+                }
+              });
             } else {
-              // 没有搜索结果，导航到搜索页面显示
-              console.log('useAIVoiceHook: No results, navigating to search page');
+              // 没有搜索结果，跳转到搜索页面
+              console.log('useAIVoiceHook: No results found, navigating to search page');
               router.push('/search');
             }
-          })
-          .catch((error) => {
-            console.error('useAIVoiceHook: Search failed:', error);
-            // 搜索失败时清空搜索结果
-            setSearchResults([]);
-            // 设置错误信息
-            setError(`搜索失败: ${error instanceof Error ? error.message : '未知错误'}`);
-            // 导航到搜索页面显示错误
-            router.push('/search');
-          })
-          .finally(() => {
-            // 命令处理完成
-            setTimeout(() => {
-              setIsListening(false);
-            }, 1000);
-          });
+          }
+        } catch (error) {
+          console.error('useAIVoiceHook: Search failed:', error);
+          // 搜索失败时处理
+          setSearchResults([]);
+          setError(`搜索失败: ${error instanceof Error ? error.message : '未知错误'}`);
+          router.push('/search');
+        } finally {
+          // 命令处理完成，延迟关闭监听状态
+          setTimeout(() => {
+            setIsListening(false);
+            flow.generateFlowReport();
+          }, 1000);
+        }
       } else if (command.type === 'control' && command.action) {
         console.log('useAIVoiceHook: Handling control command:', command.action);
-        // 这里可以添加控制命令的处理逻辑，例如：
-        // 1. 播放/暂停视频
-        // 2. 快进/快退
-        // 3. 切换到下一集/上一集
+        // 控制命令处理逻辑
         
         // 命令处理完成
         setTimeout(() => {
           setIsListening(false);
         }, 1000);
       } else {
-        // 命令处理完成
+        // 无效命令，直接关闭监听状态
+        console.log('useAIVoiceHook: Invalid command, ignoring');
         setTimeout(() => {
           setIsListening(false);
-        }, 1000);
+        }, 500);
       }
     } catch (err) {
       console.error('useAIVoiceHook: Error in handleCommand:', err);
-      setError(`Failed to handle command: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`命令处理失败: ${err instanceof Error ? err.message : '未知错误'}`);
       setIsListening(false);
     }
   }, [setCurrentCommand, setIsListening, setSearchResults, setError, router]);

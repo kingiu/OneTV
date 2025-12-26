@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { SearchResult, api } from "../services/api";
 import { getResolutionFromM3U8 } from "../services/m3u8";
 import { useSettingsStore } from "./settingsStore";
-import { FavoriteManager } from "../services/storage";
+import { FavoriteManager, DetailCacheManager } from "../services/storage";
 import Logger from "../utils/Logger";
 
 const logger = Logger.withTag('DetailStore');
@@ -62,40 +62,240 @@ const useDetailStore = create<DetailState>((set, get) => ({
       controller: newController,
     });
 
+    // 1. 尝试从全局AI语音状态获取预加载的搜索结果
+    try {
+      const aiVoiceStore = require('../stores/aiVoiceStore').useAIVoiceStore.getState();
+      const preLoadedResults = aiVoiceStore.searchResults;
+      const hasPreLoadedResults = preLoadedResults.length > 0 && preLoadedResults[0].title === q;
+      
+      if (hasPreLoadedResults) {
+        logger.info(`[PERF] Using pre-loaded search results from AI voice store - ${preLoadedResults.length} results available`);
+        
+        // 直接使用预加载的结果，避免重复请求
+        const processResultsStart = performance.now();
+        
+        // 先对预加载结果进行去重，避免重复播放源
+        const uniquePreLoadedResults = preLoadedResults.filter((result, index, self) => 
+          index === self.findIndex((r) => r.source === result.source)
+        );
+        
+        // 先直接使用预加载结果，不等待分辨率检测
+        const initialResults = uniquePreLoadedResults.map((searchResult) => ({
+          ...searchResult,
+          resolution: null // 初始分辨率设为null，稍后异步更新
+        }));
+        
+        // 立即更新状态，显示详情页
+        set({
+          searchResults: initialResults,
+          sources: initialResults.map((r) => ({
+            source: r.source,
+            source_name: r.source_name,
+            resolution: r.resolution,
+          })),
+          detail: initialResults[0] ?? null,
+          loading: false,
+          allSourcesLoaded: true,
+        });
+        
+        // 异步检测分辨率，不阻塞初始渲染
+        const updateResolutions = async () => {
+          try {
+            const updatedResults = await Promise.all(
+              preLoadedResults.map(async (searchResult) => {
+                let resolution;
+                try {
+                  if (searchResult.episodes && searchResult.episodes.length > 0) {
+                    resolution = await getResolutionFromM3U8(searchResult.episodes[0], signal);
+                  }
+                } catch (e) {
+                  if ((e as Error).name !== "AbortError") {
+                    logger.info(`Failed to get resolution for ${searchResult.source_name}`, e);
+                  }
+                }
+                return { ...searchResult, resolution };
+              })
+            );
+            
+            // 更新分辨率信息
+            set((state) => {
+              // 只更新分辨率，保持其他状态不变
+              const updatedSearchResults = state.searchResults.map((existingResult) => {
+                const updatedResult = updatedResults.find(r => r.source === existingResult.source);
+                return updatedResult || existingResult;
+              });
+              
+              return {
+                searchResults: updatedSearchResults,
+                sources: updatedSearchResults.map((r) => ({
+                  source: r.source,
+                  source_name: r.source_name,
+                  resolution: r.resolution,
+                })),
+                // 只在当前detail的source匹配时更新detail的分辨率
+                detail: state.detail ? {
+                  ...state.detail,
+                  resolution: updatedResults.find(r => r.source === state.detail?.source)?.resolution || state.detail.resolution
+                } : state.detail
+              };
+            });
+          } catch (error) {
+            logger.warn(`[WARN] Failed to update resolutions asynchronously:`, error);
+          }
+        };
+        
+        // 启动异步分辨率检测
+        updateResolutions();
+        
+        // 检查收藏状态
+        const finalState = get();
+        if (finalState.detail) {
+          const { source, id } = finalState.detail;
+          try {
+            const isFavorited = await FavoriteManager.isFavorited(source, id.toString());
+            set({ isFavorited });
+          } catch (favoriteError) {
+            logger.warn(`[WARN] Failed to check favorite status:`, favoriteError);
+          }
+          
+          // 保存结果到缓存
+          try {
+            await DetailCacheManager.save(q, source, finalState.searchResults);
+          } catch (cacheError) {
+            logger.warn(`[WARN] Failed to save detail cache:`, cacheError);
+          }
+        }
+        
+        const processResultsEnd = performance.now();
+        logger.info(`[PERF] Processing pre-loaded results took ${(processResultsEnd - processResultsStart).toFixed(2)}ms`);
+        logger.info(`[PERF] DetailStore.init COMPLETE with pre-loaded results in ${(processResultsEnd - perfStart).toFixed(2)}ms`);
+        return;
+      }
+    } catch (error) {
+      logger.warn(`[WARN] Failed to access AI voice store for pre-loaded results:`, error);
+    }
+    
+    // 2. 尝试从本地缓存获取数据
+    try {
+      const cachedResults = await DetailCacheManager.get(q, preferredSource);
+      if (cachedResults && cachedResults.length > 0) {
+        logger.info(`[PERF] Using cached search results for ${q} - ${cachedResults.length} results available`);
+        
+        // 对缓存结果进行去重，避免重复播放源
+        const uniqueCachedResults = cachedResults.filter((result: any, index: number, self: any[]) => 
+          index === self.findIndex((r: any) => r.source === result.source)
+        );
+        
+        // 先直接使用缓存结果，不重新检测分辨率
+        set({
+          searchResults: uniqueCachedResults,
+          sources: uniqueCachedResults.map((r: any) => ({
+            source: r.source,
+            source_name: r.source_name,
+            resolution: r.resolution,
+          })),
+          detail: uniqueCachedResults[0] ?? null,
+          loading: false,
+          allSourcesLoaded: true,
+        });
+        
+        // 异步重新检测分辨率，更新缓存
+        const refreshResolutions = async () => {
+          try {
+            const updatedResults = await Promise.all(
+              cachedResults.map(async (searchResult: any) => {
+                let resolution;
+                try {
+                  if (searchResult.episodes && searchResult.episodes.length > 0) {
+                    resolution = await getResolutionFromM3U8(searchResult.episodes[0], signal);
+                  }
+                } catch (e) {
+                  if ((e as Error).name !== "AbortError") {
+                    logger.info(`Failed to refresh resolution for ${searchResult.source_name}`, e);
+                  }
+                }
+                return { ...searchResult, resolution };
+              })
+            );
+            
+            // 更新分辨率信息
+            set((state) => {
+              const updatedSearchResults = state.searchResults.map((existingResult) => {
+                const updatedResult = updatedResults.find(r => r.source === existingResult.source);
+                return updatedResult || existingResult;
+              });
+              
+              return {
+                searchResults: updatedSearchResults,
+                sources: updatedSearchResults.map((r) => ({
+                  source: r.source,
+                  source_name: r.source_name,
+                  resolution: r.resolution,
+                })),
+                detail: state.detail ? {
+                  ...state.detail,
+                  resolution: updatedResults.find(r => r.source === state.detail?.source)?.resolution || state.detail.resolution
+                } : state.detail
+              };
+            });
+            
+            // 保存更新后的结果到缓存
+            const currentState = get();
+            if (currentState.detail) {
+              await DetailCacheManager.save(q, currentState.detail.source, updatedResults);
+            }
+          } catch (error) {
+            logger.warn(`[WARN] Failed to refresh resolutions from cache:`, error);
+          }
+        };
+        
+        // 启动异步分辨率刷新
+        refreshResolutions();
+        
+        // 检查收藏状态
+        const finalState = get();
+        if (finalState.detail) {
+          const { source, id } = finalState.detail;
+          try {
+            const isFavorited = await FavoriteManager.isFavorited(source, id.toString());
+            set({ isFavorited });
+          } catch (favoriteError) {
+            logger.warn(`[WARN] Failed to check favorite status:`, favoriteError);
+          }
+        }
+        
+        const perfEnd = performance.now();
+        logger.info(`[PERF] DetailStore.init COMPLETE with cached results in ${(perfEnd - perfStart).toFixed(2)}ms`);
+        return;
+      }
+    } catch (error) {
+      logger.warn(`[WARN] Failed to access detail cache:`, error);
+    }
+
+    // 没有预加载结果，使用原有逻辑
     const { videoSource } = useSettingsStore.getState();
 
     const processAndSetResults = async (results: SearchResult[], merge = false) => {
-      const resolutionStart = performance.now();
-      logger.info(`[PERF] Resolution detection START - processing ${results.length} sources`);
+      logger.info(`[PERF] Processing results - ${results.length} sources, merge: ${merge}`);
       
-      const resultsWithResolution = await Promise.all(
-        results.map(async (searchResult) => {
-          let resolution;
-          const m3u8Start = performance.now();
-          try {
-            if (searchResult.episodes && searchResult.episodes.length > 0) {
-              resolution = await getResolutionFromM3U8(searchResult.episodes[0], signal);
-            }
-          } catch (e) {
-            if ((e as Error).name !== "AbortError") {
-              logger.info(`Failed to get resolution for ${searchResult.source_name}`, e);
-            }
-          }
-          const m3u8End = performance.now();
-          logger.info(`[PERF] M3U8 resolution for ${searchResult.source_name}: ${(m3u8End - m3u8Start).toFixed(2)}ms (${resolution || 'failed'})`);
-          return { ...searchResult, resolution };
-        })
+      // 先对输入结果进行去重，避免同一source的重复条目
+      const uniqueResults = results.filter((result, index, self) => 
+        index === self.findIndex((r) => r.source === result.source)
       );
       
-      const resolutionEnd = performance.now();
-      logger.info(`[PERF] Resolution detection COMPLETE - took ${(resolutionEnd - resolutionStart).toFixed(2)}ms`);
+      // 先直接使用结果，不等待分辨率检测
+      const initialResults = uniqueResults.map((searchResult) => ({
+        ...searchResult,
+        resolution: null // 初始分辨率设为null，稍后异步更新
+      }));
 
       if (signal.aborted) return;
 
+      // 立即更新状态，显示结果
       set((state) => {
         const existingSources = new Set(state.searchResults.map((r) => r.source));
-        const newResults = resultsWithResolution.filter((r) => !existingSources.has(r.source));
-        const finalResults = merge ? [...state.searchResults, ...newResults] : resultsWithResolution;
+        const newResults = initialResults.filter((r) => !existingSources.has(r.source));
+        const finalResults = merge ? [...state.searchResults, ...newResults] : initialResults;
 
         return {
           searchResults: finalResults,
@@ -107,6 +307,67 @@ const useDetailStore = create<DetailState>((set, get) => ({
           detail: state.detail ?? finalResults[0] ?? null,
         };
       });
+      
+      // 异步检测分辨率，不阻塞初始渲染
+      const updateResolutions = async () => {
+        const resolutionStart = performance.now();
+        logger.info(`[PERF] Resolution detection START - processing ${results.length} sources`);
+        
+        const resultsWithResolution = await Promise.all(
+          results.map(async (searchResult) => {
+            let resolution;
+            const m3u8Start = performance.now();
+            try {
+              if (searchResult.episodes && searchResult.episodes.length > 0) {
+                resolution = await getResolutionFromM3U8(searchResult.episodes[0], signal);
+              }
+            } catch (e) {
+              if ((e as Error).name !== "AbortError") {
+                logger.info(`Failed to get resolution for ${searchResult.source_name}`, e);
+              }
+            }
+            const m3u8End = performance.now();
+            logger.info(`[PERF] M3U8 resolution for ${searchResult.source_name}: ${(m3u8End - m3u8Start).toFixed(2)}ms (${resolution || 'failed'})`);
+            return { ...searchResult, resolution };
+          })
+        );
+        
+        const resolutionEnd = performance.now();
+        logger.info(`[PERF] Resolution detection COMPLETE - took ${(resolutionEnd - resolutionStart).toFixed(2)}ms`);
+
+        if (signal.aborted) return;
+
+        // 更新分辨率信息
+        set((state) => {
+          const existingSources = new Set(state.searchResults.map((r) => r.source));
+          const newResults = resultsWithResolution.filter((r) => existingSources.has(r.source));
+          
+          if (newResults.length === 0) return {};
+          
+          // 更新searchResults中的分辨率
+          const updatedSearchResults = state.searchResults.map((existingResult) => {
+            const updatedResult = newResults.find(r => r.source === existingResult.source);
+            return updatedResult || existingResult;
+          });
+          
+          return {
+            searchResults: updatedSearchResults,
+            sources: updatedSearchResults.map((r) => ({
+              source: r.source,
+              source_name: r.source_name,
+              resolution: r.resolution,
+            })),
+            // 只在当前detail的source匹配时更新detail的分辨率
+            detail: state.detail ? {
+              ...state.detail,
+              resolution: newResults.find(r => r.source === state.detail?.source)?.resolution || state.detail.resolution
+            } : state.detail
+          };
+        });
+      };
+      
+      // 启动异步分辨率检测
+      updateResolutions();
     };
 
     try {
@@ -276,6 +537,15 @@ const useDetailStore = create<DetailState>((set, get) => ({
         set({ error: `未找到 "${q}" 的播放源，请检查标题拼写或稍后重试` });
       } else if (finalState.searchResults.length > 0) {
         logger.info(`[SUCCESS] DetailStore.init completed successfully with ${finalState.searchResults.length} sources`);
+        
+        // 保存结果到缓存
+        if (finalState.detail) {
+          try {
+            await DetailCacheManager.save(q, finalState.detail.source, finalState.searchResults);
+          } catch (cacheError) {
+            logger.warn(`[WARN] Failed to save detail cache:`, cacheError);
+          }
+        }
       }
 
       if (finalState.detail) {

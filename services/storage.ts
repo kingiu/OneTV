@@ -371,3 +371,110 @@ export class LoginCredentialsManager {
     }
   }
 }
+
+// --- DetailCacheManager (Uses AsyncStorage) ---
+export class DetailCacheManager {
+  // 缓存配置
+  private static readonly CACHE_KEY = "mytv_detail_cache";
+  private static readonly MAX_CACHE_ITEMS = 20; // 最多缓存20个详情页数据
+  private static readonly CACHE_EXPIRY = 24 * 60 * 60 * 1000; // 缓存有效期24小时
+
+  // 生成缓存键
+  static generateCacheKey(title: string, source?: string) {
+    return source ? `${title}+${source}` : title;
+  }
+
+  // 获取所有缓存
+  private static async getAllCache(): Promise<Record<string, any>> {
+    try {
+      const data = await AsyncStorage.getItem(this.CACHE_KEY);
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      logger.info("Failed to get all detail cache:", error);
+      return {};
+    }
+  }
+
+  // 保存所有缓存
+  private static async saveAllCache(cache: Record<string, any>): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.CACHE_KEY, JSON.stringify(cache));
+    } catch (error) {
+      logger.error("Failed to save detail cache:", error);
+    }
+  }
+
+  // 获取单个缓存项
+  static async get(title: string, source?: string): Promise<any | null> {
+    const perfStart = performance.now();
+    const cacheKey = this.generateCacheKey(title, source);
+    const cache = await this.getAllCache();
+    const cachedItem = cache[cacheKey];
+    
+    if (cachedItem) {
+      // 检查缓存是否过期
+      const now = Date.now();
+      if (now - cachedItem.timestamp > this.CACHE_EXPIRY) {
+        // 缓存过期，删除并返回null
+        delete cache[cacheKey];
+        await this.saveAllCache(cache);
+        logger.info(`[PERF] DetailCacheManager.get - Cache expired for ${cacheKey}`);
+        return null;
+      }
+      
+      const perfEnd = performance.now();
+      logger.info(`[PERF] DetailCacheManager.get - Cache hit for ${cacheKey} in ${(perfEnd - perfStart).toFixed(2)}ms`);
+      return cachedItem.data;
+    }
+    
+    const perfEnd = performance.now();
+    logger.info(`[PERF] DetailCacheManager.get - Cache miss for ${cacheKey} in ${(perfEnd - perfStart).toFixed(2)}ms`);
+    return null;
+  }
+
+  // 保存缓存项
+  static async save(title: string, source: string, data: any): Promise<void> {
+    const perfStart = performance.now();
+    const cacheKey = this.generateCacheKey(title, source);
+    let cache = await this.getAllCache();
+    
+    // 添加新缓存项
+    cache[cacheKey] = {
+      data,
+      timestamp: Date.now(),
+    };
+    
+    // 如果缓存超过最大数量，移除最旧的缓存
+    if (Object.keys(cache).length > this.MAX_CACHE_ITEMS) {
+      // 将缓存转换为数组，按时间戳排序
+      const sortedCache = Object.entries(cache).sort((a, b) => a[1].timestamp - b[1].timestamp);
+      // 移除最旧的缓存
+      const [oldestKey] = sortedCache[0];
+      delete cache[oldestKey];
+      logger.info(`[PERF] DetailCacheManager.save - Removed oldest cache: ${oldestKey}`);
+    }
+    
+    await this.saveAllCache(cache);
+    
+    const perfEnd = performance.now();
+    logger.info(`[PERF] DetailCacheManager.save - Saved cache for ${cacheKey} in ${(perfEnd - perfStart).toFixed(2)}ms`);
+  }
+
+  // 清除单个缓存项
+  static async remove(title: string, source?: string): Promise<void> {
+    const cacheKey = this.generateCacheKey(title, source);
+    const cache = await this.getAllCache();
+    delete cache[cacheKey];
+    await this.saveAllCache(cache);
+  }
+
+  // 清除所有缓存
+  static async clearAll(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(this.CACHE_KEY);
+      logger.info(`[PERF] DetailCacheManager.clearAll - Cleared all detail cache`);
+    } catch (error) {
+      logger.error("Failed to clear all detail cache:", error);
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
-import { AICommand } from '../hooks/useAIVoiceHook';
+import { AICommand, AICommandType } from '../hooks/useAIVoiceHook';
 
 // 动态导入NativeModules，避免在非Android平台报错
 let AIVoiceModule: any;
@@ -321,6 +321,51 @@ const AIVoiceService: IAIVoiceModule = {
             return;
         }
 
+        // 内部处理函数，用于统一处理接收到的命令
+        const handleVoiceCommand = (commandData: any): void => {
+            try {
+                console.log('AIVoiceModule: Processing voice command data:', commandData);
+                
+                // 处理命令格式，支持多种输入类型
+                let processedCommand: AICommand;
+                
+                if (typeof commandData === 'string') {
+                    // 直接字符串命令，默认为搜索类型
+                    processedCommand = {
+                        type: 'search',
+                        keyword: commandData.trim(),
+                    };
+                } else if (commandData && typeof commandData === 'object') {
+                    // 对象类型命令，解析各字段
+                    processedCommand = {
+                        type: (commandData?.type || 'search') as AICommandType,
+                        action: commandData?.action as any,
+                        keyword: String(commandData?.keyword || commandData?.text || commandData?.aiSearch || commandData?.search || '').trim(),
+                        playIndex: commandData?.playIndex,
+                        fastForward: commandData?.fastForward,
+                        fastBackward: commandData?.fastBackward,
+                        seekTo: commandData?.seekTo,
+                    };
+                } else {
+                    // 其他类型，转换为字符串
+                    processedCommand = {
+                        type: 'search',
+                        keyword: String(commandData || '').trim(),
+                    };
+                }
+                
+                // 只有当关键词不为空时才传递命令
+                if (processedCommand.keyword || processedCommand.action) {
+                    console.log('AIVoiceModule: Final processed command:', processedCommand);
+                    callback(processedCommand);
+                } else {
+                    console.log('AIVoiceModule: Ignoring empty voice command');
+                }
+            } catch (error) {
+                console.error('AIVoiceModule: Error processing voice command:', error);
+            }
+        };
+
         try {
             // 先清理之前的监听器，避免泄漏
             if (_eventListeners) {
@@ -335,202 +380,82 @@ const AIVoiceService: IAIVoiceModule = {
                 _eventListeners = null;
             }
             
-            if (!eventEmitter) {
-                console.warn('AIVoiceModule: Event emitter not available, trying alternative approach');
-                console.warn('AIVoiceModule: This is expected if AI voice module is not properly installed or linked');
+            // 尝试多种方式注册回调，确保语音命令能被接收
+            let callbackSet = false;
+            
+            // 方式1：使用eventEmitter监听事件
+            if (eventEmitter) {
+                console.log('AIVoiceModule: Setting up event listeners');
                 
-                // 尝试直接使用AIVoiceModule的方法注册回调
-                if (AIVoiceModule && typeof AIVoiceModule.setVoiceCommandCallback === 'function') {
-                    console.log('AIVoiceModule: Using direct method to set voice command callback');
-                    AIVoiceModule.setVoiceCommandCallback((command: any) => {
-                        try {
-                            console.log('AIVoiceModule: Received voice command from direct callback:', command);
-                            // 处理命令格式
-                            let processedCommand: AICommand;
-                            if (typeof command === 'string') {
-                                processedCommand = {
-                                    type: 'search',
-                                    keyword: command.trim(),
-                                };
-                            } else {
-                                processedCommand = {
-                                    type: (command?.type || 'search') as AICommandType,
-                                    action: command?.action as any,
-                                    keyword: String(command?.keyword || command?.text || '').trim(),
-                                    playIndex: command?.playIndex,
-                                    fastForward: command?.fastForward,
-                                    fastBackward: command?.fastBackward,
-                                    seekTo: command?.seekTo,
-                                };
-                            }
-                            callback(processedCommand);
-                        } catch (error) {
-                            console.error('AIVoiceModule: Error handling direct voice command:', error);
-                        }
+                // 定义所有事件监听器
+                const eventListeners: { remove: () => void }[] = [];
+                
+                // 监听所有可能的语音事件
+                const eventNames = [
+                    'aiSearch', 'aiControl', 'AIOpenSearch', 'AIOpenControl', 
+                    'chineseSearch', 'voiceCommand', 'voice', 'search', 'control'
+                ];
+                
+                eventNames.forEach(eventName => {
+                    const listener = eventEmitter.addListener(eventName, (event: any) => {
+                        console.log(`AIVoiceModule: Received event '${eventName}':`, event);
+                        handleVoiceCommand(event);
                     });
-                    console.log('AIVoiceModule: Direct voice command callback set successfully');
-                    return;
-                } else {
-                    console.error('AIVoiceModule: No valid method to set voice command callback');
-                    console.error('AIVoiceModule: Voice functionality will be disabled');
-                    return;
+                    eventListeners.push(listener);
+                });
+                
+                // 监听错误事件
+                const errorEventListener = eventEmitter.addListener('AIOpenError', (error: any) => {
+                    console.error('AIVoiceModule: AI Voice Error:', error);
+                });
+                eventListeners.push(errorEventListener);
+                
+                const aiErrorEventListener = eventEmitter.addListener('aiError', (error: any) => {
+                    console.error('AIVoiceModule: AI Error:', error);
+                });
+                eventListeners.push(aiErrorEventListener);
+                
+                // 存储监听器引用，以便后续清理
+                _eventListeners = eventListeners;
+                
+                console.log('AIVoiceModule: Event listeners registered successfully for events:', eventNames);
+                callbackSet = true;
+            }
+            
+            // 方式2：直接使用AIVoiceModule的方法注册回调
+            if (AIVoiceModule) {
+                // 尝试多种可能的回调方法名
+                const callbackMethods = [
+                    'setVoiceCommandCallback', 
+                    'setCommandCallback', 
+                    'setCallback',
+                    'registerCallback',
+                    'onVoiceCommand'
+                ];
+                
+                for (const methodName of callbackMethods) {
+                    if (typeof AIVoiceModule[methodName] === 'function') {
+                        console.log(`AIVoiceModule: Using direct method '${methodName}' to set callback`);
+                        AIVoiceModule[methodName](handleVoiceCommand);
+                        callbackSet = true;
+                        break;
+                    }
+                }
+                
+                // 额外检查是否有setVoiceCallback方法
+                if (typeof AIVoiceModule.setVoiceCallback === 'function') {
+                    console.log('AIVoiceModule: Using setVoiceCallback method to set callback');
+                    AIVoiceModule.setVoiceCallback(handleVoiceCommand);
+                    callbackSet = true;
                 }
             }
             
-            // 定义所有事件监听器
-            const eventListeners: { remove: () => void }[] = [];
-            
-            // 监听搜索命令 - 修复事件名称不匹配问题
-            const searchEventListener = eventEmitter.addListener('aiSearch', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received aiSearch event:', event);
-                    // 处理中文语音搜索
-                    let keyword = '';
-                    if (typeof event === 'string') {
-                        keyword = event;
-                    } else {
-                        // 兼容多种事件格式
-                        keyword = event?.keyword || event?.aiSearch || event?.search || event?.text || JSON.stringify(event);
-                    }
-                    
-                    // 确保关键词是字符串
-                    keyword = String(keyword);
-                    
-                    console.log('AIVoiceModule: Extracted keyword:', keyword);
-                    const command: AICommand = {
-                        type: 'search',
-                        keyword: keyword.trim(),
-                    };
-                    console.log('AIVoiceModule: Created search command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling aiSearch event:', error);
-                }
-            });
-            eventListeners.push(searchEventListener);
-            
-            // 监听控制命令 - 修复事件名称不匹配问题
-            const controlEventListener = eventEmitter.addListener('aiControl', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received aiControl event:', event);
-                    const command: AICommand = {
-                        type: 'control',
-                        action: event?.action,
-                        playIndex: event?.PlayIndex,
-                        fastForward: event?.FastForward,
-                        fastBackward: event?.FastBackward,
-                        seekTo: event?.SeekTo,
-                    };
-                    console.log('AIVoiceModule: Created control command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling aiControl event:', error);
-                }
-            });
-            eventListeners.push(controlEventListener);
-
-            // 兼容旧的事件名称 - AIOpenSearch
-            const aiOpenSearchListener = eventEmitter.addListener('AIOpenSearch', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received AIOpenSearch event:', event);
-                    const command: AICommand = {
-                        type: 'search',
-                        keyword: event?.keyword || event?.search || JSON.stringify(event),
-                    };
-                    console.log('AIVoiceModule: Created AIOpenSearch command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling AIOpenSearch event:', error);
-                }
-            });
-            eventListeners.push(aiOpenSearchListener);
-
-            // 兼容旧的事件名称 - AIOpenControl
-            const aiOpenControlListener = eventEmitter.addListener('AIOpenControl', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received AIOpenControl event:', event);
-                    const command: AICommand = {
-                        type: 'control',
-                        action: event?.action,
-                        playIndex: event?.PlayIndex,
-                        fastForward: event?.FastForward,
-                        fastBackward: event?.FastBackward,
-                        seekTo: event?.SeekTo,
-                    };
-                    console.log('AIVoiceModule: Created AIOpenControl command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling AIOpenControl event:', error);
-                }
-            });
-            eventListeners.push(aiOpenControlListener);
-
-            // 添加中文语音特定事件支持
-            const chineseSearchListener = eventEmitter.addListener('chineseSearch', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received chineseSearch event:', event);
-                    const keyword = event?.keyword || event?.text || JSON.stringify(event);
-                    const command: AICommand = {
-                        type: 'search',
-                        keyword: String(keyword).trim(),
-                    };
-                    console.log('AIVoiceModule: Created chineseSearch command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling chineseSearch event:', error);
-                }
-            });
-            eventListeners.push(chineseSearchListener);
-
-            // 添加通用语音事件支持
-            const voiceEventListener = eventEmitter.addListener('voiceCommand', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received voiceCommand event:', event);
-                    let commandType: AICommandType = 'search';
-                    let keyword = '';
-                    let action: string | undefined;
-                    
-                    // 解析通用语音命令
-                    if (typeof event === 'string') {
-                        keyword = event;
-                    } else {
-                        commandType = (event?.type || 'search') as AICommandType;
-                        keyword = event?.keyword || event?.text || '';
-                        action = event?.action;
-                    }
-                    
-                    const command: AICommand = {
-                        type: commandType,
-                        action: action as any,
-                        keyword: String(keyword).trim(),
-                    };
-                    console.log('AIVoiceModule: Created voiceCommand command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling voiceCommand event:', error);
-                }
-            });
-            eventListeners.push(voiceEventListener);
-
-            // 监听错误事件
-            const errorEventListener = eventEmitter.addListener('AIOpenError', (error: any) => {
-                console.error('AIVoiceModule: AI Voice Error:', error);
-            });
-            eventListeners.push(errorEventListener);
-
-            // 监听aiError事件
-            const aiErrorEventListener = eventEmitter.addListener('aiError', (error: any) => {
-                console.error('AIVoiceModule: AI Error:', error);
-            });
-            eventListeners.push(aiErrorEventListener);
-            
-            // 添加日志记录，确认监听器已注册
-            console.log('AIVoiceModule: Event listeners registered successfully');
-            console.log('AIVoiceModule: Listening for events:', 
-                'aiSearch, aiControl, AIOpenSearch, AIOpenControl, chineseSearch, voiceCommand, AIOpenError, aiError');
-            
-            // 存储监听器引用，以便后续清理
-            _eventListeners = eventListeners;
+            if (callbackSet) {
+                console.log('AIVoiceModule: Voice command callback set successfully using at least one method');
+            } else {
+                console.error('AIVoiceModule: No valid method to set voice command callback');
+                console.error('AIVoiceModule: Voice functionality may be limited');
+            }
             
         } catch (error) {
             console.error('AIVoiceModule: Error setting up voice functionality:', error);

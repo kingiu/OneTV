@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useCallback } from "react";
 import { View, Text, StyleSheet, Image, ScrollView, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ThemedView } from "@/components/ThemedView";
@@ -11,6 +11,7 @@ import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
 import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
+import performanceMonitor from '@/utils/PerformanceMonitor';
 
 export default function DetailScreen() {
   const { q, source, id } = useLocalSearchParams<{ q: string; source?: string; id?: string }>();
@@ -43,7 +44,13 @@ export default function DetailScreen() {
     };
   }, [abort, init, q, source, id]);
 
-  const handlePlay = (episodeIndex: number) => {
+  // 使用useMemo缓存动态样式，避免每次渲染都重新创建
+  const dynamicStyles = useMemo(() => {
+    return createResponsiveStyles(deviceType, spacing);
+  }, [deviceType, spacing]);
+
+  // 使用useCallback缓存handlePlay函数，确保引用稳定性
+  const handlePlay = useCallback((episodeIndex: number) => {
     if (!detail) return;
     abort(); // Cancel any ongoing fetches
     router.push({
@@ -56,7 +63,202 @@ export default function DetailScreen() {
         episodeIndex: episodeIndex.toString(),
       },
     });
-  };
+  }, [detail, abort, router]);
+
+  // 使用useMemo缓存渲染内容，避免重复计算
+  const renderDetailContent = useMemo(() => {
+    if (!detail) return null;
+    
+    if (deviceType === 'mobile') {
+      // 移动端垂直布局
+      return (
+        <ScrollView style={dynamicStyles.scrollContainer}>
+          {/* 海报和基本信息 */}
+          <View style={dynamicStyles.mobileTopContainer}>
+            <Image 
+              source={{ uri: detail.poster }} 
+              style={dynamicStyles.mobilePoster}
+              resizeMode="cover"
+              defaultSource={require('@/assets/images/icon.png')}
+            />
+            <View style={dynamicStyles.mobileInfoContainer}>
+              <View style={dynamicStyles.titleContainer}>
+                <ThemedText style={dynamicStyles.title} numberOfLines={2}>
+                  {detail.title}
+                </ThemedText>
+                <StyledButton onPress={toggleFavorite} variant="ghost" style={dynamicStyles.favoriteButton}>
+                  <FontAwesome
+                    name={isFavorited ? "heart" : "heart-o"}
+                    size={20}
+                    color={isFavorited ? "#feff5f" : "#ccc"}
+                  />
+                </StyledButton>
+              </View>
+              <View style={dynamicStyles.metaContainer}>
+                <ThemedText style={dynamicStyles.metaText}>{detail.year}</ThemedText>
+                <ThemedText style={dynamicStyles.metaText}>{detail.type_name}</ThemedText>
+              </View>
+            </View>
+          </View>
+
+          {/* 描述 */}
+          <View style={dynamicStyles.descriptionContainer}>
+            <ThemedText style={dynamicStyles.description}>{detail.desc}</ThemedText>
+          </View>
+
+          {/* 播放源 */}
+          <View style={dynamicStyles.sourcesContainer}>
+            <View style={dynamicStyles.sourcesTitleContainer}>
+              <ThemedText style={dynamicStyles.sourcesTitle}>播放源 ({searchResults.length})</ThemedText>
+              {!allSourcesLoaded && <ActivityIndicator style={{ marginLeft: 10 }} />}
+            </View>
+            <View style={dynamicStyles.sourceList}>
+              {searchResults.map((item, index) => {
+                const isSelected = detail.source === item.source;
+                return (
+                  <StyledButton
+                    key={`${item.source}-${index}`}
+                    onPress={() => setDetail(item)}
+                    isSelected={isSelected}
+                    style={dynamicStyles.sourceButton}
+                  >
+                    <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
+                    {item.episodes.length > 1 && (
+                      <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
+                        <Text style={dynamicStyles.badgeText}>
+                          {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
+                        </Text>
+                      </View>
+                    )}
+                    {item.resolution && (
+                      <View style={[dynamicStyles.badge, { backgroundColor: "#666" }, isSelected && dynamicStyles.selectedBadge]}>
+                        <Text style={dynamicStyles.badgeText}>{item.resolution}</Text>
+                      </View>
+                    )}
+                  </StyledButton>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* 剧集列表 */}
+          <View style={dynamicStyles.episodesContainer}>
+            <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
+            <View style={dynamicStyles.episodeList}>
+              {detail.episodes.map((episode, index) => (
+                <StyledButton
+                  key={`episode-${index}`}
+                  style={dynamicStyles.episodeButton}
+                  onPress={() => handlePlay(index)}
+                  text={`第 ${index + 1} 集`}
+                  textStyle={dynamicStyles.episodeButtonText}
+                />
+              ))}
+            </View>
+          </View>
+        </ScrollView>
+      );
+    } else {
+      // 平板和TV端水平布局
+      return (
+        <ScrollView style={dynamicStyles.scrollContainer}>
+          <View style={dynamicStyles.topContainer}>
+            <Image 
+              source={{ uri: detail.poster }} 
+              style={dynamicStyles.poster}
+              resizeMode="cover"
+              defaultSource={require('@/assets/images/icon.png')}
+            />
+            <View style={dynamicStyles.infoContainer}>
+              <View style={dynamicStyles.titleContainer}>
+                <ThemedText style={dynamicStyles.title} numberOfLines={1} ellipsizeMode="tail">
+                  {detail.title}
+                </ThemedText>
+                <StyledButton onPress={toggleFavorite} variant="ghost" style={dynamicStyles.favoriteButton}>
+                  <FontAwesome
+                    name={isFavorited ? "heart" : "heart-o"}
+                    size={24}
+                    color={isFavorited ? "#feff5f" : "#ccc"}
+                  />
+                </StyledButton>
+              </View>
+              <View style={dynamicStyles.metaContainer}>
+                <ThemedText style={dynamicStyles.metaText}>{detail.year}</ThemedText>
+                <ThemedText style={dynamicStyles.metaText}>{detail.type_name}</ThemedText>
+              </View>
+
+              <ScrollView style={dynamicStyles.descriptionScrollView}>
+                <ThemedText style={dynamicStyles.description}>{detail.desc}</ThemedText>
+              </ScrollView>
+            </View>
+          </View>
+
+          <View style={dynamicStyles.bottomContainer}>
+            <View style={dynamicStyles.sourcesContainer}>
+              <View style={dynamicStyles.sourcesTitleContainer}>
+                <ThemedText style={dynamicStyles.sourcesTitle}>选择播放源 共 {searchResults.length} 个</ThemedText>
+                {!allSourcesLoaded && <ActivityIndicator style={{ marginLeft: 10 }} />}
+              </View>
+              <View style={dynamicStyles.sourceList}>
+                {searchResults.map((item, index) => {
+                  const isSelected = detail.source === item.source;
+                  return (
+                    <StyledButton
+                      key={`${item.source}-${index}`}
+                      onPress={() => setDetail(item)}
+                      hasTVPreferredFocus={index === 0}
+                      isSelected={isSelected}
+                      style={dynamicStyles.sourceButton}
+                    >
+                      <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
+                      {item.episodes.length > 1 && (
+                        <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
+                          <Text style={dynamicStyles.badgeText}>
+                            {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
+                          </Text>
+                        </View>
+                      )}
+                      {item.resolution && (
+                        <View style={[dynamicStyles.badge, { backgroundColor: "#666" }, isSelected && dynamicStyles.selectedBadge]}>
+                          <Text style={dynamicStyles.badgeText}>{item.resolution}</Text>
+                        </View>
+                      )}
+                    </StyledButton>
+                  );
+                })}
+              </View>
+            </View>
+            <View style={dynamicStyles.episodesContainer}>
+              <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
+              <ScrollView contentContainerStyle={dynamicStyles.episodeList}>
+                {detail.episodes.map((episode, index) => (
+                  <StyledButton
+                    key={`episode-${index}`}
+                    style={dynamicStyles.episodeButton}
+                    onPress={() => handlePlay(index)}
+                    text={`第 ${index + 1} 集`}
+                    textStyle={dynamicStyles.episodeButtonText}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </ScrollView>
+      );
+    }
+  }, [deviceType, detail, searchResults, allSourcesLoaded, isFavorited, toggleFavorite, handlePlay, dynamicStyles, setDetail]);
+
+  // 监听详情数据加载完成，结束性能计时
+  useEffect(() => {
+    if (detail && !loading) {
+      // 结束详情页加载性能监控
+      performanceMonitor.mark('detailPageLoaded', {
+        title: detail.title,
+        source: detail.source,
+        timestamp: Date.now()
+      });
+    }
+  }, [detail, loading]);
 
   if (loading) {
     return <VideoLoadingAnimation showProgressBar={false} />;
@@ -102,182 +304,10 @@ export default function DetailScreen() {
     );
   }
 
-  // 动态样式
-  const dynamicStyles = createResponsiveStyles(deviceType, spacing);
-
-  const renderDetailContent = () => {
-    if (deviceType === 'mobile') {
-      // 移动端垂直布局
-      return (
-        <ScrollView style={dynamicStyles.scrollContainer}>
-          {/* 海报和基本信息 */}
-          <View style={dynamicStyles.mobileTopContainer}>
-            <Image source={{ uri: detail.poster }} style={dynamicStyles.mobilePoster} />
-            <View style={dynamicStyles.mobileInfoContainer}>
-              <View style={dynamicStyles.titleContainer}>
-                <ThemedText style={dynamicStyles.title} numberOfLines={2}>
-                  {detail.title}
-                </ThemedText>
-                <StyledButton onPress={toggleFavorite} variant="ghost" style={dynamicStyles.favoriteButton}>
-                  <FontAwesome
-                    name={isFavorited ? "heart" : "heart-o"}
-                    size={20}
-                    color={isFavorited ? "#feff5f" : "#ccc"}
-                  />
-                </StyledButton>
-              </View>
-              <View style={dynamicStyles.metaContainer}>
-                <ThemedText style={dynamicStyles.metaText}>{detail.year}</ThemedText>
-                <ThemedText style={dynamicStyles.metaText}>{detail.type_name}</ThemedText>
-              </View>
-            </View>
-          </View>
-
-          {/* 描述 */}
-          <View style={dynamicStyles.descriptionContainer}>
-            <ThemedText style={dynamicStyles.description}>{detail.desc}</ThemedText>
-          </View>
-
-          {/* 播放源 */}
-          <View style={dynamicStyles.sourcesContainer}>
-            <View style={dynamicStyles.sourcesTitleContainer}>
-              <ThemedText style={dynamicStyles.sourcesTitle}>播放源 ({searchResults.length})</ThemedText>
-              {!allSourcesLoaded && <ActivityIndicator style={{ marginLeft: 10 }} />}
-            </View>
-            <View style={dynamicStyles.sourceList}>
-              {searchResults.map((item, index) => {
-                const isSelected = detail?.source === item.source;
-                return (
-                  <StyledButton
-                    key={index}
-                    onPress={() => setDetail(item)}
-                    isSelected={isSelected}
-                    style={dynamicStyles.sourceButton}
-                  >
-                    <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
-                    {item.episodes.length > 1 && (
-                      <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
-                        <Text style={dynamicStyles.badgeText}>
-                          {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
-                        </Text>
-                      </View>
-                    )}
-                    {item.resolution && (
-                      <View style={[dynamicStyles.badge, { backgroundColor: "#666" }, isSelected && dynamicStyles.selectedBadge]}>
-                        <Text style={dynamicStyles.badgeText}>{item.resolution}</Text>
-                      </View>
-                    )}
-                  </StyledButton>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* 剧集列表 */}
-          <View style={dynamicStyles.episodesContainer}>
-            <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
-            <View style={dynamicStyles.episodeList}>
-              {detail.episodes.map((episode, index) => (
-                <StyledButton
-                  key={index}
-                  style={dynamicStyles.episodeButton}
-                  onPress={() => handlePlay(index)}
-                  text={`第 ${index + 1} 集`}
-                  textStyle={dynamicStyles.episodeButtonText}
-                />
-              ))}
-            </View>
-          </View>
-        </ScrollView>
-      );
-    } else {
-      // 平板和TV端水平布局
-      return (
-        <ScrollView style={dynamicStyles.scrollContainer}>
-          <View style={dynamicStyles.topContainer}>
-            <Image source={{ uri: detail.poster }} style={dynamicStyles.poster} />
-            <View style={dynamicStyles.infoContainer}>
-              <View style={dynamicStyles.titleContainer}>
-                <ThemedText style={dynamicStyles.title} numberOfLines={1} ellipsizeMode="tail">
-                  {detail.title}
-                </ThemedText>
-                <StyledButton onPress={toggleFavorite} variant="ghost" style={dynamicStyles.favoriteButton}>
-                  <FontAwesome
-                    name={isFavorited ? "heart" : "heart-o"}
-                    size={24}
-                    color={isFavorited ? "#feff5f" : "#ccc"}
-                  />
-                </StyledButton>
-              </View>
-              <View style={dynamicStyles.metaContainer}>
-                <ThemedText style={dynamicStyles.metaText}>{detail.year}</ThemedText>
-                <ThemedText style={dynamicStyles.metaText}>{detail.type_name}</ThemedText>
-              </View>
-
-              <ScrollView style={dynamicStyles.descriptionScrollView}>
-                <ThemedText style={dynamicStyles.description}>{detail.desc}</ThemedText>
-              </ScrollView>
-            </View>
-          </View>
-
-          <View style={dynamicStyles.bottomContainer}>
-            <View style={dynamicStyles.sourcesContainer}>
-              <View style={dynamicStyles.sourcesTitleContainer}>
-                <ThemedText style={dynamicStyles.sourcesTitle}>选择播放源 共 {searchResults.length} 个</ThemedText>
-                {!allSourcesLoaded && <ActivityIndicator style={{ marginLeft: 10 }} />}
-              </View>
-              <View style={dynamicStyles.sourceList}>
-                {searchResults.map((item, index) => {
-                  const isSelected = detail?.source === item.source;
-                  return (
-                    <StyledButton
-                      key={index}
-                      onPress={() => setDetail(item)}
-                      hasTVPreferredFocus={index === 0}
-                      isSelected={isSelected}
-                      style={dynamicStyles.sourceButton}
-                    >
-                      <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
-                      {item.episodes.length > 1 && (
-                        <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
-                          <Text style={dynamicStyles.badgeText}>
-                            {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
-                          </Text>
-                        </View>
-                      )}
-                      {item.resolution && (
-                        <View style={[dynamicStyles.badge, { backgroundColor: "#666" }, isSelected && dynamicStyles.selectedBadge]}>
-                          <Text style={dynamicStyles.badgeText}>{item.resolution}</Text>
-                        </View>
-                      )}
-                    </StyledButton>
-                  );
-                })}
-              </View>
-            </View>
-            <View style={dynamicStyles.episodesContainer}>
-              <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
-              <ScrollView contentContainerStyle={dynamicStyles.episodeList}>
-                {detail.episodes.map((episode, index) => (
-                  <StyledButton
-                    key={index}
-                    style={dynamicStyles.episodeButton}
-                    onPress={() => handlePlay(index)}
-                    text={`第 ${index + 1} 集`}
-                    textStyle={dynamicStyles.episodeButtonText}
-                  />
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </ScrollView>
-      );
-    }
-  };
-
+  // 使用缓存的renderDetailContent，直接引用而不是调用
   const content = (
     <ThemedView style={[commonStyles.container, { paddingTop: deviceType === 'tv' ? 40 : 0 }]}>
-      {renderDetailContent()}
+      {renderDetailContent}
     </ThemedView>
   );
 
@@ -288,7 +318,7 @@ export default function DetailScreen() {
 
   return (
     <ResponsiveNavigation>
-      <ResponsiveHeader title={detail?.title || "详情"} showBackButton />
+      <ResponsiveHeader title={detail.title || "详情"} showBackButton />
       {content}
     </ResponsiveNavigation>
   );
