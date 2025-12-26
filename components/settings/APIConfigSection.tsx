@@ -1,6 +1,6 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { View, TextInput, StyleSheet, Animated, Platform } from "react-native";
-import { useTVEventHandler } from "react-native";
+import { useSafeTVEventHandler } from "@/hooks/useSafeTVEventHandler";
 import { ThemedText } from "@/components/ThemedText";
 import { SettingsSection } from "./SettingsSection";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -68,7 +68,7 @@ export const APIConfigSection = forwardRef<APIConfigSectionRef, APIConfigSection
       onPress?.();
     }
 
-    useTVEventHandler(handleTVEvent);
+    useSafeTVEventHandler(handleTVEvent);
 
     const [selection, setSelection] = useState<{ start: number; end: number }>({
       start: 0,
@@ -83,7 +83,7 @@ export const APIConfigSection = forwardRef<APIConfigSectionRef, APIConfigSection
 
     return (
       <SettingsSection focusable onFocus={handleSectionFocus} onBlur={handleSectionBlur}
-        {...Platform.isTV || deviceType !== 'tv' ? undefined : { onPress: handlePress }}
+        {...Platform.isTV || deviceType === 'tv' ? undefined : { onPress: handlePress }}
       >
         <View style={styles.inputContainer}>
           <View style={styles.titleContainer}>

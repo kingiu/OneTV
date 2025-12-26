@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { StyleSheet, Switch, FlatList, Pressable, Animated } from "react-native";
-import { useTVEventHandler } from "react-native";
+import { useSafeTVEventHandler } from "@/hooks/useSafeTVEventHandler";
 import { ThemedText } from "@/components/ThemedText";
 import { SettingsSection } from "./SettingsSection";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -55,7 +55,7 @@ export const VideoSourceSection: React.FC<VideoSourceSectionProps> = ({ onChange
     [isSectionFocused, focusedIndex, resources, handleToggle]
   );
 
-  useTVEventHandler(handleTVEvent);
+  useSafeTVEventHandler(handleTVEvent);
 
   const renderResourceItem = ({ item, index }: { item: { source: string; source_name: string }; index: number }) => {
     const isEnabled = videoSource.enabledAll || videoSource.sources[item.source];

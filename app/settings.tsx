@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, Alert, Platform } from "react-native";
-import { useTVEventHandler } from "react-native";
+import { useSafeTVEventHandler } from "@/hooks/useSafeTVEventHandler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router"; // 在顶部导入useRouter
 import { ThemedText } from "@/components/ThemedText";
@@ -229,7 +229,7 @@ export default function SettingsScreen() {
     [currentFocusIndex, sections.length, deviceType]
   );
 
-  useTVEventHandler(deviceType === "tv" ? handleTVEvent : () => { });
+  useSafeTVEventHandler(deviceType === "tv" ? handleTVEvent : () => { });
 
   // 动态样式
   const dynamicStyles = createResponsiveStyles(deviceType, spacing, insets);

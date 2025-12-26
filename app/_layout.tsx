@@ -25,14 +25,14 @@ SplashScreen.preventAutoHideAsync?.();
 
 export default function RootLayout() {
   const colorScheme = "dark";
+  // 使用简单的字体加载方式，避免复杂的URL构建过程
   const [loaded, error] = useFonts({
-    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf").default || require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
   const { loadSettings, remoteInputEnabled, apiBaseUrl } = useSettingsStore();
   const { startServer, stopServer } = useRemoteControlStore();
   const { checkLoginStatus } = useAuthStore();
   const { checkForUpdate, lastCheckTime } = useUpdateStore();
-  const responsiveConfig = useResponsiveLayout();
   
   // 使用AI语音hook，这样它的useEffect会执行，事件监听器会被注册
   const aiVoiceState = useAIVoiceHook();
@@ -77,13 +77,20 @@ export default function RootLayout() {
   }, [loaded, lastCheckTime, checkForUpdate]);
 
   useEffect(() => {
-    // 只有在非手机端才启动远程控制服务器，并且只在非web平台启动
-    if (remoteInputEnabled && responsiveConfig.deviceType !== "mobile" && Platform.OS !== 'web') {
-      startServer();
-    } else {
-      stopServer();
-    }
-  }, [remoteInputEnabled, startServer, stopServer, responsiveConfig.deviceType]);
+    const initializeServer = async () => {
+      // 在所有设备类型上都启动远程控制服务器，只要remoteInputEnabled为true且平台不是web
+      logger.debug('RootLayout: Checking remote input server status', { remoteInputEnabled, platform: Platform.OS });
+      if (remoteInputEnabled && Platform.OS !== 'web') {
+        logger.debug('RootLayout: Starting remote input server');
+        await startServer();
+      } else {
+        logger.debug('RootLayout: Stopping remote input server');
+        stopServer();
+      }
+    };
+    
+    initializeServer();
+  }, [remoteInputEnabled, startServer, stopServer]);
 
   if (!loaded && !error) {
     return null;

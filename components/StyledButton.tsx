@@ -1,9 +1,7 @@
 import React, { forwardRef } from "react";
-import { Animated, Pressable, StyleSheet, StyleProp, ViewStyle, PressableProps, TextStyle, View, Platform } from "react-native";
+import { Animated, Pressable, StyleSheet, StyleProp, ViewStyle, PressableProps, TextStyle } from "react-native";
 import { ThemedText } from "./ThemedText";
 import { Colors } from "@/constants/Colors";
-import { useButtonAnimation } from "@/hooks/useAnimation";
-import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 interface StyledButtonProps extends PressableProps {
   children?: React.ReactNode;
@@ -22,8 +20,6 @@ export const StyledButton = forwardRef<Pressable, StyledButtonProps>(
     const colorScheme = "dark";
     const colors = Colors[colorScheme];
     const [isFocused, setIsFocused] = React.useState(false);
-    const animationStyle = useButtonAnimation(isFocused);
-    const deviceType = useResponsiveLayout().deviceType;
 
     const variantStyles = {
       default: StyleSheet.create({
@@ -110,18 +106,36 @@ export const StyledButton = forwardRef<Pressable, StyledButtonProps>(
       },
     });
 
+    // 按钮动画，使用本地状态
+    const animationStyle = {
+      transform: [{
+        scale: isFocused ? 1.1 : 1
+      }],
+    };
+
     return (
       <Animated.View style={[animationStyle, style]}>
         <Pressable
-          android_ripple={(Platform as any).isTV || deviceType !== 'tv' ? { color: 'transparent' } : { color: Colors.dark.link }}
+          android_ripple={{ color: Colors.dark.link, borderless: false }}
           ref={ref}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          style={({ focused }) => [
+          style={({ pressed, focused }) => [
             styles.button,
             variantStyles[variant].button,
             isSelected && (variantStyles[variant].selectedButton ?? styles.selectedButton),
-            focused && (variantStyles[variant].focusedButton ?? styles.focusedButton),
+            focused && [
+              variantStyles[variant].focusedButton ?? styles.focusedButton,
+              {
+                borderWidth: 3,
+                borderColor: colors.primary,
+                elevation: 8,
+                shadowColor: colors.primary,
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.8,
+                shadowRadius: 10,
+              }
+            ],
           ]}
           {...rest}
         >

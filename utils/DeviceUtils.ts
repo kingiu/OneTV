@@ -6,7 +6,7 @@ export const DeviceUtils = {
    * 检测当前设备类型
    */
   getDeviceType(): DeviceType {
-    // if (Platform.isTV) return "tv";
+    if (Platform.isTV) return "tv";
 
     const { width } = Dimensions.get("window");
 

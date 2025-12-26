@@ -102,7 +102,13 @@ const VideoCardTablet = forwardRef<View, VideoCardTabletProps>(
         delay: Math.random() * 150,
         useNativeDriver: true,
       }).start();
-    }, [fadeAnim]);
+      
+      // 组件卸载时停止所有动画，避免回调泄漏
+      return () => {
+        fadeAnim.stopAnimation();
+        scale.stopAnimation();
+      };
+    }, [fadeAnim, scale]);
 
     const handleLongPress = () => {
       if (progress === undefined) return;

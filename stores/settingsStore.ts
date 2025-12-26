@@ -35,7 +35,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   apiBaseUrl: "",
   m3uUrl: "",
   liveStreamSources: [],
-  remoteInputEnabled: false,
+  remoteInputEnabled: true,
   isModalVisible: false,
   serverConfig: null,
   isLoadingServerConfig: false,
@@ -47,10 +47,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const settings = await SettingsManager.get();
     // 如果本地设置中没有API地址，则使用api实例的默认地址
     const apiUrl = settings.apiBaseUrl || api.baseURL;
+    const isRemoteInputEnabled = settings.remoteInputEnabled ?? true;
     set({
       apiBaseUrl: apiUrl,
       m3uUrl: settings.m3uUrl,
-      remoteInputEnabled: settings.remoteInputEnabled || false,
+      remoteInputEnabled: isRemoteInputEnabled,
       videoSource: settings.videoSource || {
         enabledAll: true,
         sources: {},
@@ -61,6 +62,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // 无论API地址来自哪里，都尝试获取服务器配置
     if (apiUrl) {
       await get().fetchServerConfig();
+    }
+    // 根据设置启动或停止远程控制服务器
+    const remoteControlActions = useRemoteControlStore.getState();
+    if (isRemoteInputEnabled) {
+      remoteControlActions.startServer().catch(error => {
+        logger.error("Failed to start remote control server during loadSettings:", error);
+      });
+    } else {
+      remoteControlActions.stopServer();
     }
   },
   fetchServerConfig: async () => {

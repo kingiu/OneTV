@@ -130,13 +130,31 @@ class RemoteControlService {
         this.httpServer.stop();
       }
       
-      const url = await this.httpServer.start();
-      logger.debug(`[RemoteControl] Server started successfully at: ${url}`);
-      return url;
+      // 增加等待时间，确保操作系统完全释放端口
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 尝试启动服务器，如果失败，尝试再次停止并等待更长时间
+      try {
+        const url = await this.httpServer.start();
+        logger.debug(`[RemoteControl] Server started successfully at: ${url}`);
+        return url;
+      } catch (firstError) {
+        logger.warn("[RemoteControl] First attempt failed, trying again...", firstError);
+        
+        // 再次停止服务器，确保完全释放资源
+        this.httpServer.stop();
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // 第二次尝试启动
+        const url = await this.httpServer.start();
+        logger.debug(`[RemoteControl] Server started successfully on second attempt at: ${url}`);
+        return url;
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "启动失败";
       logger.info("[RemoteControl] Failed to start server:", errorMessage);
-      throw new Error(errorMessage);
+      // 更详细的错误信息
+      throw new Error(`启动失败: ${errorMessage}`);
     }
   }
 

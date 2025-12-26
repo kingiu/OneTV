@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 // 使用类型断言来解决找不到react-native声明文件的问题
-const Dimensions: any = require("react-native").Dimensions;
-const Platform: any = require("react-native").Platform;
-const PixelRatio: any = require("react-native").PixelRatio;
+import { Dimensions, Platform, PixelRatio } from "react-native";
 
 export type DeviceType = "mobile" | "tablet" | "tv";
 

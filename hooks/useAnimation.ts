@@ -10,6 +10,11 @@ export const useButtonAnimation = (isFocused: boolean, size: number = 1.1) => {
       friction: 5,
       useNativeDriver: true,
     }).start();
+    
+    // 组件卸载时停止动画，避免回调泄漏
+    return () => {
+      scaleValue.stopAnimation();
+    };
   }, [ isFocused, scaleValue, size]);
 
   return {

@@ -1,12 +1,12 @@
 import { Platform } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
+import Logger from '../utils/Logger';
 // 直接使用require并忽略类型检查
 // @ts-ignore
 const TcpSocket = require('react-native-tcp-socket');
-import NetInfo from '@react-native-community/netinfo';
-import Logger from '../utils/Logger';
 
 const logger = Logger.withTag('TCPHttpServer');
-const PORT = 12346;
+const PORT = 12348;
 
 // 类型定义
 type HttpRequest = {
@@ -151,6 +151,8 @@ class TCPHttpServer {
   }
 
   public async start(): Promise<string> {
+    logger.debug('[TCPHttpServer] Starting server...');
+    
     // 确保之前的服务器实例已关闭
     if (this.server && !this.isRunning) {
       try {
@@ -162,17 +164,21 @@ class TCPHttpServer {
       this.server = null;
     }
     
+    logger.debug('[TCPHttpServer] Checking network state...');
     const netState = await NetInfo.fetch();
+    logger.debug('[TCPHttpServer] Network state:', netState);
+    
     let ipAddress: string | null = null;
     
-    // 尝试从多种网络类型获取IP地址
-    if (netState.isConnected && netState.details) {
+    // 尝试从WiFi或以太网获取IP地址
+    if (netState.type === 'wifi' || netState.type === 'ethernet') {
       ipAddress = (netState.details as any)?.ipAddress ?? null;
+      logger.debug('[TCPHttpServer] IP address from network details:', ipAddress);
     }
 
     if (!ipAddress) {
-      // 如果无法获取IP地址，使用默认的localhost地址
-      logger.warn('[TCPHttpServer] 无法获取设备IP地址，使用localhost作为替代');
+      // 尝试使用127.0.0.1作为回退，确保服务器能启动
+      logger.warn('[TCPHttpServer] Failed to get IP address from WiFi/Ethernet, using localhost as fallback');
       ipAddress = '127.0.0.1';
     }
 
@@ -189,17 +195,22 @@ class TCPHttpServer {
 
     return new Promise((resolve, reject) => {
       try {
+        logger.debug('[TCPHttpServer] Creating TCP server...');
+        
         // 检查TcpSocket是否可用
         if (!TcpSocket || typeof TcpSocket.createServer !== 'function') {
           logger.error('[TCPHttpServer] TcpSocket is not available or properly initialized');
-          reject(new Error('TCP服务器初始化失败'));
+          reject(new Error('TCP服务器初始化失败: TcpSocket不可用'));
           return;
         }
+        
+        logger.debug('[TCPHttpServer] TcpSocket is available, creating server instance...');
         
         // 确保在创建新服务器前，server为null
         if (this.server) {
           try {
             this.server.close();
+            logger.debug('[TCPHttpServer] Closed existing server instance');
           } catch (error) {
             logger.info('[TCPHttpServer] Error closing previous server:', error);
           }
@@ -211,16 +222,17 @@ class TCPHttpServer {
           this.server = TcpSocket.createServer((socket: any) => {
             this.handleConnection(socket);
           });
+          logger.debug('[TCPHttpServer] Server instance created successfully');
         } catch (createError) {
           logger.error('[TCPHttpServer] Failed to create server instance:', createError);
-          reject(new Error('服务器实例创建失败'));
+          reject(new Error(`服务器实例创建失败: ${createError instanceof Error ? createError.message : '未知错误'}`));
           return;
         }
 
         // 确保server不为null再调用listen
         if (!this.server) {
-          logger.error('[TCPHttpServer] Server instance is null');
-          reject(new Error('服务器实例创建失败'));
+          logger.error('[TCPHttpServer] Server instance is null after creation');
+          reject(new Error('服务器实例创建失败: 实例为空'));
           return;
         }
         
@@ -233,26 +245,33 @@ class TCPHttpServer {
           return;
         }
         
+        logger.debug('[TCPHttpServer] Calling server.listen...');
         this.server.listen({ port: PORT, host: '0.0.0.0' }, () => {
           logger.debug(`[TCPHttpServer] Server listening on ${ipAddress}:${PORT}`);
           this.isRunning = true;
           resolve(`http://${ipAddress}:${PORT}`);
         });
 
-        this.server.on('error', (error: Error) => {
-          logger.info('[TCPHttpServer] Server error:', error);
+        this.server.on('error', (error: any) => {
+          logger.error('[TCPHttpServer] Server error:', error);
+          logger.error('[TCPHttpServer] Server error details:', { 
+            message: error.message, 
+            code: error.code, 
+            stack: error.stack 
+          });
           this.isRunning = false;
           // 针对端口占用的错误提供更友好的消息
-          if (error.message && error.message.includes('EADDRINUSE')) {
-            reject(new Error('端口已被占用，请稍后再试或重启应用。'));
+          if (error.code === 'EADDRINUSE') {
+            reject(new Error(`端口${PORT}已被占用，请稍后再试或重启应用。`));
           } else {
-            reject(error);
+            const errorMsg = error.message || JSON.stringify(error);
+            reject(new Error(`服务器启动失败: ${errorMsg}`));
           }
         });
 
       } catch (error) {
-        logger.info('[TCPHttpServer] Failed to start server:', error);
-        reject(error);
+        logger.error('[TCPHttpServer] Failed to start server:', error);
+        reject(new Error(`启动失败: ${error instanceof Error ? error.message : '未知错误'}`));
       }
     });
   }

@@ -171,6 +171,9 @@ if (Platform.OS === 'android') {
   };
 }
 
+// 存储事件监听器，避免直接修改原生模块对象
+let _eventListeners: { remove: () => void }[] | null = null;
+
 // 定义AI语音模块接口
 interface IAIVoiceModule {
   // 注册视频应用
@@ -327,16 +330,16 @@ const AIVoiceService: IAIVoiceModule = {
 
         try {
             // 先清理之前的监听器，避免泄漏
-            if ((AIVoiceModule as any)._eventListeners) {
+            if (_eventListeners) {
                 console.log('AIVoiceModule: Cleaning up previous event listeners');
-                ((AIVoiceModule as any)._eventListeners as Array<{ remove: () => void }>).forEach(listener => {
+                _eventListeners.forEach(listener => {
                     try {
                         listener.remove();
                     } catch (error) {
                         console.error('AIVoiceModule: Error removing previous listener:', error);
                     }
                 });
-                (AIVoiceModule as any)._eventListeners = null;
+                _eventListeners = null;
             }
             
             // 定义所有事件监听器
@@ -492,7 +495,7 @@ const AIVoiceService: IAIVoiceModule = {
                 'aiSearch, aiControl, AIOpenSearch, AIOpenControl, chineseSearch, voiceCommand, AIOpenError, aiError');
             
             // 存储监听器引用，以便后续清理
-            (AIVoiceModule as any)._eventListeners = eventListeners;
+            _eventListeners = eventListeners;
             
         } catch (error) {
             console.error('AIVoiceModule: Error setting up event listeners:', error);
@@ -509,16 +512,16 @@ const AIVoiceService: IAIVoiceModule = {
         }
         
         try {
-            if ((AIVoiceModule as any)._eventListeners) {
+            if (_eventListeners) {
                 console.log('AIVoiceModule: Cleaning up event listeners');
-                ((AIVoiceModule as any)._eventListeners as Array<{ remove: () => void }>).forEach(listener => {
+                _eventListeners.forEach(listener => {
                     try {
                         listener.remove();
                     } catch (error) {
                         console.error('AIVoiceModule: Error removing listener:', error);
                     }
                 });
-                (AIVoiceModule as any)._eventListeners = null;
+                _eventListeners = null;
             }
         } catch (error) {
             console.error('AIVoiceModule: Error cleaning up event listeners:', error);

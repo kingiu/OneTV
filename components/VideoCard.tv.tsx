@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
-import { View, Text, Image, StyleSheet, Pressable, TouchableOpacity, Alert, Animated, Platform } from "react-native";
+import { View, Text, Image, StyleSheet, Pressable, TouchableOpacity, Alert, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { Star, Play } from "lucide-react-native";
 import { PlayRecordManager } from "@/services/storage";
@@ -7,7 +7,6 @@ import { API } from "@/services/api";
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import Logger from '@/utils/Logger';
-import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 const logger = Logger.withTag('VideoCardTV');
 
@@ -54,8 +53,6 @@ const VideoCard = forwardRef<View, VideoCardProps>(
     const longPressTriggered = useRef(false);
 
     const scale = useRef(new Animated.Value(1)).current;
-
-    const deviceType = useResponsiveLayout().deviceType;
 
     const animatedStyle = {
       transform: [{ scale }],
@@ -157,21 +154,30 @@ const VideoCard = forwardRef<View, VideoCardProps>(
     return (
       <Animated.View style={[styles.wrapper, animatedStyle, { opacity: fadeAnim }]}>
         <Pressable
-          android_ripple={Platform.isTV || deviceType !== 'tv' ? { color: 'transparent' } : { color: Colors.dark.link }}
+          android_ripple={{ color: Colors.dark.link, borderless: false, foreground: true }}
           onPress={handlePress}
           onLongPress={handleLongPress}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          style={({ pressed }) => [
-            styles.pressable,
-            {
-              zIndex: pressed ? 999 : 1, // 确保按下时有最高优先级
-            },
-          ]}
+          style={styles.pressable}
           // activeOpacity={1}
           delayLongPress={1000}
         >
-          <View style={styles.card}>
+          <View style={[
+            styles.card,
+            isFocused && {
+              // 只在实际聚焦时显示聚焦样式
+              borderWidth: 3,
+              borderColor: Colors.dark.primary,
+              borderRadius: 10,
+              elevation: 8,
+              shadowColor: Colors.dark.primary,
+              shadowOffset: { width: 0, height: 0 },
+              shadowOpacity: 0.8,
+              shadowRadius: 15,
+              zIndex: 100,
+            }
+          ]}>
             <Image source={{ uri: api.getImageProxyUrl(poster) }} style={styles.poster} />
             {isFocused && (
               <View style={styles.overlay}>
@@ -246,9 +252,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: "#222",
-    overflow: "hidden",
+    overflow: "visible",
   },
   poster: {
     width: "100%",

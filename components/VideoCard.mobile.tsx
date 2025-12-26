@@ -80,6 +80,11 @@ const VideoCardMobile = forwardRef<View, VideoCardMobileProps>(
         delay: Math.random() * 100,
         useNativeDriver: true,
       }).start();
+      
+      // 组件卸载时停止动画，避免回调泄漏
+      return () => {
+        fadeAnim.stopAnimation();
+      };
     }, [fadeAnim]);
 
     const handleLongPress = () => {

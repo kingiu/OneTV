@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import { View, StyleSheet, Animated, Easing } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -7,22 +7,26 @@ interface VideoLoadingAnimationProps {
 }
 
 const VideoLoadingAnimation: React.FC<VideoLoadingAnimationProps> = ({ showProgressBar = true }) => {
+  // 直接在顶层使用useRef创建所有动画值，避免hooks规则违反
   const floatAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(0)).current;
-  const bounceAnims = [
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-  ];
+  
+  // 分别创建bounce动画的ref
+  const bounceAnim1 = useRef(new Animated.Value(0)).current;
+  const bounceAnim2 = useRef(new Animated.Value(0)).current;
+  const bounceAnim3 = useRef(new Animated.Value(0)).current;
+  const bounceAnims = [bounceAnim1, bounceAnim2, bounceAnim3];
+  
   const progressAnim = useRef(new Animated.Value(0)).current;
   const gradientAnim = useRef(new Animated.Value(0)).current;
   const textFadeAnim = useRef(new Animated.Value(0)).current;
-  const shapeAnims = [
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-    useRef(new Animated.Value(0)).current,
-  ];
+  
+  // 分别创建shape动画的ref
+  const shapeAnim1 = useRef(new Animated.Value(0)).current;
+  const shapeAnim2 = useRef(new Animated.Value(0)).current;
+  const shapeAnim3 = useRef(new Animated.Value(0)).current;
+  const shapeAnim4 = useRef(new Animated.Value(0)).current;
+  const shapeAnims = [shapeAnim1, shapeAnim2, shapeAnim3, shapeAnim4];
 
   useEffect(() => {
     const floatAnimation = Animated.loop(
@@ -128,7 +132,8 @@ const VideoLoadingAnimation: React.FC<VideoLoadingAnimationProps> = ({ showProgr
       )
     );
 
-    Animated.parallel([
+    // 保存动画实例，以便在组件卸载时停止
+    const animations = Animated.parallel([
       floatAnimation,
       pulseAnimation,
       ...bounceAnimations,
@@ -136,8 +141,24 @@ const VideoLoadingAnimation: React.FC<VideoLoadingAnimationProps> = ({ showProgr
       gradientAnimation,
       textFadeAnimation,
       ...shapeAnimations,
-    ]).start();
-  }, []);
+    ]);
+    
+    animations.start();
+    
+    // 组件卸载时停止所有动画，避免回调泄漏
+    return () => {
+      animations.stop();
+      
+      // 单独停止每个Animated.Value的动画，确保完全清理
+      floatAnim.stopAnimation();
+      pulseAnim.stopAnimation();
+      bounceAnims.forEach(anim => anim.stopAnimation());
+      progressAnim.stopAnimation();
+      gradientAnim.stopAnimation();
+      textFadeAnim.stopAnimation();
+      shapeAnims.forEach(anim => anim.stopAnimation());
+    };
+  }, [floatAnim, pulseAnim, bounceAnims, progressAnim, gradientAnim, textFadeAnim, shapeAnims]);
 
   const animatedStyles = {
     float: {
