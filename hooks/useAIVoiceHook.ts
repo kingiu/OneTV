@@ -133,22 +133,54 @@ export const useAIVoiceHook = (): UseAIVoiceHookReturn => {
         const isChinese = /[\u4e00-\u9fa5]/.test(command.keyword);
         console.log('useAIVoiceHook: Is Chinese keyword:', isChinese);
         
-        // 执行实际的搜索操作
-        console.log('useAIVoiceHook: Performing search with keyword:', command.keyword);
+        // 检查命令是否包含"搜索"关键词
+        const hasSearchKeyword = command.keyword.includes('搜索');
+        // 提取实际的影视名称
+        const actualKeyword = hasSearchKeyword ? command.keyword.replace(/搜索/g, '').trim() : command.keyword;
+        
+        console.log('useAIVoiceHook: Actual keyword after processing:', actualKeyword);
         
         // 更新当前命令到全局状态
-        setCurrentCommand(command);
-        
-        // 立即导航到搜索页面，让用户看到加载状态
-        console.log('useAIVoiceHook: Navigating to search page');
-        router.push('/search');
+        setCurrentCommand({ ...command, keyword: actualKeyword });
         
         // 执行搜索
-        api.searchVideos(command.keyword)
+        api.searchVideos(actualKeyword)
           .then(({ results }) => {
             console.log('useAIVoiceHook: Search results received:', results.length);
             // 存储搜索结果到全局状态
             setSearchResults(results);
+            
+            if (results.length > 0) {
+              // 如果不包含"搜索"关键词，直接跳转到第一个结果的详情页
+              if (!hasSearchKeyword) {
+                console.log('useAIVoiceHook: No "search" keyword, navigating directly to first detail page');
+                router.push({
+                  pathname: '/detail',
+                  params: { 
+                    source: results[0].source, 
+                    q: results[0].title 
+                  }
+                });
+              } else if (results.length === 1) {
+                // 如果包含"搜索"关键词且只有一个结果，直接跳转到详情页
+                console.log('useAIVoiceHook: With "search" keyword and only one result, navigating directly to detail page');
+                router.push({
+                  pathname: '/detail',
+                  params: { 
+                    source: results[0].source, 
+                    q: results[0].title 
+                  }
+                });
+              } else {
+                // 如果包含"搜索"关键词且有多个结果，导航到搜索页面
+                console.log('useAIVoiceHook: With "search" keyword and multiple results, navigating to search page');
+                router.push('/search');
+              }
+            } else {
+              // 没有搜索结果，导航到搜索页面显示
+              console.log('useAIVoiceHook: No results, navigating to search page');
+              router.push('/search');
+            }
           })
           .catch((error) => {
             console.error('useAIVoiceHook: Search failed:', error);
@@ -156,6 +188,8 @@ export const useAIVoiceHook = (): UseAIVoiceHookReturn => {
             setSearchResults([]);
             // 设置错误信息
             setError(`搜索失败: ${error instanceof Error ? error.message : '未知错误'}`);
+            // 导航到搜索页面显示错误
+            router.push('/search');
           })
           .finally(() => {
             // 命令处理完成
@@ -185,7 +219,7 @@ export const useAIVoiceHook = (): UseAIVoiceHookReturn => {
       setError(`Failed to handle command: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setIsListening(false);
     }
-  }, [setCurrentCommand, setIsListening, setSearchResults, setError]);
+  }, [setCurrentCommand, setIsListening, setSearchResults, setError, router]);
 
   useEffect(() => {
     // 只在Android平台上初始化

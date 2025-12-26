@@ -1,10 +1,5 @@
 import React, { useEffect, useCallback, useRef, useState } from "react";
 import { View, StyleSheet, ActivityIndicator, FlatList, Pressable, Animated, StatusBar, Platform, BackHandler } from "react-native";
-// 条件导入ToastAndroid
-let ToastAndroid: any = null;
-if (Platform.OS === 'android') {
-  ToastAndroid = require('react-native').ToastAndroid;
-}
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -25,6 +20,11 @@ import { Colors } from "@/constants/Colors";
 import DebugOverlay from "@/components/DebugOverlay";
 import { DEBUG_MODE, FEATURE_FLAGS } from "@/constants/DebugConfig";
 import { debug } from "@/utils/debugUtils";
+// 条件导入ToastAndroid
+let ToastAndroid: any = null;
+if (Platform.OS === 'android') {
+  ToastAndroid = require('react-native').ToastAndroid;
+}
 
 const LOAD_MORE_THRESHOLD = 200;
 

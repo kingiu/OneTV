@@ -321,13 +321,6 @@ const AIVoiceService: IAIVoiceModule = {
             return;
         }
 
-        if (!eventEmitter) {
-            console.warn('AIVoiceModule: Event emitter not available, skipping event listener setup');
-            console.warn('AIVoiceModule: This is expected if AI voice module is not properly installed or linked');
-            console.warn('AIVoiceModule: Voice functionality will be disabled but app will continue to run');
-            return;
-        }
-
         try {
             // 先清理之前的监听器，避免泄漏
             if (_eventListeners) {
@@ -340,6 +333,48 @@ const AIVoiceService: IAIVoiceModule = {
                     }
                 });
                 _eventListeners = null;
+            }
+            
+            if (!eventEmitter) {
+                console.warn('AIVoiceModule: Event emitter not available, trying alternative approach');
+                console.warn('AIVoiceModule: This is expected if AI voice module is not properly installed or linked');
+                
+                // 尝试直接使用AIVoiceModule的方法注册回调
+                if (AIVoiceModule && typeof AIVoiceModule.setVoiceCommandCallback === 'function') {
+                    console.log('AIVoiceModule: Using direct method to set voice command callback');
+                    AIVoiceModule.setVoiceCommandCallback((command: any) => {
+                        try {
+                            console.log('AIVoiceModule: Received voice command from direct callback:', command);
+                            // 处理命令格式
+                            let processedCommand: AICommand;
+                            if (typeof command === 'string') {
+                                processedCommand = {
+                                    type: 'search',
+                                    keyword: command.trim(),
+                                };
+                            } else {
+                                processedCommand = {
+                                    type: (command?.type || 'search') as AICommandType,
+                                    action: command?.action as any,
+                                    keyword: String(command?.keyword || command?.text || '').trim(),
+                                    playIndex: command?.playIndex,
+                                    fastForward: command?.fastForward,
+                                    fastBackward: command?.fastBackward,
+                                    seekTo: command?.seekTo,
+                                };
+                            }
+                            callback(processedCommand);
+                        } catch (error) {
+                            console.error('AIVoiceModule: Error handling direct voice command:', error);
+                        }
+                    });
+                    console.log('AIVoiceModule: Direct voice command callback set successfully');
+                    return;
+                } else {
+                    console.error('AIVoiceModule: No valid method to set voice command callback');
+                    console.error('AIVoiceModule: Voice functionality will be disabled');
+                    return;
+                }
             }
             
             // 定义所有事件监听器
@@ -498,7 +533,7 @@ const AIVoiceService: IAIVoiceModule = {
             _eventListeners = eventListeners;
             
         } catch (error) {
-            console.error('AIVoiceModule: Error setting up event listeners:', error);
+            console.error('AIVoiceModule: Error setting up voice functionality:', error);
             console.error('AIVoiceModule: Voice functionality may be limited, but app will continue to run');
         }
     },
