@@ -30,6 +30,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
     setOutroStartTime,
     introEndTime,
     outroStartTime,
+    seek,
   } = usePlayerStore();
 
   const { detail } = useDetailStore();
@@ -76,7 +77,25 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
               },
             ]}
           />
-          <Pressable style={styles.progressBarTouchable} />
+          <Pressable 
+            style={styles.progressBarTouchable} 
+            onPressIn={(e) => {
+              const { locationX } = e.nativeEvent;
+              const containerWidth = e.currentTarget.getBoundingClientRect().width;
+              const touchPosition = locationX / containerWidth;
+              usePlayerStore.setState({ isSeeking: true, seekPosition: touchPosition });
+            }}
+            onPressOut={(e) => {
+              const { locationX } = e.nativeEvent;
+              const containerWidth = e.currentTarget.getBoundingClientRect().width;
+              const touchPosition = locationX / containerWidth;
+              if (status?.isLoaded && status.durationMillis) {
+                const newPosition = touchPosition * status.durationMillis;
+                usePlayerStore.getState().seek(newPosition - status.positionMillis);
+              }
+              usePlayerStore.setState({ isSeeking: false });
+            }}
+          />
         </View>
 
         <ThemedText style={{ color: "white", marginTop: 5 }}>
@@ -86,6 +105,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
         </ThemedText>
 
         <View style={styles.bottomControls}>
+            <TouchableOpacity onPress={() => seek(-10000)} style={styles.controlButton}>
+              <Text style={{color: "white", fontSize: 24}}>⏪10s</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={setIntroEndTime} style={styles.controlButton}>
               <Icon name="search" color="white" size={24} />
               {introEndTime && <Text style={styles.timeLabel}>{formatTime(introEndTime)}</Text>}
@@ -93,6 +116,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
 
             <TouchableOpacity onPress={togglePlayPause} style={styles.controlButton}>
               <Text style={{color: "white", fontSize: 24}}>{status?.isLoaded && status.isPlaying ? "||" : "▶"}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => seek(10000)} style={styles.controlButton}>
+              <Text style={{color: "white", fontSize: 24}}>10s⏩</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={onPlayNextEpisode} style={styles.controlButton} disabled={!hasNextEpisode}>

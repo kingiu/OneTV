@@ -228,7 +228,7 @@ export default function PlayScreen() {
           <LoadingContainer style={dynamicStyles.loadingContainer} currentEpisode={currentEpisode} />
         )}
 
-        {showControls && deviceType === "tv" && (
+        {showControls && (
           <PlayerControls showControls={showControls} setShowControls={setShowControls} />
         )}
 

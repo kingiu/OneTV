@@ -1,564 +1,351 @@
 import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
-import { AICommand } from '../hooks/useAIVoiceHook';
 
-// 动态导入NativeModules，避免在非Android平台报错
-let AIVoiceModule: any;
-let eventEmitter: NativeEventEmitter | null = null;
+class AIVoiceModule {
+  private static instance: AIVoiceModule;
+  private eventEmitter: NativeEventEmitter | null = null;
+  private listeners: Map<string, Function> = new Map();
+  private commandCallback: ((command: any) => void) | null = null;
+  private AIOpenModule: any = null;
+  private isInitialized: boolean = false;
+  private isInitializing: boolean = false;
 
-// 添加中文语音引擎支持标志
-let isChineseVoiceEngineAvailable = false;
-
-// 简化日志，只保留关键信息
-console.log('AIVoiceModule: Initializing...');
-
-if (Platform.OS === 'android') {
-  console.log('AIVoiceModule: Running on Android platform');
-  
-  // 安全检查 NativeModules 是否存在
-  if (!NativeModules) {
-    console.error('AIVoiceModule: NativeModules is not available');
-    
-    // 创建模拟模块，避免后续调用崩溃
-    AIVoiceModule = {
-      registerVideoApp: async () => true,
-      registerVideoReceiver: async () => {},
-      unregisterVideoReceiver: async () => {}
-    };
-  } else {
-    console.log('AIVoiceModule: NativeModules is available');
-    
-    // 打印所有可用的NativeModules，帮助调试
-    const availableModules = Object.keys(NativeModules);
-    console.log('AIVoiceModule: Available NativeModules:', availableModules);
-    
-    try {
-      // 尝试获取AIOpenModule或AIOpen
-      // 首先检查AIOpen
-      const aiOpenModule = NativeModules.AIOpen;
-      console.log('AIVoiceModule: AIOpen reference obtained');
-      
-      // 检查 aiOpenModule 的类型和内容
-      const aiOpenModuleType = typeof aiOpenModule;
-      console.log('AIVoiceModule: AIOpen typeof:', aiOpenModuleType);
-      console.log('AIVoiceModule: AIOpen is null:', aiOpenModule === null);
-      console.log('AIVoiceModule: AIOpen is undefined:', aiOpenModule === undefined);
-      
-      // 原生模块的方法不是可枚举属性，所以Object.keys()会返回空数组
-      const aiOpenProperties = aiOpenModule ? Object.keys(aiOpenModule) : [];
-      console.log('AIVoiceModule: AIOpen enumerable properties:', aiOpenProperties);
-      console.log('AIVoiceModule: AIOpen has enumerable properties:', aiOpenProperties.length > 0);
-      
-      // 检查AIOpen对象是否有效 - 对于原生模块，即使没有可枚举属性，也是有效的
-      const isAIOpenValid = typeof aiOpenModule === 'object' && aiOpenModule !== null;
-      
-      if (isAIOpenValid) {
-        console.log('AIVoiceModule: AIOpen is valid object (native module)');
-        console.log('AIVoiceModule: AIOpen enumerable properties:', aiOpenProperties);
-        AIVoiceModule = aiOpenModule;
-        
-        // 尝试创建eventEmitter
-        try {
-          eventEmitter = new NativeEventEmitter(AIVoiceModule);
-          console.log('AIVoiceModule: eventEmitter created successfully');
-          
-          // 设置中文语音引擎标志
-          isChineseVoiceEngineAvailable = true;
-          console.log('AIVoiceModule: Chinese voice engine initialized successfully');
-        } catch (e) {
-          console.error('AIVoiceModule: Failed to create eventEmitter:', e);
-          // 即使eventEmitter创建失败，也要继续使用AIVoiceModule
-          console.error('AIVoiceModule: This is expected if the module is not properly implemented');
-          console.error('AIVoiceModule: Falling back to mock implementation for event handling');
-        }
-      } else {
-        // 尝试检查AIOpenModule
-        console.log('AIVoiceModule: AIOpen is not valid, checking for AIOpenModule...');
-        
-        // 检查AIOpenModule
-        const aiOpenModuleLegacy = NativeModules.AIOpenModule;
-        console.log('AIVoiceModule: AIOpenModule reference obtained');
-        
-        // 检查 aiOpenModuleLegacy 的类型和内容
-        const aiOpenModuleLegacyType = typeof aiOpenModuleLegacy;
-        console.log('AIVoiceModule: AIOpenModule typeof:', aiOpenModuleLegacyType);
-        console.log('AIVoiceModule: AIOpenModule is null:', aiOpenModuleLegacy === null);
-        console.log('AIVoiceModule: AIOpenModule is undefined:', aiOpenModuleLegacy === undefined);
-        
-        // 原生模块的方法不是可枚举属性，所以Object.keys()会返回空数组
-        const aiOpenModuleLegacyProperties = aiOpenModuleLegacy ? Object.keys(aiOpenModuleLegacy) : [];
-        console.log('AIVoiceModule: AIOpenModule enumerable properties:', aiOpenModuleLegacyProperties);
-        console.log('AIVoiceModule: AIOpenModule has enumerable properties:', aiOpenModuleLegacyProperties.length > 0);
-        
-        // 检查AIOpenModule对象是否有效 - 对于原生模块，即使没有可枚举属性，也是有效的
-        const isAIOpenModuleValid = typeof aiOpenModuleLegacy === 'object' && aiOpenModuleLegacy !== null;
-        
-        if (isAIOpenModuleValid) {
-          console.log('AIVoiceModule: AIOpenModule is valid object (native module)');
-          console.log('AIVoiceModule: AIOpenModule enumerable properties:', aiOpenModuleLegacyProperties);
-          AIVoiceModule = aiOpenModuleLegacy;
-          
-          try {
-            eventEmitter = new NativeEventEmitter(AIVoiceModule);
-            console.log('AIVoiceModule: eventEmitter created for AIOpenModule');
-            isChineseVoiceEngineAvailable = true;
-          } catch (e) {
-            console.error('AIVoiceModule: Failed to create eventEmitter for AIOpenModule:', e);
-            // 即使eventEmitter创建失败，也要继续使用AIVoiceModule
-          }
-        } else {
-          // 检查所有NativeModules中是否有AI相关的模块
-          console.log('AIVoiceModule: AIOpenModule is not valid, checking for other AI modules...');
-          const aiModules = availableModules.filter(key => 
-            key.toLowerCase().includes('ai') || 
-            key.toLowerCase().includes('voice') || 
-            key.toLowerCase().includes('speech')
-          );
-          
-          console.log('AIVoiceModule: Available modules with AI-related keywords:', aiModules);
-          
-          if (aiModules.length > 0) {
-            console.log('AIVoiceModule: Found AI-related modules:', aiModules);
-            // 尝试使用第一个找到的AI模块
-            const aiModuleName = aiModules[0];
-            AIVoiceModule = NativeModules[aiModuleName];
-            console.log('AIVoiceModule: Using AI module:', aiModuleName);
-            
-            // 原生模块的方法不是可枚举属性，所以Object.keys()会返回空数组
-            const aiModuleProperties = Object.keys(AIVoiceModule);
-            console.log('AIVoiceModule: Module enumerable properties:', aiModuleProperties);
-            console.log('AIVoiceModule: Module has enumerable properties:', aiModuleProperties.length > 0);
-            
-            try {
-              eventEmitter = new NativeEventEmitter(AIVoiceModule);
-              console.log('AIVoiceModule: eventEmitter created for module:', aiModules[0]);
-            } catch (e) {
-              console.error('AIVoiceModule: Failed to create eventEmitter for module:', aiModules[0], e);
-              // 即使eventEmitter创建失败，也要继续使用AIVoiceModule
-            }
-          } else {
-            console.error('AIVoiceModule: Neither AIOpenModule nor AIOpen is available');
-            console.error('AIVoiceModule: No AI-related NativeModules found');
-            
-            // 创建模拟模块，避免后续调用崩溃
-            AIVoiceModule = {
-              registerVideoApp: async () => true,
-              registerVideoReceiver: async () => {},
-              unregisterVideoReceiver: async () => {}
-            };
-            console.log('AIVoiceModule: Created mock AI module to prevent crashes');
-          }
-        }
-      }
-    } catch (error) {
-      console.error('AIVoiceModule: Error during initialization:', error);
-      
-      // 创建模拟模块，避免后续调用崩溃
-      AIVoiceModule = {
-        registerVideoApp: async () => true,
-        registerVideoReceiver: async () => {},
-        unregisterVideoReceiver: async () => {}
-      };
-    }
+  private constructor() {
+    console.log('AIVoiceModule: Constructor called');
+    // 延迟初始化，不在构造函数中立即初始化NativeModules
   }
-} else {
-  console.error('AIVoiceModule: Not available on non-Android platform');
-  
-  // 创建模拟模块，避免后续调用崩溃
-  AIVoiceModule = {
-    registerVideoApp: async () => true,
-    registerVideoReceiver: async () => {},
-    unregisterVideoReceiver: async () => {}
-  };
-}
 
-// 存储事件监听器，避免直接修改原生模块对象
-let _eventListeners: { remove: () => void }[] | null = null;
+  public static getInstance(): AIVoiceModule {
+    if (!AIVoiceModule.instance) {
+      AIVoiceModule.instance = new AIVoiceModule();
+    }
+    return AIVoiceModule.instance;
+  }
 
-// 定义AI语音模块接口
-interface IAIVoiceModule {
-  // 注册视频应用
-  registerVideoApp: () => Promise<boolean>;
-  
-  // 注册视频接收器
-  registerVideoReceiver: () => Promise<void>;
-  
-  // 取消注册视频接收器
-  unregisterVideoReceiver: () => Promise<void>;
-  
-  // 设置命令回调
-  setCommandCallback: (callback: (command: AICommand) => void) => void;
-  
-  // 清理事件监听器
-  cleanupEventListeners: () => void;
-  
-  // 注册广播接收器
-  registerBroadcastReceiver: () => Promise<void>;
-  
-  // 取消注册广播接收器
-  unregisterBroadcastReceiver: () => Promise<void>;
-}
-
-// 实现AI语音模块
-const AIVoiceService: IAIVoiceModule = {
-  /**
-   * 注册视频应用到夏杰语音服务
-   * @returns Promise<boolean> 注册结果
-   */
-  registerVideoApp: async (): Promise<boolean> => {
-    console.log('AIVoiceModule: registerVideoApp called');
+  // 延迟初始化方法
+  private async initialize(): Promise<boolean> {
+    if (this.isInitialized) {
+      console.log('AIVoiceModule: Already initialized');
+      return true;
+    }
     
-    if (Platform.OS !== 'android') {
-      console.warn('AIVoiceModule: Not available on non-Android platform');
+    if (this.isInitializing) {
+      console.log('AIVoiceModule: Already initializing');
       return false;
     }
     
-    if (!AIVoiceModule) {
-      console.warn('AIVoiceModule: AIVoiceModule reference is null or undefined');
-      // 即使模块不可用，也返回true以避免应用崩溃
-      return true;
-    }
-
     try {
-      // 检查并调用registerVideoApp方法
-      if (typeof AIVoiceModule.registerVideoApp === 'function') {
-        console.log('AIVoiceModule: Calling registerVideoApp method');
-        await AIVoiceModule.registerVideoApp();
-        console.log('AIVoiceModule: registerVideoApp method completed successfully');
-      } else {
-        console.warn('AIVoiceModule: registerVideoApp method not available in AIVoiceModule');
-        
-        // 尝试使用register方法（可能的别名）
-        if (typeof AIVoiceModule.register === 'function') {
-          console.log('AIVoiceModule: Calling register method as fallback');
-          await AIVoiceModule.register();
-          console.log('AIVoiceModule: register method completed successfully');
-        } else {
-          console.warn('AIVoiceModule: No register method available');
-        }
+      this.isInitializing = true;
+      console.log('AIVoiceModule: Initializing...');
+      
+      if (Platform.OS !== 'android') {
+        console.log('AIVoiceModule: Not running on Android, skipping initialization');
+        this.isInitialized = true;
+        return true;
       }
       
-      // 检查并调用registerVideoReceiver方法
-      if (typeof AIVoiceModule.registerVideoReceiver === 'function') {
-        console.log('AIVoiceModule: Calling registerVideoReceiver method');
-        await AIVoiceModule.registerVideoReceiver();
-        console.log('AIVoiceModule: registerVideoReceiver method completed successfully');
-      } else {
-        console.warn('AIVoiceModule: registerVideoReceiver method not available in AIVoiceModule');
-        
-        // 尝试使用registerReceiver方法（可能的别名）
-        if (typeof AIVoiceModule.registerReceiver === 'function') {
-          console.log('AIVoiceModule: Calling registerReceiver method as fallback');
-          await AIVoiceModule.registerReceiver();
-          console.log('AIVoiceModule: registerReceiver method completed successfully');
-        } else {
-          console.warn('AIVoiceModule: No register receiver method available');
-        }
+      console.log('AIVoiceModule: Running on Android platform');
+      
+      // 安全检查NativeModules是否可用
+      if (typeof NativeModules === 'undefined') {
+        console.error('AIVoiceModule: NativeModules is undefined');
+        return false;
       }
       
-      // 添加中文语音识别配置
-      if (typeof AIVoiceModule.setLanguage === 'function') {
-        console.log('AIVoiceModule: Setting language to Chinese');
-        await AIVoiceModule.setLanguage('zh-CN');
-        console.log('AIVoiceModule: Language set to Chinese successfully');
+      console.log('AIVoiceModule: NativeModules is available');
+      
+      // 修复模块名称：使用正确的模块名称 AISpeechModule
+      // 安全访问，避免直接访问不存在的属性导致崩溃
+      this.AIOpenModule = NativeModules.AISpeechModule || null;
+      
+      if (this.AIOpenModule) {
+        console.log('AIVoiceModule: AISpeechModule reference obtained');
+        console.log('AIVoiceModule: AISpeechModule typeof:', typeof this.AIOpenModule);
+        
+        // 检查AISpeechModule模块的方法
+        try {
+          const methods = Object.keys(this.AIOpenModule);
+          console.log('AIVoiceModule: AISpeechModule enumerable properties:', methods);
+          console.log('AIVoiceModule: AISpeechModule has enumerable properties:', methods.length > 0);
+        } catch (error) {
+          console.error('AIVoiceModule: Error getting AISpeechModule methods:', error);
+        }
+        
+        // 创建事件发射器
+        try {
+          this.eventEmitter = new NativeEventEmitter(this.AIOpenModule);
+          console.log('AIVoiceModule: eventEmitter created successfully');
+        } catch (error) {
+          console.error('AIVoiceModule: Error creating event emitter:', error);
+          this.eventEmitter = null;
+        }
+        
+        console.log('AIVoiceModule: Chinese voice engine initialized successfully');
+        this.isInitialized = true;
+        return true;
+      } else {
+        console.error('AIVoiceModule: Failed to get AISpeechModule reference');
+        return false;
       }
+    } catch (error) {
+      console.error('AIVoiceModule: Error initializing Chinese voice engine:', error);
+      return false;
+    } finally {
+      this.isInitializing = false;
+    }
+  }
+
+  // 设置命令回调
+  public setCommandCallback(callback: (command: any) => void): void {
+    this.commandCallback = callback;
+    console.log('AIVoiceModule: Command callback set successfully');
+  }
+
+  // 注册视频应用
+  public async registerVideoApp(): Promise<boolean> {
+    try {
+      console.log('AIVoiceModule: registerVideoApp called');
+      
+      // 首先确保模块已经初始化
+      const initialized = await this.initialize();
+      if (!initialized) {
+        console.error('AIVoiceModule: Failed to initialize, cannot register app');
+        return false;
+      }
+      
+      if (!this.AIOpenModule) {
+        console.error('AIVoiceModule: AIOpenModule is not available');
+        return false;
+      }
+      
+      // 检查AIOpenModule是否有registerApp方法
+      if (typeof this.AIOpenModule.registerApp === 'function') {
+        console.log('AIVoiceModule: Calling registerApp method');
+        try {
+          // 修复方法名称和参数：使用registerApp，需要packageName和category参数
+          await this.AIOpenModule.registerApp('com.onetv', 'video');
+          console.log('AIVoiceModule: registerApp method completed successfully');
+        } catch (error) {
+          console.error('AIVoiceModule: Error calling registerApp method:', error);
+          // 继续执行，不影响后续步骤
+        }
+      } else {
+        console.log('AIVoiceModule: registerApp method not available, skipping');
+      }
+      
+      // 检查AIOpenModule是否有startService方法
+      if (typeof this.AIOpenModule.startService === 'function') {
+        console.log('AIVoiceModule: Calling startService method');
+        try {
+          // 调用startService方法启动语音服务
+          await this.AIOpenModule.startService();
+          console.log('AIVoiceModule: startService method completed successfully');
+        } catch (error) {
+          console.error('AIVoiceModule: Error calling startService method:', error);
+          // 继续执行，不影响后续步骤
+        }
+      } else {
+        console.log('AIVoiceModule: startService method not available, skipping');
+      }
+      
+      // 注册事件监听器
+      this.registerEventListeners();
       
       console.log('AIVoiceModule: registerVideoApp completed successfully');
       return true;
     } catch (error) {
-      console.error('AIVoiceModule: Failed to register video app:', error);
-      // 返回false表示注册失败，但不导致应用崩溃
+      console.error('AIVoiceModule: registerVideoApp failed:', error);
       return false;
     }
-  },
+  }
 
-  /**
-   * 注册视频接收器
-   * @returns Promise<void>
-   */
-  registerVideoReceiver: async (): Promise<void> => {
-    if (Platform.OS !== 'android' || !AIVoiceModule) {
-      return;
-    }
-
+  // 注销视频接收器
+  public async unregisterVideoReceiver(): Promise<void> {
     try {
-      if (typeof AIVoiceModule.registerVideoReceiver === 'function') {
-        await AIVoiceModule.registerVideoReceiver();
-      } else {
-        console.warn('registerVideoReceiver method not available in AIVoiceModule');
+      if (!this.isInitialized) {
+        console.log('AIVoiceModule: Not initialized, skipping unregister');
+        return;
       }
-    } catch (error) {
-      console.error('Failed to register video receiver:', error);
-    }
-  },
-
-  /**
-   * 取消注册视频接收器
-   * @returns Promise<void>
-   */
-  unregisterVideoReceiver: async (): Promise<void> => {
-    if (Platform.OS !== 'android' || !AIVoiceModule) {
-      return;
-    }
-
-    try {
-      if (typeof AIVoiceModule.unregisterVideoReceiver === 'function') {
-        await AIVoiceModule.unregisterVideoReceiver();
-      } else {
-        console.warn('unregisterVideoReceiver method not available in AIVoiceModule');
+      
+      if (!this.AIOpenModule) {
+        console.error('AIVoiceModule: AIOpenModule is not available');
+        return;
       }
-    } catch (error) {
-      console.error('Failed to unregister video receiver:', error);
-    }
-  },
-
-  /**
-     * 设置命令回调
-     * @param callback 命令回调函数
-     */
-    setCommandCallback: (callback: (command: AICommand) => void): void => {
-        if (Platform.OS !== 'android') {
-            console.warn('AIVoiceModule: Not available on non-Android platform, skipping event listener setup');
-            return;
-        }
-
-        if (!eventEmitter) {
-            console.warn('AIVoiceModule: Event emitter not available, skipping event listener setup');
-            console.warn('AIVoiceModule: This is expected if AI voice module is not properly installed or linked');
-            console.warn('AIVoiceModule: Voice functionality will be disabled but app will continue to run');
-            return;
-        }
-
+      
+      // 检查unregisterVideoReceiver方法是否存在
+      if (typeof this.AIOpenModule.unregisterVideoReceiver === 'function') {
+        console.log('AIVoiceModule: Calling unregisterVideoReceiver method');
         try {
-            // 先清理之前的监听器，避免泄漏
-            if (_eventListeners) {
-                console.log('AIVoiceModule: Cleaning up previous event listeners');
-                _eventListeners.forEach(listener => {
-                    try {
-                        listener.remove();
-                    } catch (error) {
-                        console.error('AIVoiceModule: Error removing previous listener:', error);
-                    }
-                });
-                _eventListeners = null;
-            }
-            
-            // 定义所有事件监听器
-            const eventListeners: { remove: () => void }[] = [];
-            
-            // 监听搜索命令 - 修复事件名称不匹配问题
-            const searchEventListener = eventEmitter.addListener('aiSearch', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received aiSearch event:', event);
-                    // 处理中文语音搜索
-                    let keyword = '';
-                    if (typeof event === 'string') {
-                        keyword = event;
-                    } else {
-                        // 兼容多种事件格式
-                        keyword = event?.keyword || event?.aiSearch || event?.search || event?.text || JSON.stringify(event);
-                    }
-                    
-                    // 确保关键词是字符串
-                    keyword = String(keyword);
-                    
-                    console.log('AIVoiceModule: Extracted keyword:', keyword);
-                    const command: AICommand = {
-                        type: 'search',
-                        keyword: keyword.trim(),
-                    };
-                    console.log('AIVoiceModule: Created search command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling aiSearch event:', error);
-                }
-            });
-            eventListeners.push(searchEventListener);
-            
-            // 监听控制命令 - 修复事件名称不匹配问题
-            const controlEventListener = eventEmitter.addListener('aiControl', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received aiControl event:', event);
-                    const command: AICommand = {
-                        type: 'control',
-                        action: event?.action,
-                        playIndex: event?.PlayIndex,
-                        fastForward: event?.FastForward,
-                        fastBackward: event?.FastBackward,
-                        seekTo: event?.SeekTo,
-                    };
-                    console.log('AIVoiceModule: Created control command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling aiControl event:', error);
-                }
-            });
-            eventListeners.push(controlEventListener);
-
-            // 兼容旧的事件名称 - AIOpenSearch
-            const aiOpenSearchListener = eventEmitter.addListener('AIOpenSearch', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received AIOpenSearch event:', event);
-                    const command: AICommand = {
-                        type: 'search',
-                        keyword: event?.keyword || event?.search || JSON.stringify(event),
-                    };
-                    console.log('AIVoiceModule: Created AIOpenSearch command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling AIOpenSearch event:', error);
-                }
-            });
-            eventListeners.push(aiOpenSearchListener);
-
-            // 兼容旧的事件名称 - AIOpenControl
-            const aiOpenControlListener = eventEmitter.addListener('AIOpenControl', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received AIOpenControl event:', event);
-                    const command: AICommand = {
-                        type: 'control',
-                        action: event?.action,
-                        playIndex: event?.PlayIndex,
-                        fastForward: event?.FastForward,
-                        fastBackward: event?.FastBackward,
-                        seekTo: event?.SeekTo,
-                    };
-                    console.log('AIVoiceModule: Created AIOpenControl command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling AIOpenControl event:', error);
-                }
-            });
-            eventListeners.push(aiOpenControlListener);
-
-            // 添加中文语音特定事件支持
-            const chineseSearchListener = eventEmitter.addListener('chineseSearch', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received chineseSearch event:', event);
-                    const keyword = event?.keyword || event?.text || JSON.stringify(event);
-                    const command: AICommand = {
-                        type: 'search',
-                        keyword: String(keyword).trim(),
-                    };
-                    console.log('AIVoiceModule: Created chineseSearch command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling chineseSearch event:', error);
-                }
-            });
-            eventListeners.push(chineseSearchListener);
-
-            // 添加通用语音事件支持
-            const voiceEventListener = eventEmitter.addListener('voiceCommand', (event: any) => {
-                try {
-                    console.log('AIVoiceModule: Received voiceCommand event:', event);
-                    let commandType: AICommandType = 'search';
-                    let keyword = '';
-                    let action: string | undefined;
-                    
-                    // 解析通用语音命令
-                    if (typeof event === 'string') {
-                        keyword = event;
-                    } else {
-                        commandType = (event?.type || 'search') as AICommandType;
-                        keyword = event?.keyword || event?.text || '';
-                        action = event?.action;
-                    }
-                    
-                    const command: AICommand = {
-                        type: commandType,
-                        action: action as any,
-                        keyword: String(keyword).trim(),
-                    };
-                    console.log('AIVoiceModule: Created voiceCommand command:', command);
-                    callback(command);
-                } catch (error) {
-                    console.error('Error handling voiceCommand event:', error);
-                }
-            });
-            eventListeners.push(voiceEventListener);
-
-            // 监听错误事件
-            const errorEventListener = eventEmitter.addListener('AIOpenError', (error: any) => {
-                console.error('AIVoiceModule: AI Voice Error:', error);
-            });
-            eventListeners.push(errorEventListener);
-
-            // 监听aiError事件
-            const aiErrorEventListener = eventEmitter.addListener('aiError', (error: any) => {
-                console.error('AIVoiceModule: AI Error:', error);
-            });
-            eventListeners.push(aiErrorEventListener);
-            
-            // 添加日志记录，确认监听器已注册
-            console.log('AIVoiceModule: Event listeners registered successfully');
-            console.log('AIVoiceModule: Listening for events:', 
-                'aiSearch, aiControl, AIOpenSearch, AIOpenControl, chineseSearch, voiceCommand, AIOpenError, aiError');
-            
-            // 存储监听器引用，以便后续清理
-            _eventListeners = eventListeners;
-            
+          await this.AIOpenModule.unregisterVideoReceiver();
+          console.log('AIVoiceModule: unregisterVideoReceiver method completed successfully');
         } catch (error) {
-            console.error('AIVoiceModule: Error setting up event listeners:', error);
-            console.error('AIVoiceModule: Voice functionality may be limited, but app will continue to run');
+          console.error('AIVoiceModule: Error calling unregisterVideoReceiver method:', error);
+          // 继续执行，不影响后续步骤
         }
-    },
+      } else {
+        console.log('AIVoiceModule: unregisterVideoReceiver method not available, skipping');
+      }
+      
+      // 检查是否有stopService方法
+      if (typeof this.AIOpenModule.stopService === 'function') {
+        console.log('AIVoiceModule: Calling stopService method');
+        try {
+          await this.AIOpenModule.stopService();
+          console.log('AIVoiceModule: stopService method completed successfully');
+        } catch (error) {
+          console.error('AIVoiceModule: Error calling stopService method:', error);
+          // 继续执行，不影响后续步骤
+        }
+      } else {
+        console.log('AIVoiceModule: stopService method not available, skipping');
+      }
+    } catch (error) {
+      console.error('AIVoiceModule: unregisterVideoReceiver failed:', error);
+    }
+  }
+
+  // 注册事件监听器
+  private registerEventListeners(): void {
+    if (!this.eventEmitter) {
+      console.error('AIVoiceModule: eventEmitter is not available');
+      return;
+    }
     
-    /**
-     * 清理事件监听器，避免泄漏
-     */
-    cleanupEventListeners: (): void => {
-        if (Platform.OS !== 'android') {
-            return;
-        }
-        
-        try {
-            if (_eventListeners) {
-                console.log('AIVoiceModule: Cleaning up event listeners');
-                _eventListeners.forEach(listener => {
-                    try {
-                        listener.remove();
-                    } catch (error) {
-                        console.error('AIVoiceModule: Error removing listener:', error);
-                    }
-                });
-                _eventListeners = null;
+    // 先清理现有的监听器，避免重复注册
+    this.cleanupEventListeners();
+    
+    // 监听的事件类型 - 匹配原生代码发送的事件名称
+    const events = ['AISpeechCommand', 'aiSearch', 'aiControl', 'AIOpenSearch', 'AIOpenControl', 'chineseSearch', 'voiceCommand', 'AIOpenError', 'aiError'];
+    
+    events.forEach(event => {
+      try {
+        const listener = this.eventEmitter!.addListener(event, (data: any) => {
+          console.log(`AIVoiceModule: Received event ${event} with data:`, data);
+          this.handleEvent(event, data);
+        });
+        this.listeners.set(event, listener.remove);
+      } catch (error) {
+        console.error(`AIVoiceModule: Error adding listener for event ${event}:`, error);
+      }
+    });
+    
+    console.log('AIVoiceModule: Event listeners registered successfully');
+    console.log('AIVoiceModule: Listening for events:', events);
+  }
+
+  // 处理事件
+  private handleEvent(event: string, data: any): void {
+    try {
+      if (!this.commandCallback) {
+        console.log('AIVoiceModule: No command callback set, ignoring event');
+        return;
+      }
+      
+      let command = null;
+      
+      // 根据事件类型处理数据
+      switch (event) {
+        case 'AISpeechCommand':
+          // 处理原生代码发送的AISpeechCommand事件
+          console.log('AIVoiceModule: Handling AISpeechCommand event with data:', data);
+          if (typeof data === 'string') {
+            // 处理"search:关键词"格式的数据
+            if (data.startsWith('search:')) {
+              // 提取关键词，例如："search:变形金刚" -> "变形金刚"
+              const keyword = data.substring(7).trim();
+              command = {
+                type: 'search',
+                keyword: keyword
+              };
+            } else if (data.includes('搜索') || data.includes('找') || data.includes('播放')) {
+              // 提取关键词，例如："搜索电影" -> "电影"
+              const keyword = data.replace(/搜索|找|播放/g, '').trim();
+              command = {
+                type: 'search',
+                keyword: keyword
+              };
+            } else {
+              // 其他命令作为control类型
+              command = {
+                type: 'control',
+                action: data
+              };
             }
-        } catch (error) {
-            console.error('AIVoiceModule: Error cleaning up event listeners:', error);
-        }
-    },
-
-  /**
-   * 注册广播接收器
-   * @returns Promise<void>
-   */
-  registerBroadcastReceiver: async (): Promise<void> => {
-    if (Platform.OS !== 'android' || !AIVoiceModule) {
-      return;
-    }
-
-    try {
-      await AIVoiceModule.registerVideoReceiver();
+          } else if (typeof data === 'object') {
+            // 如果是对象，直接使用
+            command = data;
+          }
+          break;
+        case 'aiSearch':
+        case 'AIOpenSearch':
+        case 'chineseSearch':
+          // 处理搜索事件，data可能是字符串或对象
+          let searchKeyword = '';
+          if (typeof data === 'string') {
+            // 直接使用字符串作为关键词
+            searchKeyword = data;
+          } else if (typeof data === 'object') {
+            // 从对象中提取关键词
+            searchKeyword = data.keyword || data.content || '';
+          }
+          command = {
+            type: 'search',
+            keyword: searchKeyword
+          };
+          break;
+        case 'aiControl':
+        case 'AIOpenControl':
+          // 处理控制事件，data可能是字符串或对象
+          let controlAction = '';
+          if (typeof data === 'string') {
+            // 直接使用字符串作为动作
+            controlAction = data;
+          } else if (typeof data === 'object') {
+            // 从对象中提取动作
+            controlAction = data.action || data.command || '';
+          }
+          command = {
+            type: 'control',
+            action: controlAction
+          };
+          break;
+        case 'voiceCommand':
+          // 处理通用语音命令
+          command = typeof data === 'string' ? { type: 'control', action: data } : data;
+          break;
+        case 'AIOpenError':
+        case 'aiError':
+          console.error('AIVoiceModule: Received error event:', event, data);
+          return;
+        default:
+          console.log('AIVoiceModule: Unknown event type:', event);
+          return;
+      }
+      
+      if (command) {
+        console.log('AIVoiceModule: Calling command callback with command:', command);
+        this.commandCallback(command);
+      }
     } catch (error) {
-      console.error('Failed to register broadcast receiver:', error);
+      console.error('AIVoiceModule: Error handling event:', error);
     }
-  },
+  }
 
-  /**
-   * 取消注册广播接收器
-   * @returns Promise<void>
-   */
-  unregisterBroadcastReceiver: async (): Promise<void> => {
-    if (Platform.OS !== 'android' || !AIVoiceModule) {
-      return;
-    }
+  // 清理事件监听器
+  public cleanupEventListeners(): void {
+    console.log('AIVoiceModule: Cleaning up event listeners');
+    this.listeners.forEach((removeListener, event) => {
+      try {
+        removeListener();
+        console.log(`AIVoiceModule: Removed listener for event:`, event);
+      } catch (error) {
+        console.error(`AIVoiceModule: Error removing listener for event ${event}:`, error);
+      }
+    });
+    this.listeners.clear();
+    // 不要清除commandCallback，避免后续事件无法处理
+    // this.commandCallback = null;
+    console.log('AIVoiceModule: Event listeners cleanup completed');
+  }
+}
 
-    try {
-      await AIVoiceModule.unregisterVideoReceiver();
-    } catch (error) {
-      console.error('Failed to unregister broadcast receiver:', error);
-    }
-  },
-};
-
-export default AIVoiceService;
+export default AIVoiceModule.getInstance();
