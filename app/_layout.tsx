@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
 import * as SplashScreen from "expo-splash-screen";
 import { Platform, View, StyleSheet } from "react-native";
@@ -16,6 +16,7 @@ import { UpdateModal } from "@/components/UpdateModal";
 import { UPDATE_CONFIG } from "@/constants/UpdateConfig";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import Logger from '@/utils/Logger';
+import AIVoiceModule from '../services/AIVoiceModule';
 
 const logger = Logger.withTag('RootLayout');
 
@@ -27,6 +28,7 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
+  const router = useRouter();
   const { loadSettings, remoteInputEnabled, apiBaseUrl } = useSettingsStore();
   const { startServer, stopServer } = useRemoteControlStore();
   const { checkLoginStatus } = useAuthStore();
@@ -75,6 +77,28 @@ export default function RootLayout() {
       stopServer();
     }
   }, [remoteInputEnabled, startServer, stopServer, responsiveConfig.deviceType]);
+
+  // 集成夏杰语音SDK
+  useEffect(() => {
+    // 监听语音命令
+    const handleVoiceCommand = (command: any) => {
+      logger.info('Received voice command:', command);
+      // 可以在这里处理通用的语音命令
+      // 例如：跳转到搜索页面
+      if (command.type === 'search' && command.keyword) {
+        // 使用expo-router进行导航
+        router.push({ pathname: '/search', params: { keyword: command.keyword } });
+      }
+    };
+
+    // 添加语音命令监听器
+    AIVoiceModule.addCommandListener(handleVoiceCommand);
+
+    // 组件卸载时移除监听器
+    return () => {
+      AIVoiceModule.removeCommandListener(handleVoiceCommand);
+    };
+  }, []);
 
   if (!loaded && !error) {
     return null;

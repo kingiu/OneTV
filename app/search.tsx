@@ -10,7 +10,7 @@ import { StyledButton } from "@/components/StyledButton";
 import { useRemoteControlStore } from "@/stores/remoteControlStore";
 import { RemoteControlModal } from "@/components/RemoteControlModal";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Colors } from "@/constants/Colors";
 import CustomScrollView from "@/components/CustomScrollView";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
@@ -32,6 +32,7 @@ export default function SearchScreen() {
   const { showModal: showRemoteModal, lastMessage, targetPage, clearMessage } = useRemoteControlStore();
   const { remoteInputEnabled } = useSettingsStore();
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   // 响应式布局配置
   const responsiveConfig = useResponsiveLayout();
@@ -48,6 +49,16 @@ export default function SearchScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastMessage, targetPage]);
+
+  // 处理从URL参数传递的搜索关键词（如语音命令）
+  useEffect(() => {
+    if (params.keyword && typeof params.keyword === 'string') {
+      const searchKeyword = params.keyword;
+      logger.debug("Received search keyword from params:", searchKeyword);
+      setKeyword(searchKeyword);
+      handleSearch(searchKeyword);
+    }
+  }, [params.keyword]);
 
   // useEffect(() => {
   //   // Focus the text input when the screen loads
