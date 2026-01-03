@@ -1,8 +1,11 @@
 import { NativeModules, NativeEventEmitter } from 'react-native';
 
-const { AIVoice } = NativeModules;
+// 检查AIVoice原生模块是否存在
+const isAIVoiceAvailable = NativeModules.AIVoice !== undefined;
+const AIVoice = NativeModules.AIVoice;
 
-const eventEmitter = new NativeEventEmitter(AIVoice);
+// 只有在原生模块存在时才创建事件发射器
+const eventEmitter = isAIVoiceAvailable ? new NativeEventEmitter(AIVoice) : null;
 
 interface VoiceCommand {
   type: string;
@@ -12,10 +15,17 @@ interface VoiceCommand {
 class AIVoiceModule {
   private static instance: AIVoiceModule;
   private commandListeners: ((command: VoiceCommand) => void)[] = [];
+  private isInitialized: boolean = false;
+  private isAvailable: boolean = isAIVoiceAvailable;
 
   private constructor() {
+    if (!this.isAvailable) {
+      console.warn('AIVoiceModule: AIVoice native module is not available');
+      return;
+    }
+
     // 注册原生事件监听器
-    eventEmitter.addListener('AISpeechCommand', (event: any) => {
+    eventEmitter?.addListener('AISpeechCommand', (event: any) => {
       this.handleVoiceCommand(event);
     });
     console.log('AIVoiceModule initialized successfully');
@@ -33,12 +43,21 @@ class AIVoiceModule {
    * @param appId 应用ID
    */
   public initSDK = async (appId: string): Promise<string> => {
+    if (!this.isAvailable) {
+      const errorMsg = 'AIVoiceModule: AIVoice native module is not available, cannot initialize SDK';
+      console.warn(errorMsg);
+      this.isInitialized = false;
+      return errorMsg;
+    }
+
     try {
       const result = await AIVoice.initSDK(appId);
       console.log('AIVoice SDK initialized successfully:', result);
+      this.isInitialized = true;
       return result;
     } catch (error) {
       console.error('Failed to initialize AIVoice SDK:', error);
+      this.isInitialized = false;
       throw error;
     }
   };
@@ -47,6 +66,18 @@ class AIVoiceModule {
    * 开始语音识别
    */
   public startListening = async (): Promise<string> => {
+    if (!this.isAvailable) {
+      const errorMsg = 'AIVoiceModule: AIVoice native module is not available, cannot start listening';
+      console.warn(errorMsg);
+      return errorMsg;
+    }
+
+    if (!this.isInitialized) {
+      const errorMsg = 'AIVoiceModule: SDK not initialized, cannot start listening';
+      console.warn(errorMsg);
+      return errorMsg;
+    }
+
     try {
       const result = await AIVoice.startListening();
       console.log('Start listening successfully:', result);
@@ -61,6 +92,12 @@ class AIVoiceModule {
    * 停止语音识别
    */
   public stopListening = async (): Promise<string> => {
+    if (!this.isAvailable) {
+      const errorMsg = 'AIVoiceModule: AIVoice native module is not available, cannot stop listening';
+      console.warn(errorMsg);
+      return errorMsg;
+    }
+
     try {
       const result = await AIVoice.stopListening();
       console.log('Stop listening successfully:', result);
@@ -75,6 +112,12 @@ class AIVoiceModule {
    * 取消语音识别
    */
   public cancelListening = async (): Promise<string> => {
+    if (!this.isAvailable) {
+      const errorMsg = 'AIVoiceModule: AIVoice native module is not available, cannot cancel listening';
+      console.warn(errorMsg);
+      return errorMsg;
+    }
+
     try {
       const result = await AIVoice.cancelListening();
       console.log('Cancel listening successfully:', result);
