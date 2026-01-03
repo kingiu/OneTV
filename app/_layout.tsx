@@ -80,6 +80,19 @@ export default function RootLayout() {
 
   // 集成夏杰语音SDK
   useEffect(() => {
+    // 初始化夏杰语音SDK
+    const initVoiceSDK = async () => {
+      try {
+        // 这里可以从配置或环境变量中获取appId
+        // 暂时使用默认值，实际部署时需要替换为真实的appId
+        const appId = 'default_app_id';
+        const result = await AIVoiceModule.initSDK(appId);
+        logger.info('夏杰语音SDK初始化成功:', result);
+      } catch (error) {
+        logger.error('夏杰语音SDK初始化失败:', error);
+      }
+    };
+
     // 监听语音命令
     const handleVoiceCommand = (command: any) => {
       logger.info('Received voice command:', command);
@@ -91,6 +104,9 @@ export default function RootLayout() {
       }
     };
 
+    // 初始化SDK
+    initVoiceSDK();
+    
     // 添加语音命令监听器
     AIVoiceModule.addCommandListener(handleVoiceCommand);
 
