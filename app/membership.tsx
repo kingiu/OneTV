@@ -127,8 +127,7 @@ export default function MembershipScreen() {
           />
         }
       >
-        <Text style={styles.headerTitle}>会员中心</Text>
-        
+
         {!isLoggedIn && (
           <View style={styles.loginPromptContainer}>
             <Text style={styles.loginPromptText}>请先登录查看会员信息</Text>
