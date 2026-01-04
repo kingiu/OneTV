@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   Platform,
   RefreshControl,
-  Alert
+  Alert,
+  Image
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import { useAuthStore } from '../stores/authStore';
 import MembershipInfoCard from '../components/membership/MembershipInfoCard';
 import CouponRedeemCard from '../components/membership/CouponRedeemCard';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { LinearGradient } from 'expo-linear-gradient';
 
 
 export default function MembershipScreen() {
@@ -113,77 +115,118 @@ export default function MembershipScreen() {
   const displayError = localError || error;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={[styles.contentContainer, contentStyle]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={handleRefresh}
-            colors={['#3B82F6']}
-            tintColor="#3B82F6"
-          />
-        }
-      >
+    <SafeAreaView style={[styles.container, isTV && styles.containerTV]}>
+      {isTV ? (
+        // TV端完整布局
+        <View style={styles.tvFullLayout}>
+          {/* 顶部导航 */}
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoCircle}><Text style={styles.logoText}>TV</Text></View>
+              <Text style={styles.headerTitle}>会员中心</Text>
+            </View>
+            <View style={styles.headerIcons}>
+              <Text style={styles.icon}>🔍</Text>
+              <Text style={styles.icon}>⭐</Text>
+            </View>
+          </View>
 
-        {!isLoggedIn && (
-          <View style={styles.loginPromptContainer}>
-            <Text style={styles.loginPromptText}>请先登录查看会员信息</Text>
-            <TouchableOpacity 
-              style={styles.loginButton}
-              onPress={handleLoginPress}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.loginButtonText}>去登录</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        
-        {isLoading && !refreshing && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3B82F6" />
-            <Text style={styles.loadingText}>加载中...</Text>
-          </View>
-        )}
-        
-        {displayError && !isLoading && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{displayError}</Text>
-            <TouchableOpacity 
-              style={styles.retryButton}
-              onPress={handleRefresh}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.retryButtonText}>重试</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        
-        {!isLoading && isLoggedIn && membershipInfo && (
-          <View style={styles.cardsContainer}>
-            {/* 会员信息卡片 */}
-            <MembershipInfoCard 
-              membership={membershipInfo} 
-              onRedeemPress={handleRedeemPress}
-            />
-            
-            {/* 卡券兑换卡片 */}
-            <CouponRedeemCard 
-              onSuccess={() => {
-                // 兑换成功后可以执行一些操作，比如显示提示
-                console.log('卡券兑换成功');
-                // 兑换成功后刷新会员信息
-                handleRefresh();
-                Alert.alert('成功', '优惠券兑换成功！');
-              }}
-            />
-          </View>
-        )}
-        
+          {/* 主内容区域 - 左右分栏 */}
+          <View style={styles.content}>
+            {/* 左侧：会员信息 */}
+            <View style={styles.leftCard}>
+              <Text style={styles.sectionTitle}>会员信息</Text>
+              <MembershipInfoCard 
+                membership={membershipInfo} 
+                onRedeemPress={handleRedeemPress}
+              />
+            </View>
 
-      </ScrollView>
+            {/* 右侧：兑换区 */}
+            <View style={styles.rightCard}>
+              <Text style={styles.redeemTitle}>兑换优惠券</Text>
+              <CouponRedeemCard 
+                onSuccess={() => {
+                  // 兑换成功后可以执行一些操作，比如显示提示
+                  console.log('卡券兑换成功');
+                  // 兑换成功后刷新会员信息
+                  handleRefresh();
+                  Alert.alert('成功', '优惠券兑换成功！');
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      ) : (
+        // 移动端和平板端布局
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={[styles.contentContainer, contentStyle]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh}
+              colors={['#3B82F6']}
+              tintColor="#3B82F6"
+            />
+          }
+        >
+          {!isLoggedIn && (
+            <View style={styles.loginPromptContainer}>
+              <Text style={styles.loginPromptText}>请先登录查看会员信息</Text>
+              <TouchableOpacity 
+                style={styles.loginButton}
+                onPress={handleLoginPress}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.loginButtonText}>去登录</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {isLoading && !refreshing && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text style={styles.loadingText}>加载中...</Text>
+            </View>
+          )}
+          
+          {displayError && !isLoading && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{displayError}</Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={handleRefresh}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.retryButtonText}>重试</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {!isLoading && isLoggedIn && membershipInfo && (
+            <View style={styles.cardsContainer}>
+              {/* 会员信息卡片 */}
+              <MembershipInfoCard 
+                membership={membershipInfo} 
+                onRedeemPress={handleRedeemPress}
+              />
+              
+              {/* 卡券兑换卡片 */}
+              <CouponRedeemCard 
+                onSuccess={() => {
+                  // 兑换成功后可以执行一些操作，比如显示提示
+                  console.log('卡券兑换成功');
+                  // 兑换成功后刷新会员信息
+                  handleRefresh();
+                  Alert.alert('成功', '优惠券兑换成功！');
+                }}
+              />
+            </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -194,6 +237,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.dark.background,
+  },
+  // TV端容器样式
+  containerTV: {
+    padding: 60,
+    backgroundColor: '#0A0B0D', // 深黑色背景
   },
   scrollView: {
     flex: 1,
@@ -209,14 +257,93 @@ const styles = StyleSheet.create({
   },
   contentTV: {
     paddingHorizontal: 32,
+    paddingVertical: 30,
+  },
+  // TV端完整布局
+  tvFullLayout: {
+    flex: 1,
+    backgroundColor: '#0A0B0D',
+  },
+  // 顶部导航
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#F3D58E', // 金色边框
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  logoText: {
+    color: '#F3D58E', // 金色文字
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   headerTitle: {
+    color: '#FFFFFF',
     fontSize: 28,
-    fontWeight: '700',
-    color: '#1F2937',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 24,
+    fontWeight: '500',
+    textShadowColor: 'rgba(243, 213, 142, 0.3)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    gap: 30,
+  },
+  icon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+  },
+  // 主内容区域 - 左右分栏
+  content: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 30,
+  },
+  // 左侧：会员信息
+  leftCard: {
+    flex: 1,
+    backgroundColor: '#15171A',
+    borderRadius: 20,
+    padding: 30,
+  },
+  // 右侧：兑换区
+  rightCard: {
+    flex: 2,
+    backgroundColor: '#15171A',
+    borderRadius: 20,
+    padding: 40,
+    justifyContent: 'center',
+  },
+  // 左侧卡片标题
+  sectionTitle: {
+    color: '#AAA',
+    fontSize: 18,
+    marginBottom: 30,
+    fontWeight: '500',
+  },
+  // 右侧兑换标题
+  redeemTitle: {
+    color: '#FFF',
+    fontSize: 36,
+    fontWeight: 'bold',
+    marginBottom: 40,
+    textAlign: 'center',
+    textShadowColor: 'rgba(243, 213, 142, 0.3)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
   loginPromptContainer: {
     alignItems: 'center',

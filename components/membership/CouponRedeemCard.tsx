@@ -11,7 +11,7 @@ import {
   AccessibilityInfo,
   FocusEvent,
   NativeSyntheticEvent,
-  TouchableWithoutFeedback
+  Animated
 } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { membershipStore } from '../../stores/membershipStore';
@@ -29,28 +29,57 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
   const [success, setSuccess] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [showTvKeyboard, setShowTvKeyboard] = useState(false);
+  const [inputWrapperFocused, setInputWrapperFocused] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const redeemButtonRef = useRef<TouchableOpacity>(null);
+  
+  // 焦点动画
+  const inputScale = useRef(new Animated.Value(1)).current;
+  const buttonScale = useRef(new Animated.Value(1)).current;
   
   // TV端设备判断
   const isTVDevice = deviceType === 'tv' || Platform.isTV;
   
-  // 焦点管理
+  // 焦点管理 - 移除了TV键盘显示逻辑
   const handleInputFocus = () => {
     setIsFocused(true);
+    setInputWrapperFocused(true);
     if (isTVDevice) {
-      setShowTvKeyboard(true);
+      // 焦点动画 - 放大
+      Animated.spring(inputScale, {
+        toValue: 1.05,
+        useNativeDriver: true,
+      }).start();
     }
   };
   
   const handleInputBlur = () => {
     setIsFocused(false);
+    setInputWrapperFocused(false);
     // TV端保留键盘显示，直到用户完成输入
+    // 焦点动画 - 恢复
+    Animated.spring(inputScale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
   };
   
   // 焦点导航处理
   const handleRedeemButtonFocus = () => {
     setShowTvKeyboard(false);
+    // 按钮焦点动画 - 放大
+    Animated.spring(buttonScale, {
+      toValue: 1.1,
+      useNativeDriver: true,
+    }).start();
+  };
+  
+  const handleRedeemButtonBlur = () => {
+    // 按钮焦点动画 - 恢复
+    Animated.spring(buttonScale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleRedeemCoupon = async () => {
@@ -140,13 +169,13 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
     setError(null);
   };
   
-  // TV键盘组件
+  // TV键盘组件 - 移除了"输入卡券码"标题
   const TVKeyboard = () => {
     const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
     
     return (
       <View style={styles.tvKeyboardContainer}>
-        <Text style={styles.tvKeyboardTitle}>输入卡券码</Text>
+        {/* 移除了"输入卡券码"标题 */}
         <View style={styles.tvKeyboardGrid}>
           {keys.map((key) => (
             <TouchableOpacity
@@ -198,8 +227,17 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
       
       <View style={styles.inputContainer}>
         <Text style={styles.label}>卡券码</Text>
-        <TouchableWithoutFeedback onPress={() => isTVDevice && inputRef.current?.focus()}>
-          <View>
+        {/* 使用TouchableOpacity包裹，确保TV端可以点击聚焦 */}
+        <TouchableOpacity
+          onPress={() => inputRef.current?.focus()}
+          activeOpacity={1}
+          hasTVPreferredFocus={isTVDevice}
+          tvParallaxProperties={isTVDevice ? { magnification: 1.05, shiftDistanceX: 0, shiftDistanceY: 0 } : undefined}
+          style={[styles.inputWrapper, inputWrapperFocused && styles.inputWrapperFocused]}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+        >
+          <Animated.View style={[styles.inputContainerAnimated, { transform: [{ scale: inputScale }] }]}>
             <TextInput
               ref={inputRef}
               style={[
@@ -222,14 +260,11 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
               maxLength={12} // 限制最大长度为12位
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
-              // TV端焦点管理
-              hasTVPreferredFocus={isTVDevice}
-              tvParallaxProperties={isTVDevice ? { magnification: 1.05, shiftDistanceX: 0, shiftDistanceY: 0 } : undefined}
               accessibilityLabel="卡券码输入框"
               accessibilityHint="请输入12位字母数字组合的卡券码"
             />
-          </View>
-        </TouchableWithoutFeedback>
+          </Animated.View>
+        </TouchableOpacity>
         
         {/* 输入提示 */}
         {isTVDevice && (
@@ -239,32 +274,34 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
         )}
       </View>
       
-      <TouchableOpacity
-        ref={redeemButtonRef}
-        style={[
-          styles.redeemButton,
-          (!couponCode.trim() || isRedeeming) && styles.redeemButtonDisabled,
-          isTVDevice && styles.tvRedeemButton
-        ]}
-        onPress={handleRedeemCoupon}
-        disabled={!couponCode.trim() || isRedeeming}
-        activeOpacity={0.7}
-        onFocus={handleRedeemButtonFocus}
-        // TV端焦点管理
-        hasTVPreferredFocus={false}
-        tvParallaxProperties={isTVDevice ? { magnification: 1.1, shiftDistanceX: 0, shiftDistanceY: 0 } : undefined}
-        accessibilityLabel="立即兑换按钮"
-        accessibilityHint="点击兑换卡券"
-      >
-        {isRedeeming ? (
-          <ActivityIndicator color="#FFFFFF" size={isTVDevice ? "large" : "small"} />
-        ) : (
-          <Text style={[styles.redeemButtonText, isTVDevice && styles.tvButtonText]}>立即兑换</Text>
-        )}
-      </TouchableOpacity>
+      <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+        <TouchableOpacity
+          ref={redeemButtonRef}
+          style={[
+            styles.redeemButton,
+            (!couponCode.trim() || isRedeeming) && styles.redeemButtonDisabled,
+            isTVDevice && styles.tvRedeemButton
+          ]}
+          onPress={handleRedeemCoupon}
+          disabled={!couponCode.trim() || isRedeeming}
+          activeOpacity={0.7}
+          onFocus={handleRedeemButtonFocus}
+          onBlur={handleRedeemButtonBlur}
+          // TV端焦点管理
+          hasTVPreferredFocus={!isTVDevice}
+          tvParallaxProperties={isTVDevice ? { magnification: 1.1, shiftDistanceX: 0, shiftDistanceY: 0 } : undefined}
+          accessibilityLabel="立即兑换按钮"
+          accessibilityHint="点击兑换卡券"
+        >
+          {isRedeeming ? (
+            <ActivityIndicator color="#FFFFFF" size={isTVDevice ? "large" : "small"} />
+          ) : (
+            <Text style={[styles.redeemButtonText, isTVDevice && styles.tvButtonText]}>立即兑换</Text>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
       
-      {/* TV键盘 */}
-      {isTVDevice && showTvKeyboard && <TVKeyboard />}
+      {/* 移除TV键盘组件 */}
       
       <View style={styles.benefitsContainer}>
         <Text style={styles.benefitsTitle}>会员特权</Text>
@@ -388,6 +425,22 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     marginTop: 8,
     marginLeft: 8,
+  },
+  // 输入框包裹容器，用于TV端聚焦
+  inputWrapper: {
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+  },
+  // 输入框包裹容器聚焦样式
+  inputWrapperFocused: {
+    borderColor: '#F3D58E', // 金色边框
+    boxShadow: '0 0 10px rgba(243, 213, 142, 0.5)',
+  },
+  // 输入框容器动画
+  inputContainerAnimated: {
+    // 用于包裹输入框，实现缩放动画
   },
   // TV端兑换按钮样式
   tvRedeemButton: {
