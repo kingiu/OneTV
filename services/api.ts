@@ -201,6 +201,84 @@ export class API {
     return response.json();
   }
 
+  // 通过卡券码登录并自动兑换
+  async loginWithCard(code: string): Promise<{ success: boolean; message?: string; membership?: MembershipInfo | null }> {
+    console.debug('API: 开始卡券登录', { code });
+    
+    try {
+      const response = await this._fetch("/api/login/card", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      
+      const data = await response.json();
+      console.debug('API: 卡券登录响应', JSON.stringify(data, null, 2));
+      
+      // 存储cookie到AsyncStorage
+      const cookies = response.headers.get("Set-Cookie");
+      if (cookies) {
+        await AsyncStorage.setItem("authCookies", cookies);
+      }
+      
+      // 清除会员信息缓存，确保获取最新数据
+      try {
+        await AsyncStorage.removeItem('cached_membership');
+        console.debug('API: 卡券登录后清除缓存');
+      } catch (cacheError) {
+        console.debug('API: 清除缓存失败', cacheError);
+      }
+      
+      // 处理响应数据
+      if (data.success && data.data) {
+        // 尝试提取会员信息
+        let membershipData = null;
+        if (data.data.membership) {
+          membershipData = data.data.membership;
+        } else if (data.data.user) {
+          membershipData = data.data.user;
+        } else {
+          membershipData = data.data;
+        }
+        
+        if (membershipData) {
+          // 映射会员信息
+          const mappedResult = await this._mapLunaTVMembership(membershipData);
+          return { 
+            success: true, 
+            message: data.message || '登录成功', 
+            membership: mappedResult.membership 
+          };
+        }
+        
+        return { 
+          success: true, 
+          message: data.message || '登录成功', 
+          membership: null 
+        };
+      } else if (data.success) {
+        return { 
+          success: true, 
+          message: data.message || '登录成功', 
+          membership: null 
+        };
+      }
+      
+      return { 
+        success: false, 
+        message: data.message || '登录失败', 
+        membership: null 
+      };
+    } catch (error) {
+      console.error("Error login with card:", error);
+      return { 
+        success: false, 
+        message: '登录失败，请稍后重试', 
+        membership: null 
+      };
+    }
+  }
+
   async getServerConfig(): Promise<ServerConfig> {
     const response = await this._fetch("/api/server-config");
     return response.json();
@@ -913,38 +991,27 @@ export class API {
         console.debug('API: 清除缓存失败', cacheError);
       }
       
-      // 增强: 尝试多个可能的API端点
+      // 使用正确的卡券兑换API地址
       let response, data;
-      const endpoints = ['/api/coupon/redeem', '/api/v1/coupon/redeem', '/api/membership/redeem'];
+      const endpoint = '/api/card/redeem';
       
-      for (const endpoint of endpoints) {
-        try {
-          console.debug(`API: 尝试从端点兑换卡券: ${endpoint}`);
-          response = await this._fetch(endpoint, { 
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code, couponCode: code }), // 支持多种参数名
-          });
-          
-          if (response.ok) {
-            data = await response.json();
-            console.debug(`API: 从端点 ${endpoint} 成功获取兑换响应`, { status: response.status });
-            break; // 如果成功获取，跳出循环
-          }
-        } catch (endpointError) {
-          console.debug(`API: 端点 ${endpoint} 兑换失败，尝试下一个`, endpointError);
-        }
-      }
-      
-      // 如果所有端点都失败，使用原始端点作为最后尝试
-      if (!data) {
-        console.debug('API: 所有备用端点失败，使用原始端点');
-        response = await this._fetch("/api/coupon/redeem", { 
+      try {
+        console.debug(`API: 尝试从端点兑换卡券: ${endpoint}`);
+        response = await this._fetch(endpoint, { 
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, couponCode: code }), // 支持多种参数名
         });
-        data = await response.json();
+        
+        if (response.ok) {
+          data = await response.json();
+          console.debug(`API: 从端点 ${endpoint} 成功获取兑换响应`, { status: response.status });
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+      } catch (endpointError) {
+        console.debug(`API: 端点 ${endpoint} 兑换失败`, endpointError);
+        throw endpointError;
       }
       
       console.debug('API: 卡券兑换响应数据', JSON.stringify(data, null, 2));
