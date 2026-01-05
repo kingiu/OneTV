@@ -208,8 +208,6 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>兑换优惠券</Text>
-      
       {error && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
@@ -226,7 +224,7 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
       )}
       
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>卡券码</Text>
+        <Text style={styles.label}>输入兑换码</Text>
         {/* 使用TouchableOpacity包裹，确保TV端可以点击聚焦 */}
         <TouchableOpacity
           onPress={() => inputRef.current?.focus()}
@@ -300,87 +298,59 @@ const CouponRedeemCard: React.FC<CouponRedeemCardProps> = ({ onSuccess }) => {
           )}
         </TouchableOpacity>
       </Animated.View>
-      
-      {/* 移除TV键盘组件 */}
-      
-      <View style={styles.benefitsContainer}>
-        <Text style={styles.benefitsTitle}>会员特权</Text>
-        <View style={styles.benefitsList}>
-          <BenefitItem text="解锁高级视频资源" />
-          <BenefitItem text="无广告观影体验" />
-          <BenefitItem text="高清画质优先访问" />
-          <BenefitItem text="专属客服支持" />
-        </View>
-      </View>
     </View>
   );
 };
 
-// 会员特权项组件
-const BenefitItem: React.FC<{ text: string }> = ({ text }) => (
-  <View style={styles.benefitItem}>
-    <View style={styles.checkmark}>
-      <Text style={styles.checkmarkText}>✓</Text>
-    </View>
-    <Text style={styles.benefitText}>{text}</Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#2c2c2e',
-    borderRadius: 16,
-    padding: 20,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.dark.text,
-    marginBottom: 16,
+    backgroundColor: 'transparent',
+    borderRadius: Platform.isTV ? 0 : 16,
+    padding: Platform.isTV ? 0 : 20,
+    marginHorizontal: Platform.isTV ? 0 : 16,
+    marginVertical: Platform.isTV ? 0 : 8,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   errorContainer: {
     backgroundColor: 'rgba(220, 38, 38, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   errorText: {
     color: '#DC2626',
-    fontSize: 14,
+    fontSize: 16,
     flex: 1,
   },
   clearErrorText: {
     color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '500',
-    marginLeft: 8,
+    marginLeft: 12,
   },
   successContainer: {
     backgroundColor: 'rgba(22, 163, 74, 0.1)',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
   },
   successText: {
     color: '#22C55E',
-    fontSize: 14,
+    fontSize: 16,
     textAlign: 'center',
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   label: {
-    fontSize: 14,
+    fontSize: 20,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: 8,
+    color: '#FFFFFF',
+    marginBottom: 12,
   },
   input: {
     height: 48,
@@ -400,16 +370,16 @@ const styles = StyleSheet.create({
   },
   // 输入框选中状态样式
   inputFocused: {
-    borderColor: '#3B82F6',
+    borderColor: '#F3D58E',
     borderWidth: 2,
-    shadowColor: '#3B82F6',
+    shadowColor: '#F3D58E',
     shadowOffset: {
       width: 0,
       height: 0,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 5,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
   },
   // TV端输入框样式
   tvInput: {
@@ -418,6 +388,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 12,
     borderWidth: 2,
+    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    color: '#FFFFFF',
+    shadowColor: 'rgba(59, 130, 246, 0.4)',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   // TV端输入提示
   tvInputHint: {
@@ -430,13 +411,23 @@ const styles = StyleSheet.create({
   inputWrapper: {
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#F3D58E',
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#F3D58E',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
   },
   // 输入框包裹容器聚焦样式
   inputWrapperFocused: {
     borderColor: '#F3D58E', // 金色边框
-    boxShadow: '0 0 10px rgba(243, 213, 142, 0.5)',
+    boxShadow: '0 0 15px rgba(243, 213, 142, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   // 输入框容器动画
   inputContainerAnimated: {
@@ -444,12 +435,23 @@ const styles = StyleSheet.create({
   },
   // TV端兑换按钮样式
   tvRedeemButton: {
-    height: 64,
+    height: 72,
     borderRadius: 12,
-    paddingHorizontal: 48,
+    paddingHorizontal: 60,
+    backgroundColor: '#3B82F6',
+    borderWidth: 2,
+    borderColor: '#F3D58E',
+    shadowColor: '#F3D58E',
+    shadowOffset: {
+      width: 0,
+      height: 0,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 8,
   },
   redeemButton: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: '#3B82F6',
     height: 48,
     borderRadius: 8,
     alignItems: 'center',
@@ -457,7 +459,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   redeemButtonDisabled: {
-    backgroundColor: 'rgba(0, 187, 94, 0.5)',
+    backgroundColor: 'rgba(59, 130, 246, 0.5)',
+    borderColor: 'transparent',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   redeemButtonText: {
     color: '#FFFFFF',
@@ -466,82 +471,15 @@ const styles = StyleSheet.create({
   },
   // TV端按钮文字
   tvButtonText: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  benefitsContainer: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
-    paddingTop: 16,
-  },
-  benefitsTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.dark.text,
-    marginBottom: 12,
-  },
-  benefitsList: {
-    gap: 8,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  checkmark: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.dark.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  checkmarkText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  benefitText: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
-    flex: 1,
-  },
-  // TV键盘样式
-  tvKeyboardContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  tvKeyboardTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  tvKeyboardGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  tvKeyboardKey: {
-    width: 64,
-    height: 64,
-    backgroundColor: '#374151',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  tvKeyboardKeyText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    textShadowRadius: 4,
   },
 });
 

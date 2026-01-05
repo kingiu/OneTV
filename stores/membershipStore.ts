@@ -14,6 +14,7 @@ export interface UserMembershipInfo {
   lastRenewTime?: number;
   daysRemaining?: number;
   couponHistory?: string[];
+  points?: number;
 }
 
 // 会员状态store接口
@@ -143,13 +144,19 @@ export const useMembershipStore = create<MembershipStore>((set, get) => ({
         
         // 即使tier不是有效的枚举值，我们也接受它，因为我们有映射函数
         if (isComplete) {
+          // 从本地存储获取登录用户名
+          const loginUsername = await AsyncStorage.getItem('loginUsername');
+          
+          // 如果有本地存储的登录用户名，优先使用它
+          const updatedMembership = loginUsername ? { ...membership, userName: loginUsername } : membership;
+          
           // 直接更新store，不依赖枚举验证
           set({ 
-            membershipInfo: membership,
+            membershipInfo: updatedMembership,
             isLoading: false 
           });
-          // 缓存会员信息到本地
-          await AsyncStorage.setItem('membershipInfo', JSON.stringify(membership));
+          // 缓存更新后的会员信息到本地
+          await AsyncStorage.setItem('membershipInfo', JSON.stringify(updatedMembership));
         } else {
           console.warn('获取会员信息: 会员信息不完整', membership);
           set({ 

@@ -7,6 +7,7 @@ import {
   Platform,
   ActivityIndicator
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '@/constants/Colors';
 import { UserMembershipInfo } from '../../stores/membershipStore';
 import {
@@ -29,6 +30,19 @@ const MembershipInfoCard: React.FC<MembershipInfoCardProps> = ({
   onRedeemPress,
   isLoading = false
 }) => {
+  // 添加本地状态来存储登录用户名
+  const [loginUsername, setLoginUsername] = React.useState<string | null>(null);
+  
+  // 从本地存储获取登录用户名
+  React.useEffect(() => {
+    const loadLoginUsername = async () => {
+      const username = await AsyncStorage.getItem('loginUsername');
+      setLoginUsername(username);
+      console.debug('MembershipInfoCard: 从本地存储获取登录用户名', { username });
+    };
+    
+    loadLoginUsername();
+  }, []);
   console.debug('MembershipInfoCard 渲染', { hasMembership: !!membership, membership });
   
   // 添加详细日志记录，帮助调试会员等级映射问题
@@ -37,6 +51,13 @@ const MembershipInfoCard: React.FC<MembershipInfoCardProps> = ({
     if (membership?.tier) {
       console.debug(`MembershipInfoCard: 会员等级映射 - tier: '${membership.tier}' -> text: '${getMembershipTierText(membership.tier)}'`);
     }
+    // 添加账号相关的详细日志
+    console.debug('MembershipInfoCard: 账号信息:', {
+      userName: membership?.userName,
+      hasUserName: !!membership?.userName,
+      userNameType: typeof membership?.userName,
+      userNameLength: membership?.userName?.length || 0
+    });
   }, [membership]);
 
   // 获取会员状态文本（更健壮的状态判断）
@@ -124,7 +145,15 @@ const MembershipInfoCard: React.FC<MembershipInfoCardProps> = ({
           )}
           <View style={styles.infoRow}>
             <Text style={styles.label}>账号：</Text>
-            <Text style={styles.value}>{membership.userName || '未知'}</Text>
+            <Text style={styles.value}>
+              {loginUsername || 
+               membership.userName || 
+               // 如果没有userName，尝试使用其他有意义的信息
+               (membership.tier ? getMembershipTierText(membership.tier) + '用户' : 
+                membership.status ? membership.status : 
+                '未知')
+              }
+            </Text>
           </View>
           
           <View style={styles.infoRow}>
@@ -232,13 +261,13 @@ const MembershipInfoCard: React.FC<MembershipInfoCardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#2c2c2e',
+    backgroundColor: '#1E40AF',
     borderRadius: 16,
     padding: 20,
     marginHorizontal: 16,
     marginVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -263,20 +292,20 @@ const styles = StyleSheet.create({
   warningSection: {
     marginTop: 16,
     padding: 12,
-    backgroundColor: '#FFF3E0',
+    backgroundColor: 'rgba(255, 152, 0, 0.2)',
     borderRadius: 8,
     borderLeftWidth: 4,
     borderLeftColor: '#FF9800',
   },
   warningText: {
     fontSize: 12,
-    color: '#E65100',
+    color: '#FF9800',
     textAlign: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: Colors.dark.text,
+    color: '#FFFFFF',
     marginBottom: 16,
   },
   infoContainer: {
@@ -286,15 +315,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 8,
   },
   label: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
   },
   value: {
     fontSize: 16,
     fontWeight: '500',
-    color: Colors.dark.text,
+    color: '#FFFFFF',
   },
   tierContainer: {
     flexDirection: 'row',
@@ -307,11 +338,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   tierText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
   },
   expiredText: {
@@ -322,7 +353,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
   },
   progressHeader: {
     flexDirection: 'row',
@@ -331,16 +362,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   progressLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   progressDays: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   progressBar: {
     height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -363,10 +394,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   redeemButton: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: '#3B82F6',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3D58E',
   },
   redeemButtonText: {
     color: '#FFFFFF',

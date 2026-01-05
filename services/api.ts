@@ -86,6 +86,7 @@ export interface MembershipInfo {
   lastRenewTime?: number;
   daysRemaining?: number;
   couponHistory?: string[];
+  points?: number;
 }
 
 // 定义卡券兑换响应接口
@@ -173,6 +174,12 @@ export class API {
       await AsyncStorage.setItem("authCookies", cookies);
     }
     
+    // 如果提供了用户名，将其存储到AsyncStorage中
+    if (username) {
+      await AsyncStorage.setItem("loginUsername", username);
+      console.debug('API: 登录成功，将用户名存储到本地', { username });
+    }
+    
     // 清除会员信息缓存，确保登录后获取最新会员状态
     try {
       await AsyncStorage.removeItem('cached_membership');
@@ -190,10 +197,11 @@ export class API {
     });
     await AsyncStorage.setItem("authCookies", '');
     
-    // 清除会员信息缓存，确保登出后清除会员状态
+    // 清除会员信息缓存和存储的用户名，确保登出后清除会员状态
     try {
       await AsyncStorage.removeItem('cached_membership');
-      console.debug('API: 登出后清除会员信息缓存');
+      await AsyncStorage.removeItem('loginUsername');
+      console.debug('API: 登出后清除会员信息缓存和存储的用户名');
     } catch (error) {
       console.debug('API: 清除缓存失败', error);
     }
@@ -652,8 +660,23 @@ export class API {
       
       // 映射LunaTV的UserMembership到OneTV的MembershipInfo格式
       const mappedMembership: MembershipInfo = {
-        // 增强: 支持更多可能的用户名字段
-        userName: lunaMembership.userName || lunaMembership.username || lunaMembership.name || '',
+        // 增强: 支持更多可能的用户名字段，包括数据库用户ID
+        userName: lunaMembership.userName || 
+                 lunaMembership.username || 
+                 lunaMembership.name || 
+                 // 添加数据库用户ID相关字段
+                 lunaMembership.account || 
+                 lunaMembership.userAccount || 
+                 lunaMembership.userId || 
+                 lunaMembership.memberId || 
+                 lunaMembership.uid || 
+                 lunaMembership.id || 
+                 // 添加更多可能的字段
+                 lunaMembership.loginName || 
+                 lunaMembership.userLogin || 
+                 lunaMembership.nickname || 
+                 lunaMembership.memberName || 
+                 '',
         tier: mappedTier,
         isActive: this._determineMembershipStatus(lunaMembership),
         status: lunaMembership.status || (this._determineMembershipStatus(lunaMembership) ? 'active' : 'inactive'),
@@ -669,7 +692,9 @@ export class API {
         ),
         daysRemaining: daysRemaining,
         // 增强: 支持更多可能的优惠券历史字段
-        couponHistory: lunaMembership.couponHistory || lunaMembership.coupons || lunaMembership.coupon_records || []
+        couponHistory: lunaMembership.couponHistory || lunaMembership.coupons || lunaMembership.coupon_records || [],
+        // 增强: 支持积分字段
+        points: lunaMembership.points || lunaMembership.score || lunaMembership.credit || 0
       };
       
       console.debug('API: 映射后的会员信息', mappedMembership);
