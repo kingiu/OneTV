@@ -74,31 +74,7 @@ const withXiajieVoice = (config) => {
       androidManifest.application[0].service.push(aiVoiceService);
     }
     
-    // Ensure application.receiver array exists
-    if (!androidManifest.application[0].receiver) {
-      androidManifest.application[0].receiver = [];
-    }
-    
-    // Add AIOpenReceiver if not already present
-    const aiOpenReceiver = {
-      $: {
-        'android:name': 'com.peasun.aispeech.aiopen.AIOpenReceiver',
-        'android:exported': 'true'
-      },
-      'intent-filter': [
-        {
-          action: [{ $: { 'android:name': 'com.peasun.aispeech.action.app.register.require' } }]
-        }
-      ]
-    };
-    
-    const receiverExists = androidManifest.application[0].receiver.some(
-      receiver => receiver.$['android:name'] === 'com.peasun.aispeech.aiopen.AIOpenReceiver'
-    );
-    
-    if (!receiverExists) {
-      androidManifest.application[0].receiver.push(aiOpenReceiver);
-    }
+
     
     return props;
   });
@@ -447,10 +423,10 @@ public class AIVoicePackage implements ReactPackage {
         
         // Check if AIVoicePackage is already registered
         if (!mainApplicationContent.includes('com.onetv.modules.voiceai.AIVoicePackage.getInstance()')) {
-          // Add package registration
+          // Add package registration with proper package list handling
           mainApplicationContent = mainApplicationContent.replace(
             'override fun getPackages(): List<ReactPackage> {',
-            'override fun getPackages(): List<ReactPackage> {\n            packages.add(com.onetv.modules.voiceai.AIVoicePackage.getInstance())'
+            'override fun getPackages(): List<ReactPackage> {\n            val packages = PackageList(this).packages.toMutableList()\n            packages.add(com.onetv.modules.voiceai.AIVoicePackage.getInstance())\n            return packages'
           );
         }
         
