@@ -119,40 +119,24 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
     );
   }
 
-  // 将数据按行分组
-  const groupItemsByRow = (items: any[], columns: number) => {
-    const rows = [];
-    for (let i = 0; i < items.length; i += columns) {
-      rows.push(items.slice(i, i + columns));
-    }
-    return rows;
-  };
-
-  const rows = groupItemsByRow(data, effectiveColumns);
-
   // 动态样式
   const dynamicStyles = StyleSheet.create({
     listContent: {
-      paddingBottom: responsiveConfig.spacing * 2,
-      paddingHorizontal: responsiveConfig.spacing / 2,
+      paddingBottom: responsiveConfig.spacing * 3,
+      paddingHorizontal: responsiveConfig.spacing,
     },
     rowContainer: {
       flexDirection: "row",
-      marginBottom: responsiveConfig.spacing,
-    },
-    fullRowContainer: {
-      justifyContent: "space-around",
-      marginRight: responsiveConfig.spacing / 2,
-    },
-    partialRowContainer: {
-      justifyContent: "flex-start",
+      marginBottom: responsiveConfig.spacing * 2,
+      justifyContent: "space-between",
     },
     itemContainer: {
-      width: responsiveConfig.cardWidth,
-    },
-    itemWithMargin: {
-      width: responsiveConfig.cardWidth,
+      flex: 1,
       marginRight: responsiveConfig.spacing,
+      marginBottom: responsiveConfig.spacing * 2,
+    },
+    lastItemInRow: {
+      marginRight: 0,
     },
     scrollToTopButton: {
       position: 'absolute',
@@ -165,6 +149,17 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
     },
   });
 
+  // 将数据按行分组，确保每行只显示effectiveColumns个视频
+  const groupItemsByRow = (items: any[], columns: number) => {
+    const rows = [];
+    for (let i = 0; i < items.length; i += columns) {
+      rows.push(items.slice(i, i + columns));
+    }
+    return rows;
+  };
+
+  const rows = groupItemsByRow(data, effectiveColumns);
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView
@@ -176,31 +171,26 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
       >
         {data.length > 0 ? (
           <>
-            {rows.map((row, rowIndex) => {
-              const isFullRow = row.length === effectiveColumns;
-              const rowStyle = isFullRow ? dynamicStyles.fullRowContainer : dynamicStyles.partialRowContainer;
-
-              return (
-                <View key={rowIndex} style={[dynamicStyles.rowContainer, rowStyle]}>
-                  {row.map((item, itemIndex) => {
-                    const actualIndex = rowIndex * effectiveColumns + itemIndex;
-                    const isLastItemInPartialRow = !isFullRow && itemIndex === row.length - 1;
-                    const itemStyle = isLastItemInPartialRow ? dynamicStyles.itemContainer : dynamicStyles.itemWithMargin;
-
-                    const cardProps = {
-                      key: actualIndex,
-                      style: isFullRow ? dynamicStyles.itemContainer : itemStyle,
-                    };
-
-                    return (
-                      <View {...cardProps}>
-                        {renderItem({ item, index: actualIndex })}
-                      </View>
-                    );
-                  })}
-                </View>
-              );
-            })}
+            {rows.map((row, rowIndex) => (
+              <View key={rowIndex} style={dynamicStyles.rowContainer}>
+                {row.map((item, itemIndex) => {
+                  const actualIndex = rowIndex * effectiveColumns + itemIndex;
+                  const isLastItem = itemIndex === row.length - 1;
+                  
+                  return (
+                    <View 
+                      key={actualIndex} 
+                      style={[
+                        dynamicStyles.itemContainer,
+                        isLastItem && dynamicStyles.lastItemInRow
+                      ]}
+                    >
+                      {renderItem({ item, index: actualIndex })}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
             {renderFooter()}
           </>
         ) : (

@@ -58,8 +58,9 @@ const getLayoutConfig = (
     case "tv":
     default:
       columns = 5;
-      cardWidth = 160; // Fixed width for TV
-      cardHeight = 240; // Fixed height for TV
+      // 动态计算卡片宽度，根据屏幕宽度和间距自适应
+      cardWidth = (width - spacing * (columns + 1)) / columns;
+      cardHeight = cardWidth * 1.5; // 保持 2:3 宽高比
       break;
   }
 
