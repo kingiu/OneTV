@@ -1,6 +1,5 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { View, TextInput, StyleSheet, Animated, Platform } from "react-native";
-import { useTVEventHandler } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { SettingsSection } from "./SettingsSection";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -53,22 +52,10 @@ export const APIConfigSection = forwardRef<APIConfigSectionRef, APIConfigSection
       onBlur?.();
     };
 
-    // TV遥控器事件处理
-    const handleTVEvent = React.useCallback(
-      (event: any) => {
-        if (isSectionFocused && event.eventType === "select") {
-          inputRef.current?.focus();
-        }
-      },
-      [isSectionFocused]
-    );
-
     const handlePress = () => {
       inputRef.current?.focus();
       onPress?.();
-    }
-
-    useTVEventHandler(handleTVEvent);
+    };
 
     const [selection, setSelection] = useState<{ start: number; end: number }>({
       start: 0,
@@ -83,7 +70,7 @@ export const APIConfigSection = forwardRef<APIConfigSectionRef, APIConfigSection
 
     return (
       <SettingsSection focusable onFocus={handleSectionFocus} onBlur={handleSectionBlur}
-        {...Platform.isTV || deviceType !== 'tv' ? undefined : { onPress: handlePress }}
+        {...Platform.isTV ? { onPress: handlePress } : undefined}
       >
         <View style={styles.inputContainer}>
           <View style={styles.titleContainer}>

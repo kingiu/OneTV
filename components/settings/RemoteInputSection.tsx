@@ -1,6 +1,5 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Switch, StyleSheet, Pressable, Animated, Platform, TouchableOpacity } from "react-native";
-import { useTVEventHandler } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { SettingsSection } from "./SettingsSection";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -19,7 +18,7 @@ interface RemoteInputSectionProps {
 export const RemoteInputSection: React.FC<RemoteInputSectionProps> = ({ onChanged, onFocus, onBlur, onPress }) => {
   const { remoteInputEnabled, setRemoteInputEnabled } = useSettingsStore();
   const { isServerRunning, serverUrl, error } = useRemoteControlStore();
-  const [isFocused, setIsFocused] = React.useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const animationStyle = useButtonAnimation(isFocused, 1.2);
   const deviceType = useResponsiveLayout().deviceType;
 
@@ -43,23 +42,11 @@ export const RemoteInputSection: React.FC<RemoteInputSectionProps> = ({ onChange
 
   const handlePress = () => {
     handleToggle(!remoteInputEnabled);
-  }
-
-  // TV遥控器事件处理
-  const handleTVEvent = React.useCallback(
-    (event: any) => {
-      if (isFocused && event.eventType === "select") {
-        handleToggle(!remoteInputEnabled);
-      }
-    },
-    [isFocused, remoteInputEnabled, handleToggle]
-  );
-
-  useTVEventHandler(handleTVEvent);
+  };
 
   return (
     <SettingsSection focusable onFocus={handleSectionFocus} onBlur={handleSectionBlur}
-      {...Platform.isTV || deviceType !== 'tv' ? undefined : { onPress: handlePress }}
+      {...Platform.isTV ? { onPress: handlePress } : undefined}
     >
       <Pressable style={styles.settingItem} onFocus={handleSectionFocus} onBlur={handleSectionBlur}>
         <View style={styles.settingInfo}>
@@ -77,13 +64,12 @@ export const RemoteInputSection: React.FC<RemoteInputSectionProps> = ({ onChange
           ) : (
             <Switch
               value={remoteInputEnabled}
-              onValueChange={() => { }} // 禁用Switch的直接交互
+              onValueChange={() => {}}
               trackColor={{ false: "#767577", true: Colors.dark.primary }}
               thumbColor={remoteInputEnabled ? "#ffffff" : "#f4f3f4"}
               pointerEvents="none"
             />
-          )
-          }
+          )}
         </Animated.View>
       </Pressable>
 

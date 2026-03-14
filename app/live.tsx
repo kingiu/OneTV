@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, FlatList, StyleSheet, ActivityIndicator, Modal, useTVEventHandler, HWEvent, Text } from "react-native";
+import { View, FlatList, StyleSheet, ActivityIndicator, Modal, Text } from "react-native";
 import LivePlayer from "@/components/LivePlayer";
 import { fetchAndParseM3u, getPlayableUrl, Channel } from "@/services/m3u";
 import { ThemedView } from "@/components/ThemedView";
@@ -89,18 +89,7 @@ export default function LiveScreen() {
     [channels, currentChannelIndex]
   );
 
-  const handleTVEvent = useCallback(
-    (event: HWEvent) => {
-      if (deviceType !== 'tv') return;
-      if (isChannelListVisible) return;
-      if (event.eventType === "down") setIsChannelListVisible(true);
-      else if (event.eventType === "left") changeChannel("prev");
-      else if (event.eventType === "right") changeChannel("next");
-    },
-    [changeChannel, isChannelListVisible, deviceType]
-  );
 
-  useTVEventHandler(deviceType === 'tv' ? handleTVEvent : () => {});
 
   // 动态样式
   const dynamicStyles = createResponsiveStyles(deviceType, spacing);

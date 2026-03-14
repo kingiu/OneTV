@@ -34,7 +34,6 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   apiBaseUrl: "",
   m3uUrl: "",
-  liveStreamSources: [],
   remoteInputEnabled: false,
   isModalVisible: false,
   serverConfig: null,

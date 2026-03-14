@@ -1,6 +1,5 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { View, TextInput, StyleSheet, Animated, Platform } from "react-native";
-import { useTVEventHandler } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { SettingsSection } from "./SettingsSection";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -55,18 +54,7 @@ export const LiveStreamSection = forwardRef<LiveStreamSectionRef, LiveStreamSect
     const handlePress = () => {
       inputRef.current?.focus();
       onPress?.();
-    }
-
-    const handleTVEvent = React.useCallback(
-      (event: any) => {
-        if (isSectionFocused && event.eventType === "select") {
-          inputRef.current?.focus();
-        }
-      },
-      [isSectionFocused]
-    );
-
-    useTVEventHandler(handleTVEvent);
+    };
 
 
         const [selection, setSelection] = useState<{ start: number; end: number }>({
@@ -82,7 +70,7 @@ export const LiveStreamSection = forwardRef<LiveStreamSectionRef, LiveStreamSect
 
     return (
       <SettingsSection focusable onFocus={handleSectionFocus} onBlur={handleSectionBlur}
-        onPress={Platform.isTV || deviceType !== 'tv' ? undefined : handlePress}
+        {...Platform.isTV ? { onPress: handlePress } : undefined}
       >
         <View style={styles.inputContainer}>
           <View style={styles.titleContainer}>
