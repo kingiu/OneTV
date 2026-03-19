@@ -194,22 +194,21 @@ export default function DetailScreen() {
           <View style={dynamicStyles.episodesContainer}>
             <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
             <View style={dynamicStyles.episodeList}>
-              {/* 处理play_sources字段 */}
+              {/* 处理play_sources字段 - 只显示当前选中线路的剧集 */}
               {detail.play_sources && detail.play_sources.length > 0 ? (
-                detail.play_sources.map((source, sourceIndex) => (
-                  <View key={sourceIndex} style={dynamicStyles.sourceContainer}>
-                    <ThemedText style={dynamicStyles.sourceTitle}>{source.name}</ThemedText>
-                    {source.episodes.map((episode, episodeIndex) => (
-                      <StyledButton
-                        key={`${sourceIndex}-${episodeIndex}`}
-                        style={dynamicStyles.episodeButton}
-                        onPress={() => handlePlay(episodeIndex)}
-                        text={`第 ${episodeIndex + 1} 集`}
-                        textStyle={dynamicStyles.episodeButtonText}
-                      />
-                    ))}
-                  </View>
-                ))
+                (() => {
+                  const { selectedLineIndex } = useDetailStore.getState();
+                  const currentSource = detail.play_sources[selectedLineIndex] || detail.play_sources[0];
+                  return currentSource.episodes.map((episode, episodeIndex) => (
+                    <StyledButton
+                      key={episodeIndex}
+                      style={dynamicStyles.episodeButton}
+                      onPress={() => handlePlay(episodeIndex)}
+                      text={`第 ${episodeIndex + 1} 集`}
+                      textStyle={dynamicStyles.episodeButtonText}
+                    />
+                  ));
+                })()
               ) : (
                 /* 兼容旧版本，使用episodes字段 */
                 detail.episodes.map((episode, index) => (
@@ -300,22 +299,21 @@ export default function DetailScreen() {
             <View style={dynamicStyles.episodesContainer}>
               <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
               <ScrollView contentContainerStyle={dynamicStyles.episodeList}>
-                {/* 处理play_sources字段 */}
+                {/* 处理play_sources字段 - 只显示当前选中线路的剧集 */}
                 {detail.play_sources && detail.play_sources.length > 0 ? (
-                  detail.play_sources.map((source, sourceIndex) => (
-                    <View key={sourceIndex} style={dynamicStyles.sourceContainer}>
-                      <ThemedText style={dynamicStyles.sourceTitle}>{source.name}</ThemedText>
-                      {source.episodes.map((episode, episodeIndex) => (
-                        <StyledButton
-                          key={`${sourceIndex}-${episodeIndex}`}
-                          style={dynamicStyles.episodeButton}
-                          onPress={() => handlePlay(episodeIndex)}
-                          text={`第 ${episodeIndex + 1} 集`}
-                          textStyle={dynamicStyles.episodeButtonText}
-                        />
-                      ))}
-                    </View>
-                  ))
+                  (() => {
+                    const { selectedLineIndex } = useDetailStore.getState();
+                    const currentSource = detail.play_sources[selectedLineIndex] || detail.play_sources[0];
+                    return currentSource.episodes.map((episode, episodeIndex) => (
+                      <StyledButton
+                        key={episodeIndex}
+                        style={dynamicStyles.episodeButton}
+                        onPress={() => handlePlay(episodeIndex)}
+                        text={`第 ${episodeIndex + 1} 集`}
+                        textStyle={dynamicStyles.episodeButtonText}
+                      />
+                    ));
+                  })()
                 ) : (
                   /* 兼容旧版本，使用episodes字段 */
                   detail.episodes.map((episode, index) => (
