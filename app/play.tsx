@@ -8,6 +8,7 @@ import { PlayerControls } from "@/components/PlayerControls";
 import { EpisodeSelectionModal } from "@/components/EpisodeSelectionModal";
 import { SourceSelectionModal } from "@/components/SourceSelectionModal";
 import { SpeedSelectionModal } from "@/components/SpeedSelectionModal";
+import { LineSelectionModal } from "@/components/LineSelectionModal";
 import { SeekingBar } from "@/components/SeekingBar";
 // import { NextEpisodeOverlay } from "@/components/NextEpisodeOverlay";
 import VideoLoadingAnimation from "@/components/VideoLoadingAnimation";
@@ -133,14 +134,21 @@ export default function PlayScreen() {
 
   useEffect(() => {
     const perfStart = performance.now();
-    logger.info(`[PERF] PlayScreen useEffect START - source: ${source}, id: ${id}, title: ${title}`);
+    logger.info(`[PERF] PlayScreen useEffect START - detail: ${detail?.title}, source: ${source}, id: ${id}, title: ${title}`);
 
     setVideoRef(videoRef);
-    if (source && id && title) {
-      logger.info(`[PERF] Calling loadVideo with episodeIndex: ${episodeIndex}, position: ${position}`);
+    if (detail) {
+      // 优先使用detail中的数据，确保使用包含play_sources的完整数据
+      const detailSource = detail.source;
+      const detailId = detail.id.toString();
+      const detailTitle = detail.title;
+      logger.info(`[PERF] Calling loadVideo with detail data - source: ${detailSource}, id: ${detailId}, title: ${detailTitle}, episodeIndex: ${episodeIndex}, position: ${position}`);
+      loadVideo({ source: detailSource, id: detailId, episodeIndex, position, title: detailTitle });
+    } else if (source && id && title) {
+      logger.info(`[PERF] Calling loadVideo with local params - source: ${source}, id: ${id}, title: ${title}, episodeIndex: ${episodeIndex}, position: ${position}`);
       loadVideo({ source, id, episodeIndex, position, title });
     } else {
-      logger.info(`[PERF] Missing required params - source: ${!!source}, id: ${!!id}, title: ${!!title}`);
+      logger.info(`[PERF] Missing required params - detail: ${!!detail}, source: ${!!source}, id: ${!!id}, title: ${!!title}`);
     }
 
     const perfEnd = performance.now();
@@ -150,7 +158,7 @@ export default function PlayScreen() {
       logger.info(`[PERF] PlayScreen unmounting - calling reset()`);
       reset(); // Reset state when component unmounts
     };
-  }, [episodeIndex, source, position, setVideoRef, reset, loadVideo, id, title]);
+  }, [episodeIndex, position, setVideoRef, reset, loadVideo, detail]);
 
   // 优化的屏幕点击处理
   const onScreenPress = useCallback(() => {
@@ -228,7 +236,7 @@ export default function PlayScreen() {
           <LoadingContainer style={dynamicStyles.loadingContainer} currentEpisode={currentEpisode} />
         )}
 
-        {showControls && deviceType === "tv" && (
+        {showControls && (
           <PlayerControls showControls={showControls} setShowControls={setShowControls} />
         )}
 
@@ -247,6 +255,7 @@ export default function PlayScreen() {
       <EpisodeSelectionModal />
       <SourceSelectionModal />
       <SpeedSelectionModal />
+      <LineSelectionModal />
     </ThemedView>
   );
 }

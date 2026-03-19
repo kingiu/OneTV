@@ -23,6 +23,7 @@ interface PlayerState {
   showEpisodeModal: boolean;
   showSourceModal: boolean;
   showSpeedModal: boolean;
+  showLineModal: boolean;
   showNextEpisodeOverlay: boolean;
   isSeeking: boolean;
   seekPosition: number;
@@ -48,6 +49,7 @@ interface PlayerState {
   setShowEpisodeModal: (show: boolean) => void;
   setShowSourceModal: (show: boolean) => void;
   setShowSpeedModal: (show: boolean) => void;
+  setShowLineModal: (show: boolean) => void;
   setShowNextEpisodeOverlay: (show: boolean) => void;
   setPlaybackRate: (rate: number) => void;
   setIntroEndTime: () => void;
@@ -70,6 +72,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   showEpisodeModal: false,
   showSourceModal: false,
   showSpeedModal: false,
+  showLineModal: false,
   showNextEpisodeOverlay: false,
   isSeeking: false,
   seekPosition: 0,
@@ -90,168 +93,331 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     let detail = useDetailStore.getState().detail;
     let episodes: Episode[] = [];
     
-    // 如果有detail，使用detail的source获取episodes；否则使用传入的source
-    if (detail && detail.source) {
-      logger.info(`[INFO] Using existing detail source "${detail.source}" to get episodes`);
-      episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState()).map((ep, index) => ({
-        url: ep,
-        title: `第 ${index + 1} 集`,
-      }));
-    } else {
-      logger.info(`[INFO] No existing detail, using provided source "${source}" to get episodes`);
-      episodes = episodesSelectorBySource(source)(useDetailStore.getState()).map((ep, index) => ({
-        url: ep,
-        title: `第 ${index + 1} 集`,
-      }));
-    }
-
     set({
       isLoading: true,
     });
 
-    const needsDetailInit = !detail || !episodes || episodes.length === 0 || detail.title !== title;
-    logger.info(`[PERF] Detail check - needsInit: ${needsDetailInit}, hasDetail: ${!!detail}, episodesCount: ${episodes?.length || 0}`);
-
-    if (needsDetailInit) {
-      const detailInitStart = performance.now();
-      logger.info(`[PERF] DetailStore.init START - ${title}`);
-      
-      await useDetailStore.getState().init(title, source, id);
-      
-      const detailInitEnd = performance.now();
-      logger.info(`[PERF] DetailStore.init END - took ${(detailInitEnd - detailInitStart).toFixed(2)}ms`);
-      
-      detail = useDetailStore.getState().detail;
-      
-      if (!detail) {
-        logger.error(`[ERROR] Detail not found after initialization for "${title}" (source: ${source}, id: ${id})`);
-        
-        // 检查DetailStore的错误状态
-        const detailStoreState = useDetailStore.getState();
-        if (detailStoreState.error) {
-          logger.error(`[ERROR] DetailStore error: ${detailStoreState.error}`);
-          set({ 
-            isLoading: false,
-            // 可以选择在这里设置一个错误状态，但playerStore可能没有error字段
-          });
-        } else {
-          logger.error(`[ERROR] DetailStore init completed but no detail found and no error reported`);
-          set({ isLoading: false });
-        }
-        return;
-      }
-      
-      // 使用DetailStore找到的实际source来获取episodes，而不是原始的preferredSource
-      logger.info(`[INFO] Using actual source "${detail.source}" instead of preferred source "${source}"`);  
-      episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState()).map((ep, index) => ({
-        url: ep,
-        title: `第 ${index + 1} 集`,
-      }));
-      
-      if (!episodes || episodes.length === 0) {
-        logger.error(`[ERROR] No episodes found for "${title}" from source "${detail.source}" (${detail.source_name})`);
-        
-        // 尝试从searchResults中直接获取episodes
-        const detailStoreState = useDetailStore.getState();
-        logger.info(`[INFO] Available sources in searchResults: ${detailStoreState.searchResults.map(r => `${r.source}(${r.episodes?.length || 0} episodes)`).join(', ')}`);
-        
-        // 如果当前source没有episodes，尝试使用第一个有episodes的source
-        const sourceWithEpisodes = detailStoreState.searchResults.find(r => r.episodes && r.episodes.length > 0);
-        if (sourceWithEpisodes) {
-          logger.info(`[FALLBACK] Using alternative source "${sourceWithEpisodes.source}" with ${sourceWithEpisodes.episodes.length} episodes`);
-          episodes = sourceWithEpisodes.episodes.map((ep, index) => ({
-            url: ep,
-            title: `第 ${index + 1} 集`,
-          }));
-          // 更新detail为有episodes的source
-          detail = sourceWithEpisodes;
-        } else {
-          logger.error(`[ERROR] No source with episodes found in searchResults`);
-          set({ isLoading: false });
-          return;
-        }
-      }
-      
-      logger.info(`[SUCCESS] Detail and episodes loaded - source: ${detail.source_name}, episodes: ${episodes.length}`);
-    } else {
-      logger.info(`[PERF] Skipping DetailStore.init - using cached data`);
-      
-      // 即使是缓存的数据，也要确保使用正确的source获取episodes
-      if (detail && detail.source && detail.source !== source) {
-        logger.info(`[INFO] Cached detail source "${detail.source}" differs from provided source "${source}", updating episodes`);
-        episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState()).map((ep, index) => ({
-          url: ep,
-          title: `第 ${index + 1} 集`,
-        }));
-        
-        if (!episodes || episodes.length === 0) {
-          logger.warn(`[WARN] Cached detail source "${detail.source}" has no episodes, trying provided source "${source}"`);
-          episodes = episodesSelectorBySource(source)(useDetailStore.getState()).map((ep, index) => ({
-            url: ep,
-            title: `第 ${index + 1} 集`,
-          }));
-        }
-      }
-    }
-
-    // 最终验证：确保我们有有效的detail和episodes数据
-    if (!detail) {
-      logger.error(`[ERROR] Final check failed: detail is null`);
-      set({ isLoading: false });
-      return;
-    }
-    
-    if (!episodes || episodes.length === 0) {
-      logger.error(`[ERROR] Final check failed: no episodes available for source "${detail.source}" (${detail.source_name})`);
-      set({ isLoading: false });
-      return;
-    }
-    
-    logger.info(`[SUCCESS] Final validation passed - detail: ${detail.source_name}, episodes: ${episodes.length}`);
+    // 添加API请求超时处理
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('API request timeout'));
+      }, 30000); // 30秒超时
+    });
 
     try {
-      const storageStart = performance.now();
-      logger.info(`[PERF] Storage operations START`);
-      
-      const playRecord = await PlayRecordManager.get(detail!.source, detail!.id.toString());
-      const storagePlayRecordEnd = performance.now();
-      logger.info(`[PERF] PlayRecordManager.get took ${(storagePlayRecordEnd - storageStart).toFixed(2)}ms`);
-      
-      const playerSettings = await PlayerSettingsManager.get(detail!.source, detail!.id.toString());
-      const storageEnd = performance.now();
-      logger.info(`[PERF] PlayerSettingsManager.get took ${(storageEnd - storagePlayRecordEnd).toFixed(2)}ms`);
-      logger.info(`[PERF] Total storage operations took ${(storageEnd - storageStart).toFixed(2)}ms`);
-      
-      const initialPositionFromRecord = playRecord?.play_time ? playRecord.play_time * 1000 : 0;
-      const savedPlaybackRate = playerSettings?.playbackRate || 1.0;
-      
-      const episodesMappingStart = performance.now();
-      const mappedEpisodes = episodes.map((ep, index) => ({
-        url: typeof ep === 'string' ? ep : ep.url,
-        title: typeof ep === 'string' ? `第 ${index + 1} 集` : ep.title || `第 ${index + 1} 集`,
-      }));
-      const episodesMappingEnd = performance.now();
-      logger.info(`[PERF] Episodes mapping (${episodes.length} episodes) took ${(episodesMappingEnd - episodesMappingStart).toFixed(2)}ms`);
-      
-      set({
-        isLoading: false,
-        currentEpisodeIndex: episodeIndex,
-        initialPosition: position || initialPositionFromRecord,
-        playbackRate: savedPlaybackRate,
-        episodes: mappedEpisodes,
-        introEndTime: playRecord?.introEndTime || playerSettings?.introEndTime,
-        outroStartTime: playRecord?.outroStartTime || playerSettings?.outroStartTime,
-      });
-      
-      const perfEnd = performance.now();
-      logger.info(`[PERF] PlayerStore.loadVideo COMPLETE - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
-      
+      // 包装整个操作以支持超时
+      await Promise.race([
+        (async () => {
+          // 总是从detailStore获取最新的detail，而不是使用传入的detail参数
+          let latestDetail = useDetailStore.getState().detail;
+          
+          // 如果有detail，使用detail的source获取episodes；否则使用传入的source
+          if (latestDetail && latestDetail.source) {
+            logger.info(`[INFO] Using latest detail source "${latestDetail.source}" to get episodes`);
+            // 获取选中的线路索引
+            const selectedLineIndex = useDetailStore.getState().selectedLineIndex;
+            logger.info(`[INFO] Using selected line index: ${selectedLineIndex}`);
+            
+            // 处理play_sources字段
+            if (latestDetail.play_sources && latestDetail.play_sources.length > 0) {
+              logger.info(`[INFO] Using play_sources with ${latestDetail.play_sources.length} lines`);
+              const selectedLine = latestDetail.play_sources[selectedLineIndex];
+              if (selectedLine && selectedLine.episodes && selectedLine.episodes.length > 0) {
+                logger.info(`[INFO] Using line ${selectedLineIndex + 1} (${selectedLine.name}): ${selectedLine.episodes[0].substring(0, 100)}...`);
+                episodes = [{
+                  url: selectedLine.episodes[0],
+                  title: selectedLine.name,
+                }];
+              } else {
+                // 如果选中的线路不存在，使用第一个线路
+                logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
+                const firstLine = latestDetail.play_sources[0];
+                if (firstLine && firstLine.episodes && firstLine.episodes.length > 0) {
+                  logger.info(`[INFO] Using first line (${firstLine.name}): ${firstLine.episodes[0].substring(0, 100)}...`);
+                  episodes = [{
+                    url: firstLine.episodes[0],
+                    title: firstLine.name,
+                  }];
+                }
+              }
+            } else {
+              // 兼容旧版本，使用episodes字段
+              const allEpisodes = episodesSelectorBySource(latestDetail.source)(useDetailStore.getState());
+              logger.info(`[INFO] All episodes length: ${allEpisodes.length}`);
+              
+              // 选择当前线路的剧集
+              const currentLineEpisode = allEpisodes[selectedLineIndex];
+              
+              if (currentLineEpisode) {
+                logger.info(`[INFO] Using line ${selectedLineIndex + 1}: ${currentLineEpisode.substring(0, 100)}...`);
+                episodes = [{
+                  url: currentLineEpisode,
+                  title: `第 ${selectedLineIndex + 1} 集`,
+                }];
+              } else {
+                // 如果选中的线路不存在，使用第一个线路
+                logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
+                if (allEpisodes.length > 0) {
+                  logger.info(`[INFO] Using first line: ${allEpisodes[0].substring(0, 100)}...`);
+                  episodes = [{
+                    url: allEpisodes[0],
+                    title: `第 1 集`,
+                  }];
+                }
+              }
+            }
+          } else {
+            logger.info(`[INFO] No existing detail, using provided source "${source}" to get episodes`);
+            const allEpisodes = episodesSelectorBySource(source)(useDetailStore.getState());
+            logger.info(`[INFO] All episodes length: ${allEpisodes.length}`);
+            if (allEpisodes.length > 0) {
+              logger.info(`[INFO] Using first line: ${allEpisodes[0].substring(0, 100)}...`);
+              episodes = [{
+                url: allEpisodes[0],
+                title: `第 1 集`,
+              }];
+            }
+          }
+
+          const needsDetailInit = !latestDetail || !episodes || episodes.length === 0 || latestDetail.title !== title;
+          logger.info(`[PERF] Detail check - needsInit: ${needsDetailInit}, hasDetail: ${!!latestDetail}, episodesCount: ${episodes?.length || 0}`);
+
+          if (needsDetailInit) {
+            const detailInitStart = performance.now();
+            logger.info(`[PERF] DetailStore.init START - ${title}`);
+            
+            await useDetailStore.getState().init(title, source, id);
+            
+            const detailInitEnd = performance.now();
+            logger.info(`[PERF] DetailStore.init END - took ${(detailInitEnd - detailInitStart).toFixed(2)}ms`);
+            
+            // 更新latestDetail为最新的detail
+            latestDetail = useDetailStore.getState().detail;
+            
+            if (!latestDetail) {
+              logger.error(`[ERROR] Detail not found after initialization for "${title}" (source: ${source}, id: ${id})`);
+              
+              // 检查DetailStore的错误状态
+              const detailStoreState = useDetailStore.getState();
+              if (detailStoreState.error) {
+                logger.error(`[ERROR] DetailStore error: ${detailStoreState.error}`);
+                set({ 
+                  isLoading: false,
+                });
+              } else {
+                logger.error(`[ERROR] DetailStore init completed but no detail found and no error reported`);
+                set({ isLoading: false });
+              }
+              return;
+            }
+            
+            // 使用DetailStore找到的实际source来获取episodes，而不是原始的preferredSource
+            logger.info(`[INFO] Using actual source "${latestDetail.source}" instead of preferred source "${source}"`);  
+            // 获取选中的线路索引
+            const selectedLineIndex = useDetailStore.getState().selectedLineIndex;
+            logger.info(`[INFO] Using selected line index: ${selectedLineIndex}`);
+            
+            // 处理play_sources字段
+            if (latestDetail.play_sources && latestDetail.play_sources.length > 0) {
+              logger.info(`[INFO] Using play_sources with ${latestDetail.play_sources.length} lines`);
+              const selectedLine = latestDetail.play_sources[selectedLineIndex];
+              if (selectedLine && selectedLine.episodes && selectedLine.episodes.length > 0) {
+                logger.info(`[INFO] Using line ${selectedLineIndex + 1} (${selectedLine.name}): ${selectedLine.episodes[0].substring(0, 100)}...`);
+                episodes = [{
+                  url: selectedLine.episodes[0],
+                  title: selectedLine.name,
+                }];
+              } else {
+                // 如果选中的线路不存在，使用第一个线路
+                logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
+                const firstLine = latestDetail.play_sources[0];
+                if (firstLine && firstLine.episodes && firstLine.episodes.length > 0) {
+                  logger.info(`[INFO] Using first line (${firstLine.name}): ${firstLine.episodes[0].substring(0, 100)}...`);
+                  episodes = [{
+                    url: firstLine.episodes[0],
+                    title: firstLine.name,
+                  }];
+                }
+              }
+            } else {
+              // 兼容旧版本，使用episodes字段
+              const allEpisodes = episodesSelectorBySource(latestDetail.source)(useDetailStore.getState());
+              logger.info(`[INFO] All episodes length: ${allEpisodes.length}`);
+              
+              // 选择当前线路的剧集
+              const currentLineEpisode = allEpisodes[selectedLineIndex];
+              
+              if (currentLineEpisode) {
+                logger.info(`[INFO] Using line ${selectedLineIndex + 1}: ${currentLineEpisode.substring(0, 100)}...`);
+                episodes = [{
+                  url: currentLineEpisode,
+                  title: `第 ${selectedLineIndex + 1} 集`,
+                }];
+              } else {
+                // 如果选中的线路不存在，使用第一个线路
+                logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
+                if (allEpisodes.length > 0) {
+                  logger.info(`[INFO] Using first line: ${allEpisodes[0].substring(0, 100)}...`);
+                  episodes = [{
+                    url: allEpisodes[0],
+                    title: `第 1 集`,
+                  }];
+                }
+              }
+            }
+            
+            if (!episodes || episodes.length === 0) {
+              logger.error(`[ERROR] No episodes found for "${title}" from source "${latestDetail.source}" (${latestDetail.source_name})`);
+              
+              // 尝试从searchResults中直接获取episodes
+              const detailStoreState = useDetailStore.getState();
+              logger.info(`[INFO] Available sources in searchResults: ${detailStoreState.searchResults.map(r => `${r.source}(${r.episodes?.length || 0} episodes)`).join(', ')}`);
+              
+              // 如果当前source没有episodes，尝试使用第一个有episodes的source
+              const sourceWithEpisodes = detailStoreState.searchResults.find(r => r.episodes && r.episodes.length > 0);
+              if (sourceWithEpisodes) {
+                logger.info(`[FALLBACK] Using alternative source "${sourceWithEpisodes.source}" with ${sourceWithEpisodes.episodes.length} episodes`);
+                logger.info(`[FALLBACK] First line URL: ${sourceWithEpisodes.episodes[0].substring(0, 100)}...`);
+                episodes = [{
+                  url: sourceWithEpisodes.episodes[0],
+                  title: `第 1 集`,
+                }];
+                // 更新latestDetail为有episodes的source
+                latestDetail = sourceWithEpisodes;
+              } else {
+                logger.error(`[ERROR] No source with episodes found in searchResults`);
+                set({ isLoading: false });
+                return;
+              }
+            }
+            
+            logger.info(`[SUCCESS] Detail and episodes loaded - source: ${latestDetail.source_name}, episodes: ${episodes.length}`);
+          } else {
+            logger.info(`[PERF] Skipping DetailStore.init - using cached data`);
+            
+            // 即使是缓存的数据，也要确保使用正确的source获取episodes
+            if (latestDetail && latestDetail.source && latestDetail.source !== source) {
+              logger.info(`[INFO] Cached detail source "${latestDetail.source}" differs from provided source "${source}", updating episodes`);
+              
+              // 处理play_sources字段
+              if (latestDetail.play_sources && latestDetail.play_sources.length > 0) {
+                logger.info(`[INFO] Using play_sources with ${latestDetail.play_sources.length} lines`);
+                logger.info(`[INFO] Play sources: ${latestDetail.play_sources.map(l => l.name).join(', ')}`);
+                
+                const selectedLineIndex = useDetailStore.getState().selectedLineIndex;
+                const selectedLine = latestDetail.play_sources[selectedLineIndex];
+                if (selectedLine) {
+                  logger.info(`[INFO] Selected line: ${selectedLine.name} with ${selectedLine.episodes.length} episodes`);
+                  episodes = [{
+                    url: selectedLine.episodes[0],
+                    title: selectedLine.name,
+                  }];
+                } else {
+                  // 如果选中的线路不存在，使用第一个线路
+                  logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
+                  const firstLine = latestDetail.play_sources[0];
+                  if (firstLine) {
+                    logger.info(`[INFO] Using first line (${firstLine.name}): ${firstLine.episodes[0].substring(0, 100)}...`);
+                    episodes = [{
+                      url: firstLine.episodes[0],
+                      title: firstLine.name,
+                    }];
+                  }
+                }
+              } else {
+                const allEpisodes = episodesSelectorBySource(latestDetail.source)(useDetailStore.getState());
+                logger.info(`[INFO] All episodes length: ${allEpisodes.length}`);
+                if (allEpisodes.length > 0) {
+                  logger.info(`[INFO] Using first line: ${allEpisodes[0].substring(0, 100)}...`);
+                  episodes = [{
+                    url: allEpisodes[0],
+                    title: `第 1 集`,
+                  }];
+                } else {
+                  logger.warn(`[WARN] Cached detail source "${latestDetail.source}" has no episodes, trying provided source "${source}"`);
+                  const providedEpisodes = episodesSelectorBySource(source)(useDetailStore.getState());
+                  logger.info(`[INFO] Provided episodes length: ${providedEpisodes.length}`);
+                  if (providedEpisodes.length > 0) {
+                    logger.info(`[INFO] Using first line: ${providedEpisodes[0].substring(0, 100)}...`);
+                    episodes = [{
+                      url: providedEpisodes[0],
+                      title: `第 1 集`,
+                    }];
+                  }
+                }
+              }
+            }
+          }
+
+          // 最终验证：确保我们有有效的detail和episodes数据
+          if (!latestDetail) {
+            logger.error(`[ERROR] Final check failed: detail is null`);
+            set({ isLoading: false });
+            return;
+          }
+          
+          if (!episodes || episodes.length === 0) {
+            logger.error(`[ERROR] Final check failed: no episodes available for source "${latestDetail.source}" (${latestDetail.source_name})`);
+            set({ isLoading: false });
+            return;
+          }
+          
+          logger.info(`[SUCCESS] Final validation passed - detail: ${latestDetail.source_name}, episodes: ${episodes.length}`);
+          logger.info(`[SUCCESS] First episode URL: ${episodes[0].url.substring(0, 100)}...`);
+
+          try {
+            const storageStart = performance.now();
+            logger.info(`[PERF] Storage operations START`);
+            
+            const playRecord = await PlayRecordManager.get(latestDetail.source, latestDetail.id.toString());
+            const storagePlayRecordEnd = performance.now();
+            logger.info(`[PERF] PlayRecordManager.get took ${(storagePlayRecordEnd - storageStart).toFixed(2)}ms`);
+            
+            const playerSettings = await PlayerSettingsManager.get(latestDetail.source, latestDetail.id.toString());
+            const storageEnd = performance.now();
+            logger.info(`[PERF] PlayerSettingsManager.get took ${(storageEnd - storagePlayRecordEnd).toFixed(2)}ms`);
+            logger.info(`[PERF] Total storage operations took ${(storageEnd - storageStart).toFixed(2)}ms`);
+            
+            const initialPositionFromRecord = playRecord?.play_time ? playRecord.play_time * 1000 : 0;
+            const savedPlaybackRate = playerSettings?.playbackRate || 1.0;
+            
+            const episodesMappingStart = performance.now();
+            const mappedEpisodes = episodes.map((ep, index) => ({
+              url: typeof ep === 'string' ? ep : ep.url,
+              title: typeof ep === 'string' ? `第 ${index + 1} 集` : ep.title || `第 ${index + 1} 集`,
+            }));
+            const episodesMappingEnd = performance.now();
+            logger.info(`[PERF] Episodes mapping (${episodes.length} episodes) took ${(episodesMappingEnd - episodesMappingStart).toFixed(2)}ms`);
+            
+            set({
+              isLoading: false,
+              currentEpisodeIndex: 0, // 始终从第一集开始
+              initialPosition: position || initialPositionFromRecord,
+              playbackRate: savedPlaybackRate,
+              episodes: mappedEpisodes,
+              introEndTime: playRecord?.introEndTime || playerSettings?.introEndTime,
+              outroStartTime: playRecord?.outroStartTime || playerSettings?.outroStartTime,
+            });
+            
+            const perfEnd = performance.now();
+            logger.info(`[PERF] PlayerStore.loadVideo COMPLETE - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
+            
+          } catch (error) {
+            logger.debug("Failed to load play record", error);
+            set({ isLoading: false });
+            
+            const perfEnd = performance.now();
+            logger.info(`[PERF] PlayerStore.loadVideo ERROR - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
+          }
+        })(),
+        timeoutPromise
+      ]);
     } catch (error) {
-      logger.debug("Failed to load play record", error);
+      logger.error(`[ERROR] PlayerStore.loadVideo timeout or error:`, error);
       set({ isLoading: false });
       
       const perfEnd = performance.now();
-      logger.info(`[PERF] PlayerStore.loadVideo ERROR - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
+      logger.info(`[PERF] PlayerStore.loadVideo TIMEOUT - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
     }
   },
 
@@ -450,6 +616,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   setShowEpisodeModal: (show) => set({ showEpisodeModal: show }),
   setShowSourceModal: (show) => set({ showSourceModal: show }),
   setShowSpeedModal: (show) => set({ showSpeedModal: show }),
+  setShowLineModal: (show) => set({ showLineModal: show }),
   setShowNextEpisodeOverlay: (show) => set({ showNextEpisodeOverlay: show }),
 
   setPlaybackRate: async (rate) => {
@@ -479,6 +646,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       showEpisodeModal: false,
       showSourceModal: false,
       showSpeedModal: false,
+      showLineModal: false,
       showNextEpisodeOverlay: false,
       initialPosition: 0,
       playbackRate: 1.0,

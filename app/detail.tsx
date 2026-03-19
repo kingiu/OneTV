@@ -33,6 +33,17 @@ export default function DetailScreen() {
     isFavorited,
     toggleFavorite,
   } = useDetailStore();
+  
+  // 线路显示逻辑
+  // 每个SearchResult的episodes数组中的每个元素代表一个线路
+  console.log('=== 搜索结果数量:', searchResults.length);
+  searchResults.forEach((result, index) => {
+    console.log(`结果 ${index} 标题:`, result.title);
+    console.log(`结果 ${index} 播放源:`, result.source_name);
+    console.log(`结果 ${index} 线路数量:`, result.episodes?.length || 0);
+    console.log(`结果 ${index} 线路:`, result.episodes);
+    console.log(`结果 ${index} 完整数据:`, JSON.stringify(result));
+  });
 
   useEffect(() => {
     if (q) {
@@ -147,18 +158,24 @@ export default function DetailScreen() {
             <View style={dynamicStyles.sourceList}>
               {searchResults.map((item, index) => {
                 const isSelected = detail?.source === item.source;
+                
                 return (
                   <StyledButton
-                    key={index}
-                    onPress={() => setDetail(item)}
+                    key={item.source}
+                    onPress={() => {
+                      // 选择当前播放源并保存线路索引
+                      setDetail(item, 0); // 默认选择第一个线路
+                    }}
                     isSelected={isSelected}
                     style={dynamicStyles.sourceButton}
                   >
-                    <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
-                    {item.episodes.length > 1 && (
+                    <View style={dynamicStyles.sourceButtonContent}>
+                      <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
+                    </View>
+                    {item.play_sources && item.play_sources.length > 1 && (
                       <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
                         <Text style={dynamicStyles.badgeText}>
-                          {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
+                          {item.play_sources.length > 99 ? "99+" : `${item.play_sources.length}`} 线路
                         </Text>
                       </View>
                     )}
@@ -177,15 +194,34 @@ export default function DetailScreen() {
           <View style={dynamicStyles.episodesContainer}>
             <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
             <View style={dynamicStyles.episodeList}>
-              {detail.episodes.map((episode, index) => (
-                <StyledButton
-                  key={index}
-                  style={dynamicStyles.episodeButton}
-                  onPress={() => handlePlay(index)}
-                  text={`第 ${index + 1} 集`}
-                  textStyle={dynamicStyles.episodeButtonText}
-                />
-              ))}
+              {/* 处理play_sources字段 */}
+              {detail.play_sources && detail.play_sources.length > 0 ? (
+                detail.play_sources.map((source, sourceIndex) => (
+                  <View key={sourceIndex} style={dynamicStyles.sourceContainer}>
+                    <ThemedText style={dynamicStyles.sourceTitle}>{source.name}</ThemedText>
+                    {source.episodes.map((episode, episodeIndex) => (
+                      <StyledButton
+                        key={`${sourceIndex}-${episodeIndex}`}
+                        style={dynamicStyles.episodeButton}
+                        onPress={() => handlePlay(episodeIndex)}
+                        text={`第 ${episodeIndex + 1} 集`}
+                        textStyle={dynamicStyles.episodeButtonText}
+                      />
+                    ))}
+                  </View>
+                ))
+              ) : (
+                /* 兼容旧版本，使用episodes字段 */
+                detail.episodes.map((episode, index) => (
+                  <StyledButton
+                    key={index}
+                    style={dynamicStyles.episodeButton}
+                    onPress={() => handlePlay(index)}
+                    text={`第 ${index + 1} 集`}
+                    textStyle={dynamicStyles.episodeButtonText}
+                  />
+                ))
+              )}
             </View>
           </View>
         </ScrollView>
@@ -223,50 +259,75 @@ export default function DetailScreen() {
           <View style={dynamicStyles.bottomContainer}>
             <View style={dynamicStyles.sourcesContainer}>
               <View style={dynamicStyles.sourcesTitleContainer}>
-                <ThemedText style={dynamicStyles.sourcesTitle}>选择播放源 共 {searchResults.length} 个</ThemedText>
-                {!allSourcesLoaded && <ActivityIndicator style={{ marginLeft: 10 }} />}
-              </View>
-              <View style={dynamicStyles.sourceList}>
-                {searchResults.map((item, index) => {
-                  const isSelected = detail?.source === item.source;
-                  return (
-                    <StyledButton
-                      key={index}
-                      onPress={() => setDetail(item)}
-                      hasTVPreferredFocus={index === 0}
-                      isSelected={isSelected}
-                      style={dynamicStyles.sourceButton}
-                    >
+              <ThemedText style={dynamicStyles.sourcesTitle}>选择播放源 共 {searchResults.length} 个</ThemedText>
+              {!allSourcesLoaded && <ActivityIndicator style={{ marginLeft: 10 }} />}
+            </View>
+            <View style={dynamicStyles.sourceList}>
+              {searchResults.map((item, index) => {
+                const isSelected = detail?.source === item.source;
+                
+                return (
+                  <StyledButton
+                    key={item.source}
+                    onPress={() => {
+                      // 选择当前播放源并保存线路索引
+                      setDetail(item, 0); // 默认选择第一个线路
+                    }}
+                    hasTVPreferredFocus={index === 0}
+                    isSelected={isSelected}
+                    style={dynamicStyles.sourceButton}
+                  >
+                    <View style={dynamicStyles.sourceButtonContent}>
                       <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
-                      {item.episodes.length > 1 && (
-                        <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
-                          <Text style={dynamicStyles.badgeText}>
-                            {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
-                          </Text>
-                        </View>
-                      )}
-                      {item.resolution && (
-                        <View style={[dynamicStyles.badge, { backgroundColor: "#666" }, isSelected && dynamicStyles.selectedBadge]}>
-                          <Text style={dynamicStyles.badgeText}>{item.resolution}</Text>
-                        </View>
-                      )}
-                    </StyledButton>
-                  );
-                })}
+                    </View>
+                    {item.play_sources && item.play_sources.length > 1 && (
+                      <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
+                        <Text style={dynamicStyles.badgeText}>
+                          {item.play_sources.length > 99 ? "99+" : `${item.play_sources.length}`} 线路
+                        </Text>
+                      </View>
+                    )}
+                    {item.resolution && (
+                      <View style={[dynamicStyles.badge, { backgroundColor: "#666" }, isSelected && dynamicStyles.selectedBadge]}>
+                        <Text style={dynamicStyles.badgeText}>{item.resolution}</Text>
+                      </View>
+                    )}
+                  </StyledButton>
+                );
+              })}
               </View>
             </View>
             <View style={dynamicStyles.episodesContainer}>
               <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
               <ScrollView contentContainerStyle={dynamicStyles.episodeList}>
-                {detail.episodes.map((episode, index) => (
-                  <StyledButton
-                    key={index}
-                    style={dynamicStyles.episodeButton}
-                    onPress={() => handlePlay(index)}
-                    text={`第 ${index + 1} 集`}
-                    textStyle={dynamicStyles.episodeButtonText}
-                  />
-                ))}
+                {/* 处理play_sources字段 */}
+                {detail.play_sources && detail.play_sources.length > 0 ? (
+                  detail.play_sources.map((source, sourceIndex) => (
+                    <View key={sourceIndex} style={dynamicStyles.sourceContainer}>
+                      <ThemedText style={dynamicStyles.sourceTitle}>{source.name}</ThemedText>
+                      {source.episodes.map((episode, episodeIndex) => (
+                        <StyledButton
+                          key={`${sourceIndex}-${episodeIndex}`}
+                          style={dynamicStyles.episodeButton}
+                          onPress={() => handlePlay(episodeIndex)}
+                          text={`第 ${episodeIndex + 1} 集`}
+                          textStyle={dynamicStyles.episodeButtonText}
+                        />
+                      ))}
+                    </View>
+                  ))
+                ) : (
+                  /* 兼容旧版本，使用episodes字段 */
+                  detail.episodes.map((episode, index) => (
+                    <StyledButton
+                      key={index}
+                      style={dynamicStyles.episodeButton}
+                      onPress={() => handlePlay(index)}
+                      text={`第 ${index + 1} 集`}
+                      textStyle={dynamicStyles.episodeButtonText}
+                    />
+                  ))
+                )}
               </ScrollView>
             </View>
           </View>
@@ -402,6 +463,10 @@ const createResponsiveStyles = (deviceType: string, spacing: number) => {
       margin: isMobile ? 4 : 8,
       minHeight: isMobile ? 36 : 44,
     },
+    sourceButtonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
     sourceButtonText: {
       color: "white",
       fontSize: isMobile ? 14 : 16,
@@ -444,6 +509,16 @@ const createResponsiveStyles = (deviceType: string, spacing: number) => {
     episodeButtonText: {
       color: "white",
       fontSize: isMobile ? 12 : 14,
+    },
+    sourceContainer: {
+      marginBottom: 16,
+      width: '100%',
+    },
+    sourceTitle: {
+      color: "#4CAF50",
+      fontSize: isMobile ? 14 : 16,
+      fontWeight: "bold",
+      marginBottom: 8,
     },
   });
 };

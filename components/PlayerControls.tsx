@@ -26,13 +26,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
     setShowEpisodeModal,
     setShowSourceModal,
     setShowSpeedModal,
+    setShowLineModal,
     setIntroEndTime,
     setOutroStartTime,
     introEndTime,
     outroStartTime,
   } = usePlayerStore();
 
-  const { detail } = useDetailStore();
+  const { detail, selectedLineIndex } = useDetailStore();
   const resources = useSources();
 
   const videoTitle = detail?.title || "";
@@ -41,6 +42,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   const currentSource = resources.find((r) => r.source === detail?.source);
   const currentSourceName = currentSource?.source_name;
   const hasNextEpisode = currentEpisodeIndex < (episodes.length || 0) - 1;
+  
+  // 线路显示逻辑 - 修复：使用play_sources判断线路数量，而不是episodes
+  const hasMultipleLines = detail?.play_sources && detail.play_sources.length > 1;
+  const lineLabel = hasMultipleLines ? `线路${selectedLineIndex + 1}` : "";
 
   const formatTime = (milliseconds: number) => {
     if (!milliseconds) return "00:00";
@@ -59,10 +64,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   return (
     <View style={styles.controlsOverlay}>
       <View style={styles.topControls}>
-        <Text style={styles.controlTitle}>
-          {videoTitle} {currentEpisodeTitle ? `- ${currentEpisodeTitle}` : ""}{" "}
-          {currentSourceName ? `(${currentSourceName})` : ""}
-        </Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.controlTitle}>
+            {videoTitle} {currentEpisodeTitle ? `- ${currentEpisodeTitle}` : ""}
+          </Text>
+          {lineLabel ? (
+            <Text style={styles.lineLabel}>{lineLabel}</Text>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.bottomControlsContainer}>
@@ -87,8 +96,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
 
         <View style={styles.bottomControls}>
             <TouchableOpacity onPress={setIntroEndTime} style={styles.controlButton}>
-              <Icon name="search" color="white" size={24} />
-              {introEndTime && <Text style={styles.timeLabel}>{formatTime(introEndTime)}</Text>}
+              <Text style={{color: "white", fontSize: 16}}>片头</Text>
+              <Text style={styles.timeLabel}>{formatTime(introEndTime || 0)}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={togglePlayPause} style={styles.controlButton}>
@@ -100,21 +109,30 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
             </TouchableOpacity>
 
             <TouchableOpacity onPress={setOutroStartTime} style={styles.controlButton}>
-              <Icon name="search" color="white" size={24} />
-              {outroStartTime && <Text style={styles.timeLabel}>{formatTime(outroStartTime)}</Text>}
+              <Text style={{color: "white", fontSize: 16}}>片尾</Text>
+              <Text style={styles.timeLabel}>{formatTime(outroStartTime || 0)}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => setShowEpisodeModal(true)} style={styles.controlButton}>
-              <Icon name="menu" color="white" size={24} />
+              <Icon name="list" color="white" size={24} />
+              <Text style={{color: "white", fontSize: 16, marginLeft: 4}}>剧集</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => setShowSpeedModal(true)} style={styles.controlButton}>
-              <Icon name="settings" color="white" size={24} />
+              <Icon name="speedometer" color="white" size={24} />
+              <Text style={{color: "white", fontSize: 16, marginLeft: 4}}>倍速</Text>
               {playbackRate !== 1.0 && <Text style={styles.timeLabel}>{playbackRate}x</Text>}
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => setShowSourceModal(true)} style={styles.controlButton}>
-              <Icon name="settings" color="white" size={24} />
+              <Icon name="videocam" color="white" size={24} />
+              <Text style={{color: "white", fontSize: 16, marginLeft: 4}}>播放源</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setShowLineModal(true)} style={styles.controlButton} disabled={!hasMultipleLines}>
+              <Icon name="link" color={hasMultipleLines ? "white" : "#666"} size={24} />
+              <Text style={{color: hasMultipleLines ? "white" : "#666", fontSize: 16, marginLeft: 4}}>线路</Text>
+              {lineLabel ? <Text style={styles.timeLabel}>{selectedLineIndex + 1}</Text> : null}
             </TouchableOpacity>
           </View>
       </View>
@@ -141,6 +159,22 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
     marginHorizontal: 10,
+  },
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+  },
+  lineLabel: {
+    color: "#00bb5e",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginLeft: 10,
+    backgroundColor: "rgba(0, 187, 94, 0.2)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   bottomControlsContainer: {
     width: "100%",
