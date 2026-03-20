@@ -29,8 +29,8 @@ export const Icon: React.FC<IconProps> = ({
     'videocam': 'videocam',
     'radio': 'radio',
     'wifi': 'wifi',
-    'cable': 'cable',
-    'antenna': 'antenna',
+    'cable': 'tv',
+    'antenna': 'radio',
     'play-circle': 'play-circle',
     'globe': 'globe',
     'server': 'server'

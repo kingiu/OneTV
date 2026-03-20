@@ -4,7 +4,7 @@
 # 遵循规范的 Expo 构建流程：prebuild -> build -> install
 
 # 配置项
-DEVICE_IP="192.168.100.247"
+DEVICE_IP="emulator-5554"
 PLATFORM="android"
 VARIANT="release"
 
@@ -37,9 +37,8 @@ fi
 
 # 2. 检查设备连接
 echo -e "\n${BLUE}2. 检查设备连接...${NC}"
-adb connect ${DEVICE_IP}
 
-if ! adb devices | grep -q "${DEVICE_IP}:5555\s*device"; then
+if ! adb devices | grep -q "${DEVICE_IP}\s*device"; then
     echo -e "${RED}错误: 设备 ${DEVICE_IP} 未连接或不可用${NC}"
     exit 1
 fi
@@ -77,7 +76,7 @@ if [ ! -f "${APK_PATH}" ]; then
     exit 1
 fi
 
-adb -s ${DEVICE_IP}:5555 install -r "${APK_PATH}"
+adb -s ${DEVICE_IP} install -r "${APK_PATH}"
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}错误: 安装失败${NC}"
