@@ -4,7 +4,7 @@
 # 遵循规范的 Expo 构建流程：prebuild -> build -> run
 
 # 配置项
-DEVICE_IP="192.168.100.247"
+DEVICE_IP="127.0.0.1"
 PLATFORM="android"
 VARIANT="debug"
 
@@ -57,10 +57,41 @@ fi
 
 echo -e "${GREEN}✓ prebuild 成功完成${NC}"
 
-# 4. 运行开发构建
-echo -e "\n${BLUE}4. 运行 ${VARIANT} 版本构建...${NC}"
-# 使用 --device 直接在设备上运行
-echo -e "${YELLOW}注意: 开发构建会启动 Metro 服务器，按 Ctrl+C 停止${NC}"
-npx expo run:${PLATFORM} --device --variant ${VARIANT}
+# 4. 停止可能的emulator-5554连接
+echo -e "\n${BLUE}4. 清理设备连接...${NC}"
+adb disconnect emulator-5554
+
+# 5. 使用Gradle直接构建apk
+echo -e "\n${BLUE}5. 使用Gradle构建 ${VARIANT} 版本apk...${NC}"
+cd android && ./gradlew assembleDebug
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}错误: 构建失败${NC}"
+    cd ..
+    exit 1
+fi
+
+cd ..
+echo -e "${GREEN}✓ 构建成功完成${NC}"
+
+# 6. 安装apk到设备
+echo -e "\n${BLUE}6. 安装apk到设备 ${DEVICE_IP}:5555...${NC}"
+# 查找生成的apk文件
+APK_FILE="./android/app/build/outputs/apk/debug/app-debug.apk"
+
+if [ -f "$APK_FILE" ]; then
+    echo -e "${GREEN}✓ 找到apk文件: ${APK_FILE}${NC}"
+    adb -s ${DEVICE_IP}:5555 install "$APK_FILE"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ apk安装成功${NC}"
+    else
+        echo -e "${RED}错误: apk安装失败${NC}"
+        exit 1
+    fi
+else
+    echo -e "${RED}错误: 未找到apk文件${NC}"
+    exit 1
+fi
 
 # 开发构建会保持运行，直到用户手动停止

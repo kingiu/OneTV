@@ -130,7 +130,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => setShowLineModal(true)} style={styles.controlButton} disabled={!hasMultipleLines}>
-              <Icon name="link" color={hasMultipleLines ? "white" : "#666"} size={24} />
+              <Icon name="cable" color={hasMultipleLines ? "white" : "#666"} size={24} />
               <Text style={{color: hasMultipleLines ? "white" : "#666", fontSize: 16, marginLeft: 4}}>线路</Text>
               {lineLabel ? <Text style={styles.timeLabel}>{selectedLineIndex + 1}</Text> : null}
             </TouchableOpacity>

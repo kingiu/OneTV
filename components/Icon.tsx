@@ -1,7 +1,7 @@
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 
-export type IconName = 'heart' | 'search' | 'settings' | 'menu' | 'close' | 'chevron-right';
+export type IconName = 'heart' | 'search' | 'settings' | 'menu' | 'close' | 'chevron-right' | 'list' | 'speedometer' | 'videocam' | 'radio' | 'wifi' | 'cable' | 'antenna' | 'play-circle' | 'globe' | 'server';
 
 interface IconProps {
   name: IconName;
@@ -23,7 +23,17 @@ export const Icon: React.FC<IconProps> = ({
     'settings': 'settings',
     'menu': 'menu',
     'close': 'close',
-    'chevron-right': 'chevron-forward'
+    'chevron-right': 'chevron-forward',
+    'list': 'list',
+    'speedometer': 'speedometer',
+    'videocam': 'videocam',
+    'radio': 'radio',
+    'wifi': 'wifi',
+    'cable': 'cable',
+    'antenna': 'antenna',
+    'play-circle': 'play-circle',
+    'globe': 'globe',
+    'server': 'server'
   };
 
   return (

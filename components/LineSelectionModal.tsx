@@ -70,8 +70,8 @@ export const LineSelectionModal: React.FC = () => {
   const onSelectLine = (lineIndex: number) => {
     logger.debug("onSelectLine", lineIndex);
     if (detailWithPlaySources) {
-      // 更新选中的线路索引
-      setDetail(detailWithPlaySources, lineIndex);
+      // 更新选中的线路索引，标记为用户手动选择
+      setDetail(detailWithPlaySources, lineIndex, true);
       
       // 重新加载视频，保持当前位置
       const currentPosition = status?.isLoaded ? status.positionMillis : undefined;

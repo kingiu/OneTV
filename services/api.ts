@@ -38,12 +38,18 @@ export interface SearchResult {
   title: string;
   poster: string;
   episodes: string[];
+  episodes_titles?: string[];
   source: string;
   source_name: string;
   class?: string;
   year: string;
   desc?: string;
   type_name?: string;
+  play_sources?: Array<{
+    name: string;
+    episodes: string[];
+    episodes_titles: string[];
+  }>;
 }
 
 export interface Favorite {
@@ -125,6 +131,27 @@ export class API {
     const method = options.method || "GET";
     const fullUrl = `${this.baseURL}${url}`;
     
+    // 获取认证cookie
+    let authCookies = '';
+    try {
+      authCookies = await AsyncStorage.getItem('authCookies') || '';
+    } catch (error) {
+      console.debug('API: 读取认证cookie失败', error);
+    }
+    
+    // 构建请求头
+    const headers = {
+      ...options.headers,
+      'Content-Type': 'application/json',
+      'Cookie': authCookies,
+    };
+    
+    const requestOptions: RequestInit = {
+      ...options,
+      headers,
+      credentials: 'include',
+    };
+    
     // 记录请求
     const requestBody = options.body ? JSON.parse(options.body as string) : undefined;
     apiRequest(method, url, requestBody);
@@ -132,7 +159,7 @@ export class API {
     const startTime = Date.now();
     
     try {
-      const response = await fetch(fullUrl, options);
+      const response = await fetch(fullUrl, requestOptions);
       
       // 记录性能
       const duration = Date.now() - startTime;
@@ -378,7 +405,13 @@ export class API {
     const url = `/api/search/one?q=${encodeURIComponent(query)}&resourceId=${encodeURIComponent(resourceId)}`;
     const response = await this._fetch(url, { signal });
     const { results } = await response.json();
-    return { results: results.filter((item: any) => item.title === query )};
+    // 放宽标题过滤逻辑，使用includes而不是严格相等
+    const filteredResults = results.filter((item: any) => item.title && item.title.includes(query) );
+    console.log(`[API] 搜索结果: ${filteredResults.length} 个结果，来源: ${resourceId}`);
+    filteredResults.forEach((item: any, index: number) => {
+      console.log(`[API] 结果 ${index}: source=${item.source}, source_name=${item.source_name}, title=${item.title}`);
+    });
+    return { results: filteredResults };
   }
 
   async getResources(signal?: AbortSignal): Promise<ApiSite[]> {

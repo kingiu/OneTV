@@ -5,6 +5,7 @@ import { RefObject } from "react";
 import { PlayRecord, PlayRecordManager, PlayerSettingsManager } from "../services/storage";
 import useDetailStore, { episodesSelectorBySource } from "./detailStore";
 import Logger from "../utils/Logger";
+import { LineSpeedTest } from "../services/lineSpeedTest";
 
 const logger = Logger.withTag('PlayerStore');
 
@@ -60,6 +61,7 @@ interface PlayerState {
   // Internal helper
   _savePlayRecord: (updates?: Partial<PlayRecord>, options?: { immediate?: boolean }) => void;
   handleVideoError: (errorType: 'ssl' | 'network' | 'other', failedUrl: string) => Promise<void>;
+  handleLineError: () => Promise<void>;
 }
 
 const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -114,29 +116,51 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
           // 如果有detail，使用detail的source获取episodes；否则使用传入的source
           if (latestDetail && latestDetail.source) {
             logger.info(`[INFO] Using latest detail source "${latestDetail.source}" to get episodes`);
-            // 获取选中的线路索引
-            const selectedLineIndex = useDetailStore.getState().selectedLineIndex;
-            logger.info(`[INFO] Using selected line index: ${selectedLineIndex}`);
             
             // 处理play_sources字段
             if (latestDetail.play_sources && latestDetail.play_sources.length > 0) {
               logger.info(`[INFO] Using play_sources with ${latestDetail.play_sources.length} lines`);
-              const selectedLine = latestDetail.play_sources[selectedLineIndex];
+              
+              // 检查用户是否已经手动选择了线路
+              const { selectedLineIndex, userSelectedLine } = useDetailStore.getState();
+              let finalLineIndex = selectedLineIndex;
+              
+              // 如果用户没有手动选择线路，则自动测速选择最快的线路
+              if (!userSelectedLine) {
+                const fastestLineIndex = await LineSpeedTest.findFastestLine(
+                  latestDetail.play_sources,
+                  episodeIndex,
+                  5000 // 5秒超时
+                );
+                
+                // 更新选中的线路索引
+                if (fastestLineIndex !== selectedLineIndex) {
+                  logger.info(`[INFO] Auto-switching to fastest line: ${fastestLineIndex}`);
+                  await useDetailStore.getState().setDetail(latestDetail, fastestLineIndex);
+                  finalLineIndex = fastestLineIndex;
+                }
+              } else {
+                logger.info(`[INFO] User manually selected line ${selectedLineIndex}, skipping auto speed test`);
+              }
+              
+              const selectedLine = latestDetail.play_sources[finalLineIndex];
               if (selectedLine && selectedLine.episodes && selectedLine.episodes.length > 0) {
-                logger.info(`[INFO] Using line ${selectedLineIndex + 1} (${selectedLine.name}): ${selectedLine.episodes[0].substring(0, 100)}...`);
+                const episodeUrl = selectedLine.episodes[episodeIndex] || selectedLine.episodes[0];
+                logger.info(`[INFO] Using line ${finalLineIndex + 1} (${selectedLine.name}): episode ${episodeIndex + 1}, ${episodeUrl.substring(0, 100)}...`);
                 episodes = [{
-                  url: selectedLine.episodes[0],
-                  title: selectedLine.name,
+                  url: episodeUrl,
+                  title: `第 ${episodeIndex + 1} 集`,
                 }];
               } else {
                 // 如果选中的线路不存在，使用第一个线路
-                logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
+                logger.warn(`[WARN] Selected line index ${finalLineIndex} out of range, using first line`);
                 const firstLine = latestDetail.play_sources[0];
                 if (firstLine && firstLine.episodes && firstLine.episodes.length > 0) {
-                  logger.info(`[INFO] Using first line (${firstLine.name}): ${firstLine.episodes[0].substring(0, 100)}...`);
+                  const episodeUrl = firstLine.episodes[episodeIndex] || firstLine.episodes[0];
+                  logger.info(`[INFO] Using first line (${firstLine.name}): episode ${episodeIndex + 1}, ${episodeUrl.substring(0, 100)}...`);
                   episodes = [{
-                    url: firstLine.episodes[0],
-                    title: firstLine.name,
+                    url: episodeUrl,
+                    title: `第 ${episodeIndex + 1} 集`,
                   }];
                 }
               }
@@ -213,30 +237,50 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
             
             // 使用DetailStore找到的实际source来获取episodes，而不是原始的preferredSource
             logger.info(`[INFO] Using actual source "${latestDetail.source}" instead of preferred source "${source}"`);  
-            // 获取选中的线路索引
-            const selectedLineIndex = useDetailStore.getState().selectedLineIndex;
-            logger.info(`[INFO] Using selected line index: ${selectedLineIndex}`);
             
             // 处理play_sources字段
             if (latestDetail.play_sources && latestDetail.play_sources.length > 0) {
               logger.info(`[INFO] Using play_sources with ${latestDetail.play_sources.length} lines`);
-              const selectedLine = latestDetail.play_sources[selectedLineIndex];
+              
+              // 检查用户是否已经手动选择了线路
+              const { selectedLineIndex, userSelectedLine } = useDetailStore.getState();
+              let finalLineIndex = selectedLineIndex;
+              
+              // 如果用户没有手动选择线路，则自动测速选择最快的线路
+              if (!userSelectedLine) {
+                const fastestLineIndex = await LineSpeedTest.findFastestLine(
+                  latestDetail.play_sources,
+                  episodeIndex,
+                  5000 // 5秒超时
+                );
+                
+                // 更新选中的线路索引
+                if (fastestLineIndex !== selectedLineIndex) {
+                  logger.info(`[INFO] Auto-switching to fastest line: ${fastestLineIndex}`);
+                  await useDetailStore.getState().setDetail(latestDetail, fastestLineIndex);
+                  finalLineIndex = fastestLineIndex;
+                }
+              } else {
+                logger.info(`[INFO] User manually selected line ${selectedLineIndex}, skipping auto speed test`);
+              }
+              
+              const selectedLine = latestDetail.play_sources[finalLineIndex];
               if (selectedLine && selectedLine.episodes && selectedLine.episodes.length > 0) {
-                logger.info(`[INFO] Using line ${selectedLineIndex + 1} (${selectedLine.name}): ${selectedLine.episodes[0].substring(0, 100)}...`);
-                episodes = [{
-                  url: selectedLine.episodes[0],
-                  title: selectedLine.name,
-                }];
+                logger.info(`[INFO] Using line ${finalLineIndex + 1} (${selectedLine.name}): ${selectedLine.episodes[0].substring(0, 100)}...`);
+                episodes = selectedLine.episodes.map((episodeUrl, index) => ({
+                  url: episodeUrl,
+                  title: `第 ${index + 1} 集`,
+                }));
               } else {
                 // 如果选中的线路不存在，使用第一个线路
-                logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
+                logger.warn(`[WARN] Selected line index ${finalLineIndex} out of range, using first line`);
                 const firstLine = latestDetail.play_sources[0];
                 if (firstLine && firstLine.episodes && firstLine.episodes.length > 0) {
                   logger.info(`[INFO] Using first line (${firstLine.name}): ${firstLine.episodes[0].substring(0, 100)}...`);
-                  episodes = [{
-                    url: firstLine.episodes[0],
-                    title: firstLine.name,
-                  }];
+                  episodes = firstLine.episodes.map((episodeUrl, index) => ({
+                    url: episodeUrl,
+                    title: `第 ${index + 1} 集`,
+                  }));
                 }
               }
             } else {
@@ -304,23 +348,46 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
                 logger.info(`[INFO] Using play_sources with ${latestDetail.play_sources.length} lines`);
                 logger.info(`[INFO] Play sources: ${latestDetail.play_sources.map(l => l.name).join(', ')}`);
                 
-                const selectedLineIndex = useDetailStore.getState().selectedLineIndex;
-                const selectedLine = latestDetail.play_sources[selectedLineIndex];
+                // 检查用户是否已经手动选择了线路
+                const { selectedLineIndex, userSelectedLine } = useDetailStore.getState();
+                let finalLineIndex = selectedLineIndex;
+                
+                // 如果用户没有手动选择线路，则自动测速选择最快的线路
+                if (!userSelectedLine) {
+                  const fastestLineIndex = await LineSpeedTest.findFastestLine(
+                    latestDetail.play_sources,
+                    episodeIndex,
+                    5000 // 5秒超时
+                  );
+                  
+                  // 更新选中的线路索引
+                  if (fastestLineIndex !== selectedLineIndex) {
+                    logger.info(`[INFO] Auto-switching to fastest line: ${fastestLineIndex}`);
+                    await useDetailStore.getState().setDetail(latestDetail, fastestLineIndex);
+                    finalLineIndex = fastestLineIndex;
+                  }
+                } else {
+                  logger.info(`[INFO] User manually selected line ${selectedLineIndex}, skipping auto speed test`);
+                }
+                
+                const selectedLine = latestDetail.play_sources[finalLineIndex];
                 if (selectedLine) {
-                  logger.info(`[INFO] Selected line: ${selectedLine.name} with ${selectedLine.episodes.length} episodes`);
+                  const episodeUrl = selectedLine.episodes[episodeIndex] || selectedLine.episodes[0];
+                  logger.info(`[INFO] Selected line: ${selectedLine.name} with ${selectedLine.episodes.length} episodes, playing episode ${episodeIndex + 1}`);
                   episodes = [{
-                    url: selectedLine.episodes[0],
-                    title: selectedLine.name,
+                    url: episodeUrl,
+                    title: `第 ${episodeIndex + 1} 集`,
                   }];
                 } else {
                   // 如果选中的线路不存在，使用第一个线路
-                  logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
+                  logger.warn(`[WARN] Selected line index ${finalLineIndex} out of range, using first line`);
                   const firstLine = latestDetail.play_sources[0];
                   if (firstLine) {
-                    logger.info(`[INFO] Using first line (${firstLine.name}): ${firstLine.episodes[0].substring(0, 100)}...`);
+                    const episodeUrl = firstLine.episodes[episodeIndex] || firstLine.episodes[0];
+                    logger.info(`[INFO] Using first line (${firstLine.name}): episode ${episodeIndex + 1}, ${episodeUrl.substring(0, 100)}...`);
                     episodes = [{
-                      url: firstLine.episodes[0],
-                      title: firstLine.name,
+                      url: episodeUrl,
+                      title: `第 ${episodeIndex + 1} 集`,
                     }];
                   }
                 }
@@ -562,7 +629,6 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         source_name: detail.source_name,
         year: detail.year || "",
         ...existingRecord,
-        ...updates,
       });
     }
   },
@@ -571,6 +637,8 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     if (!newStatus.isLoaded) {
       if (!newStatus.isLoaded && 'error' in newStatus) {
         logger.debug(`Playback Error: ${String(newStatus.error || 'Unknown error')}`);
+        // 处理播放错误，尝试切换线路
+        get().handleLineError();
       }
       set({ status: newStatus });
       return;
@@ -653,6 +721,104 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       introEndTime: undefined,
       outroStartTime: undefined,
     });
+  },
+
+  handleLineError: async () => {
+    const perfStart = performance.now();
+    logger.error(`[LINE_ERROR] Handling playback error, trying to switch line`);
+    
+    const detailStoreState = useDetailStore.getState();
+    const { detail, selectedLineIndex } = detailStoreState;
+    const { currentEpisodeIndex } = get();
+    
+    if (!detail) {
+      logger.error(`[LINE_ERROR] Cannot switch line - no detail available`);
+      return;
+    }
+    
+    // 检查是否有多个线路
+    if (detail.play_sources && detail.play_sources.length > 1) {
+      logger.info(`[LINE_ERROR] Multiple lines available: ${detail.play_sources.length}`);
+      
+      // 尝试切换到下一个线路
+      const nextLineIndex = (selectedLineIndex + 1) % detail.play_sources.length;
+      logger.info(`[LINE_ERROR] Switching from line ${selectedLineIndex + 1} to ${nextLineIndex + 1}`);
+      
+      try {
+        // 更新选中的线路
+        await useDetailStore.getState().setDetail(detail, nextLineIndex);
+        
+        // 重新加载视频
+        await get().loadVideo({
+          source: detail.source,
+          id: detail.id.toString(),
+          episodeIndex: currentEpisodeIndex,
+          title: detail.title
+        });
+        
+        const perfEnd = performance.now();
+        logger.info(`[LINE_ERROR] Successfully switched to line ${nextLineIndex + 1} in ${(perfEnd - perfStart).toFixed(2)}ms`);
+        
+        Toast.show({ 
+          type: "success", 
+          text1: "已切换线路", 
+          text2: `正在使用 ${detail.play_sources[nextLineIndex].name}` 
+        });
+        
+        return; // 成功切换线路，结束处理
+      } catch (error) {
+        logger.error(`[LINE_ERROR] Failed to switch line:`, error);
+      }
+    } else {
+      logger.info(`[LINE_ERROR] Only one line available, switching to next source`);
+    }
+    
+    // 如果只有一个线路或切换线路失败，尝试切换播放源
+    logger.info(`[LINE_ERROR] All lines failed, switching to next source`);
+    const currentSource = detail.source;
+    const errorReason = `All lines failed for source ${currentSource}`;
+    useDetailStore.getState().markSourceAsFailed(currentSource, errorReason);
+    
+    // 获取下一个可用的source
+    const fallbackSource = useDetailStore.getState().getNextAvailableSource(currentSource, currentEpisodeIndex);
+    
+    if (!fallbackSource) {
+      logger.error(`[LINE_ERROR] No fallback sources available for episode ${currentEpisodeIndex + 1}`);
+      Toast.show({ 
+        type: "error", 
+        text1: "播放失败", 
+        text2: "所有播放源都不可用，请稍后重试" 
+      });
+      set({ isLoading: false });
+      return;
+    }
+    
+    logger.info(`[LINE_ERROR] Switching to fallback source: ${fallbackSource.source} (${fallbackSource.source_name})`);
+    
+    try {
+      // 更新DetailStore的当前detail为fallback source
+      await useDetailStore.getState().setDetail(fallbackSource);
+      
+      // 重新加载视频
+      await get().loadVideo({
+        source: fallbackSource.source,
+        id: fallbackSource.id.toString(),
+        episodeIndex: currentEpisodeIndex,
+        title: fallbackSource.title
+      });
+      
+      const perfEnd = performance.now();
+      logger.info(`[LINE_ERROR] Successfully switched to fallback source in ${(perfEnd - perfStart).toFixed(2)}ms`);
+      
+      Toast.show({ 
+        type: "success", 
+        text1: "已切换播放源", 
+        text2: `正在使用 ${fallbackSource.source_name}` 
+      });
+    } catch (error) {
+      logger.error(`[LINE_ERROR] Failed to switch to fallback source:`, error);
+      set({ isLoading: false });
+    }
   },
 
   handleVideoError: async (errorType: 'ssl' | 'network' | 'other', failedUrl: string) => {

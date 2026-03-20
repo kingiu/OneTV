@@ -1,13 +1,17 @@
 import React, { forwardRef } from "react";
 import { Animated, Pressable, StyleSheet, StyleProp, ViewStyle, PressableProps, TextStyle, View, Platform } from "react-native";
 import { ThemedText } from "./ThemedText";
+import { Icon } from "./Icon";
 import { Colors } from "@/constants/Colors";
 import { useButtonAnimation } from "@/hooks/useAnimation";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
+import { IconName } from './Icon';
+
 interface StyledButtonProps extends PressableProps {
   children?: React.ReactNode;
   text?: string;
+  icon?: IconName;
   variant?: "default" | "primary" | "ghost";
   isSelected?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -18,7 +22,7 @@ interface StyledButtonProps extends PressableProps {
 }
 
 export const StyledButton = forwardRef<Pressable, StyledButtonProps>(
-  ({ children, text, variant = "default", isSelected = false, style, textStyle, ...rest }, ref) => {
+  ({ children, text, icon, variant = "default", isSelected = false, style, textStyle, ...rest }, ref) => {
     const colorScheme = "dark";
     const colors = Colors[colorScheme];
     const [isFocused, setIsFocused] = React.useState(false);
@@ -126,16 +130,19 @@ export const StyledButton = forwardRef<Pressable, StyledButtonProps>(
           {...rest}
         >
           {text ? (
-            <ThemedText
-              style={[
-                styles.text,
-                variantStyles[variant].text,
-                isSelected && (variantStyles[variant].selectedText ?? styles.selectedText),
-                textStyle,
-              ]}
-            >
-              {text}
-            </ThemedText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {icon && <Icon name={icon} size={16} color={isSelected ? (variantStyles[variant].selectedText?.color || Colors.dark.text) : (variantStyles[variant].text?.color || colors.text)} />}
+              <ThemedText
+                style={[
+                  styles.text,
+                  variantStyles[variant].text,
+                  isSelected && (variantStyles[variant].selectedText ?? styles.selectedText),
+                  textStyle,
+                ]}
+              >
+                {text}
+              </ThemedText>
+            </View>
           ) : (
             children
           )}

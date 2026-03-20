@@ -1,4 +1,4 @@
-import { useCallback, RefObject, useMemo } from 'react';
+import React, { useCallback, RefObject, useMemo } from 'react';
 import { Video, ResizeMode } from 'expo-av';
 import Toast from 'react-native-toast-message';
 import usePlayerStore from '@/stores/playerStore';
@@ -25,8 +25,36 @@ export const useVideoHandlers = ({
   detail,
 }: UseVideoHandlersProps) => {
   
+  // 视频加载超时处理
+  const videoLoadTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const onLoadStart = useCallback(() => {
+    if (!currentEpisode?.url) return;
+    
+    console.info(`[PERF] Video onLoadStart - starting to load video: ${currentEpisode.url.substring(0, 100)}...`);
+    usePlayerStore.setState({ isLoading: true });
+    
+    // 清除之前的超时计时器
+    if (videoLoadTimeoutRef.current) {
+      clearTimeout(videoLoadTimeoutRef.current);
+    }
+    
+    // 设置视频加载超时
+    videoLoadTimeoutRef.current = setTimeout(() => {
+      console.error(`[ERROR] Video loading timeout for URL: ${currentEpisode.url}`);
+      usePlayerStore.setState({ isLoading: false });
+      // 可以在这里添加错误处理逻辑
+    }, 45000); // 45秒超时
+  }, [currentEpisode?.url]);
+
   const onLoad = useCallback(async () => {
     console.info(`[PERF] Video onLoad - video ready to play`);
+    
+    // 清除超时计时器
+    if (videoLoadTimeoutRef.current) {
+      clearTimeout(videoLoadTimeoutRef.current);
+      videoLoadTimeoutRef.current = null;
+    }
     
     try {
       // 1. 先设置位置（如果需要）
@@ -51,15 +79,14 @@ export const useVideoHandlers = ({
     }
   }, [videoRef, initialPosition, introEndTime]);
 
-  const onLoadStart = useCallback(() => {
-    if (!currentEpisode?.url) return;
-    
-    console.info(`[PERF] Video onLoadStart - starting to load video: ${currentEpisode.url.substring(0, 100)}...`);
-    usePlayerStore.setState({ isLoading: true });
-  }, [currentEpisode?.url]);
-
   const onError = useCallback((error: any) => {
     if (!currentEpisode?.url) return;
+    
+    // 清除超时计时器
+    if (videoLoadTimeoutRef.current) {
+      clearTimeout(videoLoadTimeoutRef.current);
+      videoLoadTimeoutRef.current = null;
+    }
     
     console.error(`[ERROR] Video playback error:`, error);
     
@@ -109,7 +136,7 @@ export const useVideoHandlers = ({
     onLoad,
     onLoadStart,
     onError,
-    useNativeControls: deviceType !== 'tv',
+    useNativeControls: false,
     shouldPlay: true,
   }), [
     currentEpisode?.url,

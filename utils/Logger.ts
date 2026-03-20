@@ -31,8 +31,7 @@ class LoggerClass {
    * 格式化日志输出
    */
   private formatMessage(level: string, tag: string | undefined, message: any, ...args: any[]): void {
-    if (!__DEV__) return;
-
+    // 始终输出日志，以便调试
     const timestamp = new Date().toISOString().substr(11, 12);
     const prefix = tag ? `[${timestamp}][${level}][${tag}]` : `[${timestamp}][${level}]`;
     
@@ -58,8 +57,6 @@ class LoggerClass {
   debug(message: any, ...args: any[]): void;
   debug(options: LoggerOptions, message: any, ...args: any[]): void;
   debug(optionsOrMessage: LoggerOptions | any, message?: any, ...args: any[]): void {
-    if (!__DEV__) return;
-
     if (this.minLevel > LogLevel.DEBUG) return;
 
     if (typeof optionsOrMessage === 'object' && optionsOrMessage.tag !== undefined) {
@@ -76,8 +73,6 @@ class LoggerClass {
   info(message: any, ...args: any[]): void;
   info(options: LoggerOptions, message: any, ...args: any[]): void;
   info(optionsOrMessage: LoggerOptions | any, message?: any, ...args: any[]): void {
-    if (!__DEV__) return;
-
     if (this.minLevel > LogLevel.INFO) return;
 
     if (typeof optionsOrMessage === 'object' && optionsOrMessage.tag !== undefined) {
@@ -94,8 +89,6 @@ class LoggerClass {
   warn(message: any, ...args: any[]): void;
   warn(options: LoggerOptions, message: any, ...args: any[]): void;
   warn(optionsOrMessage: LoggerOptions | any, message?: any, ...args: any[]): void {
-    if (!__DEV__) return;
-
     if (this.minLevel > LogLevel.WARN) return;
 
     if (typeof optionsOrMessage === 'object' && optionsOrMessage.tag !== undefined) {
@@ -112,8 +105,6 @@ class LoggerClass {
   error(message: any, ...args: any[]): void;
   error(options: LoggerOptions, message: any, ...args: any[]): void;
   error(optionsOrMessage: LoggerOptions | any, message?: any, ...args: any[]): void {
-    if (!__DEV__) return;
-
     if (this.minLevel > LogLevel.ERROR) return;
 
     if (typeof optionsOrMessage === 'object' && optionsOrMessage.tag !== undefined) {

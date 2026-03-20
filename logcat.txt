@@ -1,0 +1,457 @@
+--------- beginning of system
+03-16 16:36:06.562  2064  4318 I ActivityManager: Force stopping com.onetv appid=10059 user=0: from pid 19614
+03-16 16:36:06.562  2064  4318 I ActivityManager: Killing 19464:com.onetv/u0a59 (adj 0): stop com.onetv
+03-16 16:36:06.562  2064  4318 W ActivityManager: Force removing ActivityRecord{6289d95 u0 com.onetv/.MainActivity t92}: app died, no saved state
+--------- beginning of main
+03-16 16:36:06.562  2064  2082 W libprocessgroup: kill(-19464, 9) failed: No such process
+03-16 16:36:06.565  1847  1983 W SurfaceFlinger: Attempting to destroy on removed layer: AppWindowToken{b9a5a9b token=Token{58caeaa ActivityRecord{6289d95 u0 com.onetv/.MainActivity t92}}}#0
+03-16 16:36:06.569  2064  4318 D ActivityManager: TopActivityInfo, pkgName: com.uncube.launcher3 activityName: com.uncube.launcher3/com.bluestacks.launcher.activity.HomeActivity callingPackage:   bstSpecialAppKeyboardHandlingEnabled = false
+03-16 16:36:06.578  2348  2348 E PhoneInterfaceManager: [PhoneIntfMgr] getCarrierPackageNamesForIntent: No UICC
+03-16 16:36:06.578  2348  2348 D CarrierSvcBindHelper: No carrier app for: 0
+03-16 16:36:06.586  2856  2997 D SessionLifecycleClient: Sending lifecycle 1 to service
+03-16 16:36:06.586  2856  3138 D SessionLifecycleService: Activity foregrounding at 31007163.
+03-16 16:36:06.591  2783  2783 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.measurement.START pkg=com.google.android.gms }
+03-16 16:36:06.591  2783  2783 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.measurement.START pkg=com.google.android.gms }
+03-16 16:36:06.593  2064  4318 D WindowManager: calling BstHostCallManagerService onActivityDisplayed method, packageName: com.uncube.launcher3, activityName: com.bluestacks.launcher.activity.HomeActivity
+03-16 16:36:06.593  2064  4318 D WindowManager: BstHostCallManagerService onActivityDisplayed method returned: 0
+03-16 16:36:06.593  2064  2096 I HCALL   : hcallOnActivityDisplayedRpc(com.uncube.launcher3, com.bluestacks.launcher.activity.HomeActivity, com.uncube.launcher3)
+03-16 16:36:06.593  2064  2096 I VMSG    : getHostBoundBuffer:94 called for hcal
+03-16 16:36:06.593  2064  2096 I VMSG    : processRequest:104 called for hcal
+03-16 16:36:06.595  2064  4318 D WindowManager: calling BstHostCallManagerService setAppConfigDbParams method, packageName: com.uncube.launcher3, macrosDisabled: false, showFeedbackPopup: false, mouseCursorStyle: , nativeGamepad: false
+03-16 16:36:06.595  2332  2483 E BstGCallService-JNI: gcallCommonCommandClbk called: code=1, name=com.uncube.launcher3, data=
+03-16 16:36:06.595  2064  2096 I HCALL   : hcallSetAppConfigDbParamsRpc(com.uncube.launcher3, 0, 0, , 0)
+03-16 16:36:06.595  2064  4318 D WindowManager: BstHostCallManagerService setAppConfigDbParams method returned: 0
+03-16 16:36:06.595  2064  2096 I VMSG    : getHostBoundBuffer:94 called for hcal
+03-16 16:36:06.595  2332  2479 I VMSG    : processRequest:104 called for gcal
+03-16 16:36:06.595  2064  2096 I VMSG    : processRequest:104 called for hcal
+03-16 16:36:06.595  2064  4318 D WindowManager: bstSendTopDisplayedOnFocusChange packageName : com.uncube.launcher3  activityName : com.bluestacks.launcher.activity.HomeActivity  mouseAction  :   lastSentMouseAction : 
+03-16 16:36:06.597  1847  1983 D gralloc_default: gralloc_alloc: Creating ashmem region of size 8298496
+03-16 16:36:06.598  2064  2082 W libprocessgroup: kill(-19464, 9) failed: No such process
+03-16 16:36:06.600  1847  1984 D gralloc_default: gralloc_alloc: Creating ashmem region of size 1458176
+03-16 16:36:06.616  2064 18592 I ActivityManager: START u0 {flg=0x10000000 cmp=com.onetv/.MainActivity} from uid 2000
+03-16 16:36:06.617  2064 18592 D ActivityManager: TopActivityInfo, pkgName: com.onetv activityName: com.onetv.MainActivity callingPackage: null  bstSpecialAppKeyboardHandlingEnabled = false
+03-16 16:36:06.623  2856  3121 E EGL_emulation: tid 3121: eglSurfaceAttrib(1726): error 0x3009 (EGL_BAD_MATCH)
+03-16 16:36:06.623  2856  3121 W OpenGLRenderer: Failed to set EGL_SWAP_BEHAVIOR on surface 0x787f022a7380, error=EGL_BAD_MATCH
+03-16 16:36:06.627  2064  2839 D ConnectivityService: ConnectivityService NetworkRequestInfo binderDied(NetworkRequest [ TRACK_DEFAULT id=31, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Unwanted:  Uid: 10059] ], android.os.BinderProxy@f8c786)
+03-16 16:36:06.627  2064  2503 D Sensor  : bstsensor_batch
+03-16 16:36:06.627  2064  2503 D Sensor  : bstsensor_setDelay, handle 0, delay ms 200
+03-16 16:36:06.627  2064  2186 D ConnectivityService: releasing NetworkRequest [ TRACK_DEFAULT id=31, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Unwanted:  Uid: 10059] ] (release request)
+03-16 16:36:06.628  1827  1827 I Zygote  : Process 19464 exited due to signal (9)
+03-16 16:36:06.641  2064  2082 W libprocessgroup: kill(-19464, 9) failed: No such process
+03-16 16:36:06.641  2064  2082 I libprocessgroup: Successfully killed process cgroup uid 10059 pid 19464 in 78ms
+03-16 16:36:06.656  2856  3241 D EGL_emulation: eglMakeCurrent: 0x787ee1cb1600: ver 3 2 (tinfo 0x787ede98c680)
+03-16 16:36:06.659  2856  3241 D EGL_emulation: eglMakeCurrent: 0x787ee1cb1600: ver 3 2 (tinfo 0x787ede98c680)
+03-16 16:36:06.660  2064  4318 D InputMethodManagerService: packageName=com.onetv.MainActivity, activityName=null
+03-16 16:36:06.660  2064  4318 D InputMethodManagerService: ime_enabled = false is same as last value, no change
+03-16 16:36:06.671  2064  2087 W ActivityManager: setHasOverlayUi called on unknown pid: 19464
+03-16 16:36:06.673  2856  3121 D EGL_emulation: eglMakeCurrent: 0x787ee3263200: ver 3 2 (tinfo 0x787ee5cd1ba0)
+03-16 16:36:06.673  1847  1984 D gralloc_default: gralloc_alloc: Creating ashmem region of size 1458176
+03-16 16:36:06.691  1847  1984 D gralloc_default: gralloc_alloc: Creating ashmem region of size 8298496
+03-16 16:36:06.706  1847  2436 D gralloc_default: gralloc_alloc: Creating ashmem region of size 8298496
+03-16 16:36:06.752  2856  2989 D SessionLifecycleClient: Sending lifecycle 2 to service
+03-16 16:36:06.752  2856  3138 D SessionLifecycleService: Activity backgrounding at 31007329
+03-16 16:36:06.753  2064  3302 D ActivityManager: TopActivityInfo, pkgName: com.onetv activityName: com.onetv/.MainActivity callingPackage:   bstSpecialAppKeyboardHandlingEnabled = false
+03-16 16:36:06.762  2064  2087 D ActivityManager: onWindowsDrawn: packageName = com.uncube.launcher3, name = com.bluestacks.launcher.activity.HomeActivity, mCallingPackage = com.android.systemui
+03-16 16:36:06.762  2064  2096 I HCALL   : hcallCommonCommandRpc(5, , )
+03-16 16:36:06.762  2064  2096 I VMSG    : getHostBoundBuffer:94 called for hcal
+03-16 16:36:06.762  2064  2096 I VMSG    : processRequest:104 called for hcal
+03-16 16:36:06.770  2064  2081 I ActivityManager: Start proc 19623:com.onetv/u0a59 for activity com.onetv/.MainActivity
+03-16 16:36:06.770 19623 19623 I Zygote  : seccomp disabled by setenforce 0
+03-16 16:36:06.770 19623 19623 I com.onetv: Late-enabling -Xcheck:jni
+03-16 16:36:06.779  1847  1984 D gralloc_default: gralloc_alloc: Creating ashmem region of size 1458176
+03-16 16:36:06.781 19623 19623 W com.onetv: Unexpected CPU variant for X86 using defaults: x86_64
+03-16 16:36:06.840  1847  2436 D gralloc_default: gralloc_alloc: Creating ashmem region of size 8298496
+03-16 16:36:06.883  2856  3121 D EGL_emulation: eglMakeCurrent: 0x787ee3263200: ver 3 2 (tinfo 0x787ee5cd1ba0)
+03-16 16:36:07.230 19623 19623 W com.onetv: Accessing hidden field Landroid/os/Trace;->TRACE_TAG_APP:J (light greylist, reflection)
+03-16 16:36:07.230 19623 19623 W com.onetv: Accessing hidden method Landroid/os/Trace;->isTagEnabled(J)Z (light greylist, reflection)
+03-16 16:36:07.238 19623 19623 W com.onetv: Accessing hidden method Ldalvik/system/BaseDexClassLoader;->getLdLibraryPath()Ljava/lang/String; (light greylist, reflection)
+03-16 16:36:07.260 19623 19623 V SoLoader: Init SoLoader delegate
+03-16 16:36:07.303 19623 19623 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+03-16 16:36:07.318 19623 19623 W com.onetv: Accessing hidden field Landroid/graphics/Insets;->left:I (light greylist, linking)
+03-16 16:36:07.318 19623 19623 W com.onetv: Accessing hidden field Landroid/graphics/Insets;->top:I (light greylist, linking)
+03-16 16:36:07.318 19623 19623 W com.onetv: Accessing hidden field Landroid/graphics/Insets;->right:I (light greylist, linking)
+03-16 16:36:07.318 19623 19623 W com.onetv: Accessing hidden field Landroid/graphics/Insets;->bottom:I (light greylist, linking)
+03-16 16:36:07.347 19623 19623 W com.onetv: Accessing hidden method Landroid/view/View;->computeFitSystemWindows(Landroid/graphics/Rect;Landroid/graphics/Rect;)Z (light greylist, reflection)
+03-16 16:36:07.347 19623 19623 W com.onetv: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (light greylist, reflection)
+03-16 16:36:07.362 19623 19623 D SoLoader: libhermes.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:07.362 19623 19623 D SoLoader: Not resolving dependencies for libhermes.so
+03-16 16:36:07.370 19623 19623 D SoLoader: libhermes_executor.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:07.370 19623 19623 D SoLoader: Not resolving dependencies for libhermes_executor.so
+03-16 16:36:07.403 19623 19623 W com.onetv: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setUseSessionTickets(Z)V (light greylist, reflection)
+03-16 16:36:07.404 19623 19623 W com.onetv: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setHostname(Ljava/lang/String;)V (light greylist, reflection)
+03-16 16:36:07.404 19623 19623 W com.onetv: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->getAlpnSelectedProtocol()[B (light greylist, reflection)
+03-16 16:36:07.404 19623 19623 W com.onetv: Accessing hidden method Lcom/android/org/conscrypt/OpenSSLSocketImpl;->setAlpnProtocols([B)V (light greylist, reflection)
+03-16 16:36:07.407 19623 19623 W com.onetv: Accessing hidden method Ldalvik/system/CloseGuard;->get()Ldalvik/system/CloseGuard; (light greylist, reflection)
+03-16 16:36:07.407 19623 19623 W com.onetv: Accessing hidden method Ldalvik/system/CloseGuard;->open(Ljava/lang/String;)V (light greylist, reflection)
+03-16 16:36:07.407 19623 19623 W com.onetv: Accessing hidden method Ldalvik/system/CloseGuard;->warnIfOpen()V (light greylist, reflection)
+03-16 16:36:07.407 19623 19623 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+03-16 16:36:07.412  2064  3302 D Sensor  : bstsensor_flush
+03-16 16:36:07.415 19623 19645 D SoLoader: libreact_devsupportjni.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:07.415 19623 19645 D SoLoader: Not resolving dependencies for libreact_devsupportjni.so
+03-16 16:36:07.430 19623 19648 W unknown:InspectorPackagerConnection: Couldn't connect to packager, will silently retry
+03-16 16:36:07.430 19623 19647 W unknown:ReactNative: The packager does not seem to be running as we got an IOException requesting its status: Failed to connect to localhost/127.0.0.1:8081
+03-16 16:36:07.430 19623 19649 W unknown:ReconnectingWebSocket: Couldn't connect to "ws://localhost:8081/message?device=SM-G998B%20-%209%20-%20API%2028&app=com.onetv&clientid=BridgeDevSupportManager", will silently retry
+03-16 16:36:07.434 19623 19623 D OpenGLRenderer: Skia GL Pipeline
+03-16 16:36:07.443 19623 19655 D SoLoader: libfbjni.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:07.443 19623 19655 D SoLoader: Not resolving dependencies for libfbjni.so
+03-16 16:36:07.450 19623 19655 D TelephonyManager: creating subscriptionInfo Record, context : com.onetv.MainApplication@1a882eb
+03-16 16:36:07.456 19623 19623 W unknown:ReactNative: Packager connection already open, nooping.
+03-16 16:36:07.462  2064  3302 D WindowManager: calling BstHostCallManagerService onActivityDisplayed method, packageName: com.onetv, activityName: com.onetv.MainActivity
+03-16 16:36:07.462  2064  3302 D WindowManager: BstHostCallManagerService onActivityDisplayed method returned: 0
+03-16 16:36:07.462  2064  2096 I HCALL   : hcallOnActivityDisplayedRpc(com.onetv, com.onetv.MainActivity, com.uncube.launcher3)
+03-16 16:36:07.462  2064  2096 I VMSG    : getHostBoundBuffer:94 called for hcal
+03-16 16:36:07.462  2064  2096 I VMSG    : processRequest:104 called for hcal
+03-16 16:36:07.464  2064  3302 D WindowManager: calling BstHostCallManagerService setAppConfigDbParams method, packageName: com.onetv, macrosDisabled: false, showFeedbackPopup: false, mouseCursorStyle: , nativeGamepad: false
+03-16 16:36:07.464  2064  3302 D WindowManager: BstHostCallManagerService setAppConfigDbParams method returned: 0
+03-16 16:36:07.464  2064  3302 D WindowManager: bstSendTopDisplayedOnFocusChange packageName : com.onetv  activityName : com.onetv.MainActivity  mouseAction  :   lastSentMouseAction : 
+03-16 16:36:07.464  2064  2096 I HCALL   : hcallSetAppConfigDbParamsRpc(com.onetv, 0, 0, , 0)
+03-16 16:36:07.464  2064  2096 I VMSG    : getHostBoundBuffer:94 called for hcal
+03-16 16:36:07.464  2064  2096 I VMSG    : processRequest:104 called for hcal
+03-16 16:36:07.466  2332  2479 I VMSG    : processRequest:104 called for gcal
+03-16 16:36:07.466  2332  2483 E BstGCallService-JNI: gcallCommonCommandClbk called: code=1, name=com.onetv, data=
+03-16 16:36:07.468  1847  1983 D gralloc_default: gralloc_alloc: Creating ashmem region of size 8298496
+03-16 16:36:07.473 19623 19653 D HostConnection: createUnique: call
+03-16 16:36:07.474 19623 19653 I AGA     : hstInit: opened /dev/bstpgaipc: fd = 45
+03-16 16:36:07.474 19623 19653 I AGA     : Attempting to create new SOCKET connection pid = 19623, tid = 19653
+03-16 16:36:07.475  1847  1983 D gralloc_default: gralloc_alloc: Creating ashmem region of size 8298496
+03-16 16:36:07.475 19623 19653 I AGA     : hstInitClientPgaIpc: Attempting to get GROUP2 cid
+03-16 16:36:07.476 19623 19653 I AGA     : hstInitClientPgaIpc: data mapped to 0x787ee4a51000 with size 4194304
+03-16 16:36:07.476 19623 19653 I AGA     : New SOCKET connection: com.onetv (pid 19623, tid 19653)
+03-16 16:36:07.480 19623 19653 D HostConnection: HostComposition ext ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_vulkan_batched_descriptor_set_update ANDROID_EMU_vulkan_enabled ANDROID_EMU_vulkan_initialized GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object GL_KHR_texture_compression_astc_ldr ANDROID_EMU_gles_max_version_3_2 
+03-16 16:36:07.480  1847  1983 D gralloc_default: gralloc_alloc: Creating ashmem region of size 8298496
+03-16 16:36:07.482 19623 19653 I ConfigStore: android::hardware::configstore::V1_0::ISurfaceFlingerConfigs::hasWideColorDisplay retrieved: 0
+03-16 16:36:07.482 19623 19653 I ConfigStore: android::hardware::configstore::V1_0::ISurfaceFlingerConfigs::hasHDRDisplay retrieved: 0
+03-16 16:36:07.482 19623 19653 I OpenGLRenderer: Initialized EGL, version 1.4
+03-16 16:36:07.482 19623 19653 D OpenGLRenderer: Swap behavior 1
+03-16 16:36:07.488  2064  3302 D InputMethodManagerService: packageName=com.onetv, activityName=.MainActivity
+03-16 16:36:07.488  2064  3302 D InputMethodManagerService: ime_enabled = false is same as last value, no change
+03-16 16:36:07.507 19623 19653 D EGL_emulation: eglCreateContext: 0x787f023d9400: maj 3 min 2 rcv 5
+03-16 16:36:07.534 19623 19655 I ExpoModulesCore: ✅ AppContext was initialized
+03-16 16:36:07.537 19623 19653 D EGL_emulation: eglMakeCurrent: 0x787f023d9400: ver 3 2 (tinfo 0x787f023520a0)
+03-16 16:36:07.537 19623 19653 I AGA     : The gl query need cache 0
+03-16 16:36:07.538 19623 19653 D EGL_emulation: eglMakeCurrent: 0x787f023d9400: ver 3 2 (tinfo 0x787f023520a0) (first time)
+03-16 16:36:07.539 19623 19655 D AIVoiceModule: AIVoiceModule constructor called
+03-16 16:36:07.540 19623 19653 E eglCodecCommon: glUtilsParamSize: unknow param 0x000082da
+03-16 16:36:07.541 19623 19653 E eglCodecCommon: glUtilsParamSize: unknow param 0x000082da
+03-16 16:36:07.541 19623 19653 E eglCodecCommon: glUtilsParamSize: unknow param 0x000082e5
+03-16 16:36:07.541 19623 19653 E eglCodecCommon: glUtilsParamSize: unknow param 0x000082e5
+03-16 16:36:07.542 19623 19655 D SoLoader: libreactnativejni.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:07.542 19623 19655 D SoLoader: Not resolving dependencies for libreactnativejni.so
+03-16 16:36:07.544 19623 19653 D emuglGLESv2_enc: check TTCDisabled with pkg[com.onetv] with res[0]
+03-16 16:36:07.551 19623 19663 W com.onetv: Accessing hidden method Landroid/os/Trace;->traceCounter(JLjava/lang/String;I)V (light greylist, reflection)
+03-16 16:36:07.556 19623 19653 E eglCodecCommon: glUtilsParamSize: unknow param 0x00008c29
+03-16 16:36:07.556 19623 19653 E eglCodecCommon: glUtilsParamSize: unknow param 0x00008c29
+03-16 16:36:07.558 19623 19653 D vndksupport: Loading /vendor/lib64/hw/android.hardware.graphics.mapper@2.0-impl.so from current namespace instead of sphal namespace.
+03-16 16:36:07.559 19623 19653 D vndksupport: Loading /vendor/lib64/hw/gralloc.default.so from current namespace instead of sphal namespace.
+03-16 16:36:07.561 19623 19653 D HostConnection: createUnique: call
+03-16 16:36:07.561 19623 19653 I AGA     : hstInit: opened /dev/bstpgaipc: fd = 57
+03-16 16:36:07.561 19623 19653 I AGA     : Attempting to create new SOCKET connection pid = 19623, tid = 19653
+03-16 16:36:07.562 19623 19653 I AGA     : hstInitClientPgaIpc: Attempting to get GROUP2 cid
+03-16 16:36:07.563 19623 19653 I AGA     : hstInitClientPgaIpc: data mapped to 0x787ee35c9000 with size 4194304
+03-16 16:36:07.563 19623 19653 I AGA     : New SOCKET connection: com.onetv (pid 19623, tid 19653)
+03-16 16:36:07.564 19623 19653 D HostConnection: HostComposition ext ANDROID_EMU_vulkan ANDROID_EMU_deferred_vulkan_commands ANDROID_EMU_vulkan_create_resources_with_requirements ANDROID_EMU_vulkan_shader_float16_int8 ANDROID_EMU_vulkan_async_queue_submit ANDROID_EMU_vulkan_queue_submit_with_commands ANDROID_EMU_vulkan_batched_descriptor_set_update ANDROID_EMU_vulkan_enabled ANDROID_EMU_vulkan_initialized GL_OES_EGL_image_external_essl3 GL_OES_vertex_array_object GL_KHR_texture_compression_astc_ldr ANDROID_EMU_gles_max_version_3_2 
+03-16 16:36:07.570 19623 19653 E EGL_emulation: tid 19653: eglSurfaceAttrib(1726): error 0x3009 (EGL_BAD_MATCH)
+03-16 16:36:07.570 19623 19653 W OpenGLRenderer: Failed to set EGL_SWAP_BEHAVIOR on surface 0x787f0238e580, error=EGL_BAD_MATCH
+03-16 16:36:07.574 19623 19653 D EGL_emulation: eglMakeCurrent: 0x787f023d9400: ver 3 2 (tinfo 0x787f023520a0)
+03-16 16:36:07.578 19623 19664 W com.onetv: Accessing hidden method Landroid/view/View;->setAnimationMatrix(Landroid/graphics/Matrix;)V (light greylist, linking)
+03-16 16:36:07.579 19623 19653 D emuglGLESv2_enc: check GLMBRH with pkg[com.onetv] with res[0]
+03-16 16:36:07.579 19623 19653 D emuglGLESv2_enc: check GLUBPerf with pkg[com.onetv] with res[0]
+03-16 16:36:07.581 19623 19653 D emuglGLESv2_enc: GL com.onetv ViewportNeedFlush 0
+03-16 16:36:07.590 19623 19623 W unknown:ReactNative: Packager connection already open, nooping.
+03-16 16:36:07.604  2064  2087 D ActivityManager: onWindowsDrawn: packageName = com.onetv, name = com.onetv.MainActivity, mCallingPackage = null
+03-16 16:36:07.604  2064  2087 I ActivityManager: Displayed com.onetv/.MainActivity: +835ms
+03-16 16:36:07.604  2064  2096 I HCALL   : hcallCommonCommandRpc(5, , )
+03-16 16:36:07.604  2064  2096 I VMSG    : getHostBoundBuffer:94 called for hcal
+03-16 16:36:07.604  2064  2096 I VMSG    : processRequest:104 called for hcal
+03-16 16:36:07.618 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.debuggingoverlay.DebuggingOverlayManager
+03-16 16:36:07.622 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.uimanager.LayoutShadowNode
+03-16 16:36:07.623  2856  2856 W LauncherApplication: onTrimMemory() called with: trimLevel = [TRIM_MEMORY_UI_HIDDEN]
+03-16 16:36:07.625 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.drawer.ReactDrawerLayoutManager
+03-16 16:36:07.626 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollViewManager
+03-16 16:36:07.628 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactHorizontalScrollContainerViewManager
+03-16 16:36:07.629 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.progressbar.ReactProgressBarViewManager
+03-16 16:36:07.629 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.progressbar.ProgressBarShadowNode
+03-16 16:36:07.630 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.scroll.ReactScrollViewManager
+03-16 16:36:07.632 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchManager
+03-16 16:36:07.633 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.switchview.ReactSwitchManager$ReactSwitchShadowNode
+03-16 16:36:07.634 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.swiperefresh.SwipeRefreshLayoutManager
+03-16 16:36:07.634 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.frescosupport.FrescoBasedReactTextInlineImageViewManager
+03-16 16:36:07.635 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.frescosupport.FrescoBasedReactTextInlineImageShadowNode
+03-16 16:36:07.636 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.image.ReactImageManager
+03-16 16:36:07.637 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.modal.ReactModalHostManager
+03-16 16:36:07.638 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.modal.ModalHostShadowNode
+03-16 16:36:07.639 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactRawTextManager
+03-16 16:36:07.639 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactRawTextShadowNode
+03-16 16:36:07.639 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputManager
+03-16 16:36:07.642 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.textinput.ReactTextInputShadowNode
+03-16 16:36:07.643 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactTextViewManager
+03-16 16:36:07.645 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactTextShadowNode
+03-16 16:36:07.645 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.view.ReactViewManager
+03-16 16:36:07.647 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactVirtualTextViewManager
+03-16 16:36:07.647 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.text.ReactVirtualTextShadowNode
+03-16 16:36:07.647 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.facebook.react.views.unimplementedview.ReactUnimplementedViewManager
+03-16 16:36:07.648 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class expo.modules.kotlin.views.GroupViewManagerWrapper
+03-16 16:36:07.649 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class expo.modules.kotlin.views.SimpleViewManagerWrapper
+03-16 16:36:07.649 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerRootViewManager
+03-16 16:36:07.649 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.gesturehandler.react.RNGestureHandlerButtonViewManager
+03-16 16:36:07.650 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaProviderManager
+03-16 16:36:07.650 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewManager
+03-16 16:36:07.651 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.th3rdwave.safeareacontext.SafeAreaViewShadowNode
+03-16 16:36:07.651 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenContainerViewManager
+03-16 16:36:07.651 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenViewManager
+03-16 16:36:07.652 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ModalScreenViewManager
+03-16 16:36:07.652 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackViewManager
+03-16 16:36:07.653 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderConfigViewManager
+03-16 16:36:07.653 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreenStackHeaderSubviewManager
+03-16 16:36:07.654 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.SearchBarManager
+03-16 16:36:07.654 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$DefsViewManager
+03-16 16:36:07.655 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.VirtualViewManager$RenderableShadowNode
+03-16 16:36:07.655 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$MarkerManager
+03-16 16:36:07.657 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$ForeignObjectManager
+03-16 16:36:07.658 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$EllipseViewManager
+03-16 16:36:07.658 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$LineViewManager
+03-16 16:36:07.659 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$LinearGradientManager
+03-16 16:36:07.660 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$GroupViewManager
+03-16 16:36:07.661 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$TextViewManager
+03-16 16:36:07.662 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$ImageViewManager
+03-16 16:36:07.663 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$ClipPathViewManager
+03-16 16:36:07.664 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$RadialGradientManager
+03-16 16:36:07.664 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$MaskManager
+03-16 16:36:07.665 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$SymbolManager
+03-16 16:36:07.667 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$PatternManager
+03-16 16:36:07.668 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$RectViewManager
+03-16 16:36:07.669 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$TextPathViewManager
+03-16 16:36:07.670 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.SvgViewManager
+03-16 16:36:07.672 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$PathViewManager
+03-16 16:36:07.672 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$UseViewManager
+03-16 16:36:07.673 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$CircleViewManager
+03-16 16:36:07.674 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.horcrux.svg.RenderableViewManager$TSpanViewManager
+03-16 16:36:07.680 19623 19664 W com.onetv: Accessing hidden field Ljava/lang/reflect/Field;->accessFlags:I (light greylist, reflection)
+03-16 16:36:07.681 19623 19664 D SoLoader: libyoga.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:07.681 19623 19664 D SoLoader: Not resolving dependencies for libyoga.so
+03-16 16:36:07.686 19623 19664 W com.onetv: Accessing hidden method Landroid/os/Trace;->asyncTraceBegin(JLjava/lang/String;I)V (light greylist, reflection)
+03-16 16:36:07.687 19623 19623 W com.onetv: Accessing hidden method Landroid/os/Trace;->asyncTraceEnd(JLjava/lang/String;I)V (light greylist, reflection)
+03-16 16:36:07.706  2064 18592 D ConnectivityService: requestNetwork for uid/pid:10059/19623 NetworkRequest [ TRACK_DEFAULT id=32, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Unwanted:  Uid: 10059] ]
+03-16 16:36:07.707  2064  2183 D WIFI_UT : got request NetworkRequest [ TRACK_DEFAULT id=32, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Unwanted:  Uid: 10059] ] with score 70
+03-16 16:36:07.707  2064  2183 D WIFI    : got request NetworkRequest [ TRACK_DEFAULT id=32, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Unwanted:  Uid: 10059] ] with score 70
+03-16 16:36:07.707  2348  2348 D PhoneSwitcherNetworkRequstListener: got request NetworkRequest [ TRACK_DEFAULT id=32, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Unwanted:  Uid: 10059] ] with score 70
+03-16 16:36:07.707  2064  2208 D Ethernet: got request NetworkRequest [ TRACK_DEFAULT id=32, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED Unwanted:  Uid: 10059] ] with score 70
+03-16 16:36:07.758  1847  2436 W SurfaceFlinger: Attempting to set client state on removed layer: Splash Screen com.onetv#0
+03-16 16:36:07.758  1847  2436 W SurfaceFlinger: Attempting to destroy on removed layer: Splash Screen com.onetv#0
+03-16 16:36:07.799 19623 19663 D SoLoader: libexpo-modules-core.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:07.799 19623 19663 D SoLoader: Not resolving dependencies for libexpo-modules-core.so
+03-16 16:36:07.804 19623 19663 D SoLoader: libturbomodulejsijni.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:07.804 19623 19663 D SoLoader: Not resolving dependencies for libturbomodulejsijni.so
+03-16 16:36:07.811 19623 19663 I ExpoModulesCore: ✅ JSI interop was installed
+03-16 16:36:07.812 19623 19663 W ExpoModulesCore: ⚠️ JSI interop was already installed
+03-16 16:36:07.813 19623 19663 I ExpoModulesCore: ✅ Constants were exported
+03-16 16:36:07.893 19623 19623 W com.onetv: Accessing hidden field Landroid/view/View;->mAccessibilityDelegate:Landroid/view/View$AccessibilityDelegate; (light greylist, reflection)
+03-16 16:36:07.914 19623 19664 D AIVoiceModule: initSDK called with appId: default_app_id
+03-16 16:36:07.940  2671  2691 I FontLog : (REDACTED) Received query %s, URI %s
+03-16 16:36:07.940  2671  2691 I FontLog : (REDACTED) Query [%s] resolved to %s
+03-16 16:36:07.941  2671  2691 I FontLog : (REDACTED) Fetch %s end status %s
+03-16 16:36:07.945 19623 19670 W com.onetv: Accessing hidden method Landroid/graphics/FontFamily;-><init>()V (light greylist, reflection)
+03-16 16:36:07.945 19623 19670 W com.onetv: Accessing hidden method Landroid/graphics/FontFamily;->addFontFromAssetManager(Landroid/content/res/AssetManager;Ljava/lang/String;IZIII[Landroid/graphics/fonts/FontVariationAxis;)Z (light greylist, reflection)
+03-16 16:36:07.945 19623 19670 W com.onetv: Accessing hidden method Landroid/graphics/FontFamily;->addFontFromBuffer(Ljava/nio/ByteBuffer;I[Landroid/graphics/fonts/FontVariationAxis;II)Z (light greylist, reflection)
+03-16 16:36:07.945 19623 19670 W com.onetv: Accessing hidden method Landroid/graphics/FontFamily;->freeze()Z (light greylist, reflection)
+03-16 16:36:07.945 19623 19670 W com.onetv: Accessing hidden method Landroid/graphics/FontFamily;->abortCreation()V (light greylist, reflection)
+03-16 16:36:07.945 19623 19670 W com.onetv: Accessing hidden method Landroid/graphics/Typeface;->createFromFamiliesWithDefault([Landroid/graphics/FontFamily;Ljava/lang/String;II)Landroid/graphics/Typeface; (light greylist, reflection)
+03-16 16:36:07.947  2671  2691 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+03-16 16:36:07.949  2671  2691 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+03-16 16:36:08.010 19623 19664 W unknown:ViewManagerPropertyUpdater: Could not find generated setter for class com.swmansion.rnscreens.ScreensShadowNode
+03-16 16:36:08.016 19623 19664 D SoLoader: libreact_featureflagsjni.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:08.016 19623 19664 D SoLoader: Not resolving dependencies for libreact_featureflagsjni.so
+03-16 16:36:08.050 19623 19623 W com.onetv: Accessing hidden method Landroid/view/View;->setLeftTopRightBottom(IIII)V (light greylist, linking)
+03-16 16:36:08.052 19623 19663 D SoLoader: libreactnativeblob.so found on /data/app/com.onetv-TorhR0PqVDfAZb4fxc_8MA==/lib/x86_64
+03-16 16:36:08.052 19623 19663 D SoLoader: Not resolving dependencies for libreactnativeblob.so
+03-16 16:36:08.054 19623 19623 W com.onetv: Accessing hidden field Landroid/widget/HorizontalScrollView;->mScroller:Landroid/widget/OverScroller; (light greylist, reflection)
+03-16 16:36:08.073 19623 19673 W com.onetv: Unknown chunk type '200'.
+03-16 16:36:08.117 19623 19673 I WebViewFactory: Loading com.android.chrome version 129.0.6668.70 (code 666807027)
+03-16 16:36:08.119 19623 19673 W com.onetv: Unknown chunk type '200'.
+03-16 16:36:08.134 19623 19673 I com.onetv: Rejecting re-init on previously-failed class java.lang.Class<IS2>: java.lang.NoClassDefFoundError: Failed resolution of: Landroid/webkit/PacProcessor;
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:453)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getWebViewProviderClass(java.lang.ClassLoader) (WebViewFactory.java:176)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:459)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:251)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:40)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.java:102)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.java:43)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.java:44)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1167)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:641)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.lang.Thread.run() (Thread.java:764)
+03-16 16:36:08.134 19623 19673 I com.onetv: Caused by: java.lang.ClassNotFoundException: Didn't find class "android.webkit.PacProcessor" on path: DexPathList[[zip file "/data/downloads/com.android.chrome/base.apk"],nativeLibraryDirectories=[/data/downloads/com.android.chrome/lib/x86_64, /data/downloads/com.android.chrome/base.apk!/lib/x86_64, /system/lib64, /system/vendor/lib64, /system/lib64, /system/vendor/lib64]]
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class dalvik.system.BaseDexClassLoader.findClass(java.lang.String) (BaseDexClassLoader.java:134)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String, boolean) (ClassLoader.java:379)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String) (ClassLoader.java:312)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:453)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getWebViewProviderClass(java.lang.ClassLoader) (WebViewFactory.java:176)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:459)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:251)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:40)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.java:102)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.java:43)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.java:44)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1167)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:641)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.lang.Thread.run() (Thread.java:764)
+03-16 16:36:08.134 19623 19673 I com.onetv: 
+03-16 16:36:08.134 19623 19673 I com.onetv: Rejecting re-init on previously-failed class java.lang.Class<IS2>: java.lang.NoClassDefFoundError: Failed resolution of: Landroid/webkit/PacProcessor;
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:453)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getWebViewProviderClass(java.lang.ClassLoader) (WebViewFactory.java:176)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:459)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:251)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:40)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.java:102)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.java:43)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.java:44)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1167)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:641)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.lang.Thread.run() (Thread.java:764)
+03-16 16:36:08.134 19623 19673 I com.onetv: Caused by: java.lang.ClassNotFoundException: Didn't find class "android.webkit.PacProcessor" on path: DexPathList[[zip file "/data/downloads/com.android.chrome/base.apk"],nativeLibraryDirectories=[/data/downloads/com.android.chrome/lib/x86_64, /data/downloads/com.android.chrome/base.apk!/lib/x86_64, /system/lib64, /system/vendor/lib64, /system/lib64, /system/vendor/lib64]]
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class dalvik.system.BaseDexClassLoader.findClass(java.lang.String) (BaseDexClassLoader.java:134)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String, boolean) (ClassLoader.java:379)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String) (ClassLoader.java:312)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:453)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getWebViewProviderClass(java.lang.ClassLoader) (WebViewFactory.java:176)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:459)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:251)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:40)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.java:102)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.java:43)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.java:44)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1167)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:641)
+03-16 16:36:08.134 19623 19673 I com.onetv:   at void java.lang.Thread.run() (Thread.java:764)
+03-16 16:36:08.134 19623 19673 I com.onetv: 
+03-16 16:36:08.135 19623 19673 I com.onetv: Rejecting re-init on previously-failed class java.lang.Class<IS2>: java.lang.NoClassDefFoundError: Failed resolution of: Landroid/webkit/PacProcessor;
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:453)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getWebViewProviderClass(java.lang.ClassLoader) (WebViewFactory.java:176)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:459)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:251)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:40)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.java:102)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.java:43)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.java:44)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1167)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:641)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.lang.Thread.run() (Thread.java:764)
+03-16 16:36:08.135 19623 19673 I com.onetv: Caused by: java.lang.ClassNotFoundException: Didn't find class "android.webkit.PacProcessor" on path: DexPathList[[zip file "/data/downloads/com.android.chrome/base.apk"],nativeLibraryDirectories=[/data/downloads/com.android.chrome/lib/x86_64, /data/downloads/com.android.chrome/base.apk!/lib/x86_64, /system/lib64, /system/vendor/lib64, /system/lib64, /system/vendor/lib64]]
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class dalvik.system.BaseDexClassLoader.findClass(java.lang.String) (BaseDexClassLoader.java:134)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String, boolean) (ClassLoader.java:379)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String) (ClassLoader.java:312)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:453)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getWebViewProviderClass(java.lang.ClassLoader) (WebViewFactory.java:176)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:459)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:251)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:40)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.java:102)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.java:43)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.java:44)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1167)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:641)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.lang.Thread.run() (Thread.java:764)
+03-16 16:36:08.135 19623 19673 I com.onetv: 
+03-16 16:36:08.135 19623 19673 I com.onetv: Rejecting re-init on previously-failed class java.lang.Class<IS2>: java.lang.NoClassDefFoundError: Failed resolution of: Landroid/webkit/PacProcessor;
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:453)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getWebViewProviderClass(java.lang.ClassLoader) (WebViewFactory.java:176)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:459)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:251)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:40)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.java:102)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.java:43)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.java:44)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1167)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:641)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.lang.Thread.run() (Thread.java:764)
+03-16 16:36:08.135 19623 19673 I com.onetv: Caused by: java.lang.ClassNotFoundException: Didn't find class "android.webkit.PacProcessor" on path: DexPathList[[zip file "/data/downloads/com.android.chrome/base.apk"],nativeLibraryDirectories=[/data/downloads/com.android.chrome/lib/x86_64, /data/downloads/com.android.chrome/base.apk!/lib/x86_64, /system/lib64, /system/vendor/lib64, /system/lib64, /system/vendor/lib64]]
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class dalvik.system.BaseDexClassLoader.findClass(java.lang.String) (BaseDexClassLoader.java:134)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String, boolean) (ClassLoader.java:379)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.ClassLoader.loadClass(java.lang.String) (ClassLoader.java:312)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.classForName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:-2)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class java.lang.Class.forName(java.lang.String, boolean, java.lang.ClassLoader) (Class.java:453)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getWebViewProviderClass(java.lang.ClassLoader) (WebViewFactory.java:176)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.lang.Class android.webkit.WebViewFactory.getProviderClass() (WebViewFactory.java:459)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.WebViewFactoryProvider android.webkit.WebViewFactory.getProvider() (WebViewFactory.java:251)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.CookieManager android.webkit.CookieManager.getInstance() (CookieManager.java:40)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at android.webkit.CookieManager com.facebook.react.modules.network.ForwardingCookieHandler.getCookieManager() (ForwardingCookieHandler.java:102)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.Map com.facebook.react.modules.network.ForwardingCookieHandler.get(java.net.URI, java.util.Map) (ForwardingCookieHandler.java:43)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.List okhttp3.JavaNetCookieJar.loadForRequest(okhttp3.HttpUrl) (JavaNetCookieJar.kt:47)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at java.util.List com.facebook.react.modules.network.ReactCookieJarContainer.loadForRequest(okhttp3.HttpUrl) (ReactCookieJarContainer.java:44)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.BridgeInterceptor.intercept(okhttp3.Interceptor$Chain) (BridgeInterceptor.kt:74)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RetryAndFollowUpInterceptor.intercept(okhttp3.Interceptor$Chain) (RetryAndFollowUpInterceptor.kt:76)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.http.RealInterceptorChain.proceed(okhttp3.Request) (RealInterceptorChain.kt:109)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at okhttp3.Response okhttp3.internal.connection.RealCall.getResponseWithInterceptorChain$okhttp() (RealCall.kt:201)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void okhttp3.internal.connection.RealCall$AsyncCall.run() (RealCall.kt:517)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor.runWorker(java.util.concurrent.ThreadPoolExecutor$Worker) (ThreadPoolExecutor.java:1167)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.util.concurrent.ThreadPoolExecutor$Worker.run() (ThreadPoolExecutor.java:641)
+03-16 16:36:08.135 19623 19673 I com.onetv:   at void java.lang.Thread.run() (Thread.java:764)
+03-16 16:36:08.135 19623 19673 I com.onetv: 
+03-16 16:36:08.144 19623 19673 I cr_WVCFactoryProvider: version=129.0.6668.70 (666807027) minSdkVersion=26 isBundle=true multiprocess=true packageId=2
+03-16 16:36:08.164 19623 19678 E chromium: [0316/163608.164465:ERROR:variations_seed_loader.cc(39)] Seed missing signature.
+03-16 16:36:08.164 19623 19678 I chromium: [0316/163608.164755:INFO:variations_seed_loader.cc(68)] Failed to open file for reading.: No such file or directory (2)
+03-16 16:36:08.169 19623 19673 I cr_LibraryLoader: Successfully loaded native library
+03-16 16:36:08.169 19623 19673 I cr_CachingUmaRecorder: Flushed 5 samples from 5 histograms, 0 samples were dropped.
+03-16 16:36:08.789  2856 19617 I FA      : Application backgrounded at: timestamp_millis: 1773650166753
+03-16 16:36:09.256 19623 19623 W com.onetv: Accessing hidden field Landroid/widget/ScrollView;->mScroller:Landroid/widget/OverScroller; (light greylist, reflection)
+03-16 16:36:16.830  2783  2783 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.measurement.START pkg=com.google.android.gms }
+03-16 16:36:21.262  2671 19097 I AlarmManager: setExactAndAllowWhileIdle [name: GCM_HB_ALARM type: 2 triggerAtMillis: 31581839]
+03-16 16:36:21.263  2671 19097 I AlarmManager: setExactAndAllowWhileIdle [name: GCM_HB_ALARM type: 2 triggerAtMillis: 31581840]
+03-16 16:36:25.917  1863  1893 E storaged: getDiskStats failed with result NOT_SUPPORTED and size 0

@@ -22,10 +22,11 @@ interface DetailState {
   controller: AbortController | null;
   isFavorited: boolean;
   failedSources: Set<string>;
-  selectedLineIndex: number; // 选中的线路索引 // 记录失败的source列表
+  selectedLineIndex: number;
+  userSelectedLine: boolean;
 
   init: (q: string, preferredSource?: string, id?: string) => Promise<void>;
-  setDetail: (detail: SearchResultWithResolution, lineIndex: number) => Promise<void>;
+  setDetail: (detail: SearchResultWithResolution, lineIndex: number, userSelected?: boolean) => Promise<void>;
   abort: () => void;
   toggleFavorite: () => Promise<void>;
   markSourceAsFailed: (source: string, reason: string) => void;
@@ -44,6 +45,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
   isFavorited: false,
   failedSources: new Set<string>(),
   selectedLineIndex: 0,
+  userSelectedLine: false,
 
   init: async (q, preferredSource, id) => {
     console.log('=== DetailStore.init START ===', { q, preferredSource, id });
@@ -65,6 +67,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
       error: null,
       allSourcesLoaded: false,
       controller: newController,
+      userSelectedLine: false,
     });
 
     const { videoSource } = useSettingsStore.getState();
@@ -248,8 +251,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
     }
   },
 
-  setDetail: async (detail, lineIndex = 0) => {
-    set({ detail, selectedLineIndex: lineIndex });
+  setDetail: async (detail, lineIndex = 0, userSelected = false) => {
+    set({ detail, selectedLineIndex: lineIndex, userSelectedLine: userSelected });
     const { source, id } = detail;
     const isFavorited = await FavoriteManager.isFavorited(source, id.toString());
     set({ isFavorited });
