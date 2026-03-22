@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { View, Text, StyleSheet, Modal, FlatList } from "react-native";
 import { StyledButton } from "./StyledButton";
 import usePlayerStore from "@/stores/playerStore";
@@ -8,8 +8,16 @@ interface EpisodeSelectionModalProps {}
 export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () => {
   const { showEpisodeModal, episodes, currentEpisodeIndex, playEpisode, setShowEpisodeModal } = usePlayerStore();
 
-  const [episodeGroupSize] = useState(30);
+  const episodeGroupSize = 30;
   const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(Math.floor(currentEpisodeIndex / episodeGroupSize));
+  const flatListRef = useRef<FlatList>(null);
+
+  // 当模态框打开时，重置选中的分组到当前播放集数所在分组
+  useEffect(() => {
+    if (showEpisodeModal) {
+      setSelectedEpisodeGroup(Math.floor(currentEpisodeIndex / episodeGroupSize));
+    }
+  }, [showEpisodeModal, currentEpisodeIndex]);
 
   const onSelectEpisode = (index: number) => {
     playEpisode(index);
@@ -20,11 +28,23 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
     setShowEpisodeModal(false);
   };
 
+  const getItemLayout = (_: any, index: number) => ({
+    length: 40,
+    offset: 40 * Math.floor(index / 5),
+    index,
+  });
+
+  // 计算当前分组的剧集
+  const currentGroupEpisodes = episodes.slice(
+    selectedEpisodeGroup * episodeGroupSize,
+    (selectedEpisodeGroup + 1) * episodeGroupSize
+  );
+
   return (
     <Modal visible={showEpisodeModal} transparent={true} animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>选择剧集</Text>
+          <Text style={styles.modalTitle}>选择剧集 (共 {episodes.length} 集)</Text>
 
           {episodes.length > episodeGroupSize && (
             <View style={styles.episodeGroupContainer}>
@@ -44,13 +64,12 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
             </View>
           )}
           <FlatList
-            data={episodes.slice(
-              selectedEpisodeGroup * episodeGroupSize,
-              (selectedEpisodeGroup + 1) * episodeGroupSize
-            )}
+            ref={flatListRef}
+            data={currentGroupEpisodes}
             numColumns={5}
             contentContainerStyle={styles.episodeList}
             keyExtractor={(_, index) => `episode-${selectedEpisodeGroup * episodeGroupSize + index}`}
+            getItemLayout={getItemLayout}
             renderItem={({ item, index }) => {
               const absoluteIndex = selectedEpisodeGroup * episodeGroupSize + index;
               return (
@@ -107,6 +126,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "center",
     paddingHorizontal: 10,
+    marginBottom: 10,
   },
   episodeGroupButton: {
     paddingHorizontal: 6,

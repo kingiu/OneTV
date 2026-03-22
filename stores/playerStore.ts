@@ -145,23 +145,21 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
               
               const selectedLine = latestDetail.play_sources[finalLineIndex];
               if (selectedLine && selectedLine.episodes && selectedLine.episodes.length > 0) {
-                const episodeUrl = selectedLine.episodes[episodeIndex] || selectedLine.episodes[0];
-                logger.info(`[INFO] Using line ${finalLineIndex + 1} (${selectedLine.name}): episode ${episodeIndex + 1}, ${episodeUrl.substring(0, 100)}...`);
-                episodes = [{
+                logger.info(`[INFO] Using line ${finalLineIndex + 1} (${selectedLine.name}): ${selectedLine.episodes.length} episodes`);
+                episodes = selectedLine.episodes.map((episodeUrl, index) => ({
                   url: episodeUrl,
-                  title: `第 ${episodeIndex + 1} 集`,
-                }];
+                  title: `第 ${index + 1} 集`,
+                }));
               } else {
                 // 如果选中的线路不存在，使用第一个线路
                 logger.warn(`[WARN] Selected line index ${finalLineIndex} out of range, using first line`);
                 const firstLine = latestDetail.play_sources[0];
                 if (firstLine && firstLine.episodes && firstLine.episodes.length > 0) {
-                  const episodeUrl = firstLine.episodes[episodeIndex] || firstLine.episodes[0];
-                  logger.info(`[INFO] Using first line (${firstLine.name}): episode ${episodeIndex + 1}, ${episodeUrl.substring(0, 100)}...`);
-                  episodes = [{
+                  logger.info(`[INFO] Using first line (${firstLine.name}): ${firstLine.episodes.length} episodes`);
+                  episodes = firstLine.episodes.map((episodeUrl, index) => ({
                     url: episodeUrl,
-                    title: `第 ${episodeIndex + 1} 集`,
-                  }];
+                    title: `第 ${index + 1} 集`,
+                  }));
                 }
               }
             } else {
@@ -169,25 +167,12 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
               const allEpisodes = episodesSelectorBySource(latestDetail.source)(useDetailStore.getState());
               logger.info(`[INFO] All episodes length: ${allEpisodes.length}`);
               
-              // 选择当前线路的剧集
-              const currentLineEpisode = allEpisodes[selectedLineIndex];
-              
-              if (currentLineEpisode) {
-                logger.info(`[INFO] Using line ${selectedLineIndex + 1}: ${currentLineEpisode.substring(0, 100)}...`);
-                episodes = [{
-                  url: currentLineEpisode,
-                  title: `第 ${selectedLineIndex + 1} 集`,
-                }];
-              } else {
-                // 如果选中的线路不存在，使用第一个线路
-                logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
-                if (allEpisodes.length > 0) {
-                  logger.info(`[INFO] Using first line: ${allEpisodes[0].substring(0, 100)}...`);
-                  episodes = [{
-                    url: allEpisodes[0],
-                    title: `第 1 集`,
-                  }];
-                }
+              if (allEpisodes.length > 0) {
+                logger.info(`[INFO] Using ${allEpisodes.length} episodes from ${latestDetail.source}`);
+                episodes = allEpisodes.map((episodeUrl, index) => ({
+                  url: episodeUrl,
+                  title: `第 ${index + 1} 集`,
+                }));
               }
             }
           } else {
@@ -195,11 +180,11 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
             const allEpisodes = episodesSelectorBySource(source)(useDetailStore.getState());
             logger.info(`[INFO] All episodes length: ${allEpisodes.length}`);
             if (allEpisodes.length > 0) {
-              logger.info(`[INFO] Using first line: ${allEpisodes[0].substring(0, 100)}...`);
-              episodes = [{
-                url: allEpisodes[0],
-                title: `第 1 集`,
-              }];
+              logger.info(`[INFO] Using ${allEpisodes.length} episodes from ${source}`);
+              episodes = allEpisodes.map((episodeUrl, index) => ({
+                url: episodeUrl,
+                title: `第 ${index + 1} 集`,
+              }));
             }
           }
 
@@ -288,25 +273,12 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
               const allEpisodes = episodesSelectorBySource(latestDetail.source)(useDetailStore.getState());
               logger.info(`[INFO] All episodes length: ${allEpisodes.length}`);
               
-              // 选择当前线路的剧集
-              const currentLineEpisode = allEpisodes[selectedLineIndex];
-              
-              if (currentLineEpisode) {
-                logger.info(`[INFO] Using line ${selectedLineIndex + 1}: ${currentLineEpisode.substring(0, 100)}...`);
-                episodes = [{
-                  url: currentLineEpisode,
-                  title: `第 ${selectedLineIndex + 1} 集`,
-                }];
-              } else {
-                // 如果选中的线路不存在，使用第一个线路
-                logger.warn(`[WARN] Selected line index ${selectedLineIndex} out of range, using first line`);
-                if (allEpisodes.length > 0) {
-                  logger.info(`[INFO] Using first line: ${allEpisodes[0].substring(0, 100)}...`);
-                  episodes = [{
-                    url: allEpisodes[0],
-                    title: `第 1 集`,
-                  }];
-                }
+              if (allEpisodes.length > 0) {
+                logger.info(`[INFO] Using ${allEpisodes.length} episodes from ${latestDetail.source}`);
+                episodes = allEpisodes.map((episodeUrl, index) => ({
+                  url: episodeUrl,
+                  title: `第 ${index + 1} 集`,
+                }));
               }
             }
             
@@ -321,11 +293,10 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
               const sourceWithEpisodes = detailStoreState.searchResults.find(r => r.episodes && r.episodes.length > 0);
               if (sourceWithEpisodes) {
                 logger.info(`[FALLBACK] Using alternative source "${sourceWithEpisodes.source}" with ${sourceWithEpisodes.episodes.length} episodes`);
-                logger.info(`[FALLBACK] First line URL: ${sourceWithEpisodes.episodes[0].substring(0, 100)}...`);
-                episodes = [{
-                  url: sourceWithEpisodes.episodes[0],
-                  title: `第 1 集`,
-                }];
+                episodes = sourceWithEpisodes.episodes.map((episodeUrl, index) => ({
+                  url: episodeUrl,
+                  title: `第 ${index + 1} 集`,
+                }));
                 // 更新latestDetail为有episodes的source
                 latestDetail = sourceWithEpisodes;
               } else {
@@ -371,45 +342,43 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
                 }
                 
                 const selectedLine = latestDetail.play_sources[finalLineIndex];
-                if (selectedLine) {
-                  const episodeUrl = selectedLine.episodes[episodeIndex] || selectedLine.episodes[0];
-                  logger.info(`[INFO] Selected line: ${selectedLine.name} with ${selectedLine.episodes.length} episodes, playing episode ${episodeIndex + 1}`);
-                  episodes = [{
+                if (selectedLine && selectedLine.episodes && selectedLine.episodes.length > 0) {
+                  logger.info(`[INFO] Selected line: ${selectedLine.name} with ${selectedLine.episodes.length} episodes`);
+                  episodes = selectedLine.episodes.map((episodeUrl, index) => ({
                     url: episodeUrl,
-                    title: `第 ${episodeIndex + 1} 集`,
-                  }];
+                    title: `第 ${index + 1} 集`,
+                  }));
                 } else {
                   // 如果选中的线路不存在，使用第一个线路
                   logger.warn(`[WARN] Selected line index ${finalLineIndex} out of range, using first line`);
                   const firstLine = latestDetail.play_sources[0];
-                  if (firstLine) {
-                    const episodeUrl = firstLine.episodes[episodeIndex] || firstLine.episodes[0];
-                    logger.info(`[INFO] Using first line (${firstLine.name}): episode ${episodeIndex + 1}, ${episodeUrl.substring(0, 100)}...`);
-                    episodes = [{
+                  if (firstLine && firstLine.episodes && firstLine.episodes.length > 0) {
+                    logger.info(`[INFO] Using first line (${firstLine.name}): ${firstLine.episodes.length} episodes`);
+                    episodes = firstLine.episodes.map((episodeUrl, index) => ({
                       url: episodeUrl,
-                      title: `第 ${episodeIndex + 1} 集`,
-                    }];
+                      title: `第 ${index + 1} 集`,
+                    }));
                   }
                 }
               } else {
                 const allEpisodes = episodesSelectorBySource(latestDetail.source)(useDetailStore.getState());
                 logger.info(`[INFO] All episodes length: ${allEpisodes.length}`);
                 if (allEpisodes.length > 0) {
-                  logger.info(`[INFO] Using first line: ${allEpisodes[0].substring(0, 100)}...`);
-                  episodes = [{
-                    url: allEpisodes[0],
-                    title: `第 1 集`,
-                  }];
+                  logger.info(`[INFO] Using ${allEpisodes.length} episodes from ${latestDetail.source}`);
+                  episodes = allEpisodes.map((episodeUrl, index) => ({
+                    url: episodeUrl,
+                    title: `第 ${index + 1} 集`,
+                  }));
                 } else {
                   logger.warn(`[WARN] Cached detail source "${latestDetail.source}" has no episodes, trying provided source "${source}"`);
                   const providedEpisodes = episodesSelectorBySource(source)(useDetailStore.getState());
                   logger.info(`[INFO] Provided episodes length: ${providedEpisodes.length}`);
                   if (providedEpisodes.length > 0) {
-                    logger.info(`[INFO] Using first line: ${providedEpisodes[0].substring(0, 100)}...`);
-                    episodes = [{
-                      url: providedEpisodes[0],
-                      title: `第 1 集`,
-                    }];
+                    logger.info(`[INFO] Using ${providedEpisodes.length} episodes from ${source}`);
+                    episodes = providedEpisodes.map((episodeUrl, index) => ({
+                      url: episodeUrl,
+                      title: `第 ${index + 1} 集`,
+                    }));
                   }
                 }
               }
@@ -448,6 +417,13 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
             const initialPositionFromRecord = playRecord?.play_time ? playRecord.play_time * 1000 : 0;
             const savedPlaybackRate = playerSettings?.playbackRate || 1.0;
             
+            // 确定播放的集数索引：优先使用 playRecord 中保存的集数，否则使用传入的 episodeIndex
+            // playRecord.index 是 1-based，需要转换为 0-based
+            const savedEpisodeIndex = playRecord?.index ? playRecord.index - 1 : episodeIndex;
+            // 确保索引在有效范围内
+            const validEpisodeIndex = Math.max(0, Math.min(savedEpisodeIndex, episodes.length - 1));
+            logger.info(`[INFO] Episode index - requested: ${episodeIndex}, saved: ${playRecord?.index}, final: ${validEpisodeIndex}`);
+            
             const episodesMappingStart = performance.now();
             const mappedEpisodes = episodes.map((ep, index) => ({
               url: typeof ep === 'string' ? ep : ep.url,
@@ -458,7 +434,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
             
             set({
               isLoading: false,
-              currentEpisodeIndex: 0, // 始终从第一集开始
+              currentEpisodeIndex: validEpisodeIndex,
               initialPosition: position || initialPositionFromRecord,
               playbackRate: savedPlaybackRate,
               episodes: mappedEpisodes,
@@ -509,28 +485,63 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
   togglePlayPause: async () => {
     const { status, videoRef } = get();
+    console.log(`[DEBUG] togglePlayPause called - status?.isLoaded: ${status?.isLoaded}, isPlaying: ${status?.isPlaying}`);
     if (status?.isLoaded) {
       try {
         if (status.isPlaying) {
+          console.log('[DEBUG] Pausing video...');
           await videoRef?.current?.pauseAsync();
+          console.log('[DEBUG] Video paused');
         } else {
+          console.log('[DEBUG] Playing video...');
           await videoRef?.current?.playAsync();
+          console.log('[DEBUG] Video playing');
         }
       } catch (error) {
         logger.debug("Failed to toggle play/pause:", error);
         Toast.show({ type: "error", text1: "操作失败" });
       }
+    } else {
+      console.log('[DEBUG] Video not loaded, cannot toggle play/pause');
     }
   },
 
   seek: async (duration) => {
-    const { status, videoRef } = get();
-    if (!status?.isLoaded || !status.durationMillis) return;
+    const { status, videoRef, isSeeking, seekPosition } = get();
+    console.log('[SEEK] Called with duration:', duration);
+    console.log('[SEEK] status?.isLoaded:', status?.isLoaded);
+    console.log('[SEEK] status?.durationMillis:', status?.durationMillis);
+    console.log('[SEEK] videoRef?.current:', !!videoRef?.current);
 
-    const newPosition = Math.max(0, Math.min(status.positionMillis + duration, status.durationMillis));
+    if (!status?.isLoaded || !status.durationMillis) {
+      console.log('[SEEK] Early return - status not loaded or no duration');
+      return;
+    }
+
+    // 如果duration是绝对位置（大于总时长的一半），直接使用它作为目标位置
+    // 否则，将它作为相对偏移量处理
+    let newPosition: number;
+    if (Math.abs(duration) > status.durationMillis / 2) {
+      // duration是绝对位置
+      newPosition = Math.max(0, Math.min(duration, status.durationMillis));
+      console.log('[SEEK] Using absolute position:', newPosition);
+    } else {
+      // duration是相对偏移量
+      // 如果在seeking状态，使用seekPosition作为基准位置，否则使用当前播放位置
+      // 这样可以避免连续seek时位置计算错误
+      const basePosition = isSeeking && seekPosition > 0
+        ? seekPosition * status.durationMillis
+        : status.positionMillis;
+      newPosition = Math.max(0, Math.min(basePosition + duration, status.durationMillis));
+      console.log('[SEEK] Base position:', basePosition);
+    }
+    console.log('[SEEK] New position:', newPosition);
+
     try {
       await videoRef?.current?.setPositionAsync(newPosition);
+      console.log('[SEEK] setPositionAsync success');
     } catch (error) {
+      console.log('[SEEK] Failed to seek video:', error);
       logger.debug("Failed to seek video:", error);
       Toast.show({ type: "error", text1: "快进/快退失败" });
     }
@@ -922,3 +933,4 @@ export const selectCurrentEpisode = (state: PlayerState) => {
   }
   return undefined;
 };
+

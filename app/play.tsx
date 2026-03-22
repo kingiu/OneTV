@@ -126,15 +126,18 @@ export default function PlayScreen() {
     logger.info(`[PERF] PlayScreen useEffect START - detail: ${detail?.title}, source: ${source}, id: ${id}, title: ${title}`);
 
     setVideoRef(videoRef);
-    if (detail) {
+    
+    // 优先使用 URL 参数中的数据，而不是 detail store 中的数据
+    // 这样可以确保从历史记录点击不同视频时使用正确的视频信息
+    if (source && id && title) {
+      logger.info(`[PERF] Calling loadVideo with URL params - source: ${source}, id: ${id}, title: ${title}, episodeIndex: ${episodeIndex}, position: ${position}`);
+      loadVideo({ source, id, episodeIndex, position, title });
+    } else if (detail) {
       const detailSource = detail.source;
       const detailId = detail.id.toString();
       const detailTitle = detail.title;
       logger.info(`[PERF] Calling loadVideo with detail data - source: ${detailSource}, id: ${detailId}, title: ${detailTitle}, episodeIndex: ${episodeIndex}, position: ${position}`);
       loadVideo({ source: detailSource, id: detailId, episodeIndex, position, title: detailTitle });
-    } else if (source && id && title) {
-      logger.info(`[PERF] Calling loadVideo with local params - source: ${source}, id: ${id}, title: ${title}, episodeIndex: ${episodeIndex}, position: ${position}`);
-      loadVideo({ source, id, episodeIndex, position, title });
     } else {
       logger.info(`[PERF] Missing required params - detail: ${!!detail}, source: ${!!source}, id: ${!!id}, title: ${!!title}`);
     }
@@ -146,7 +149,7 @@ export default function PlayScreen() {
       logger.info(`[PERF] PlayScreen unmounting - calling reset()`);
       reset();
     };
-  }, [episodeIndex, position, setVideoRef, reset, loadVideo, detail]);
+  }, [episodeIndex, position, setVideoRef, reset, loadVideo, source, id, title]);
 
   const onScreenPress = useCallback(() => {
     if (deviceType === "tv") {
