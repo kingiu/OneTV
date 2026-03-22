@@ -1,7 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, TouchableOpacity } from "react-native";
-import Icon from "@/components/Icon";
+import { View, Text, StyleSheet, Pressable } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
+import { MediaButton } from "@/components/MediaButton";
 
 import usePlayerStore from "@/stores/playerStore";
 import useDetailStore from "@/stores/detailStore";
@@ -42,10 +42,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   const currentSource = resources.find((r) => r.source === detail?.source);
   const currentSourceName = currentSource?.source_name;
   const hasNextEpisode = currentEpisodeIndex < (episodes.length || 0) - 1;
-  
-  // 线路显示逻辑 - 修复：使用play_sources判断线路数量，而不是episodes
+
   const hasMultipleLines = detail?.play_sources && detail.play_sources.length > 1;
-  const lineLabel = hasMultipleLines ? `线路${selectedLineIndex + 1}` : "";
 
   const formatTime = (milliseconds: number) => {
     if (!milliseconds) return "00:00";
@@ -64,14 +62,10 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   return (
     <View style={styles.controlsOverlay}>
       <View style={styles.topControls}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.controlTitle}>
-            {videoTitle} {currentEpisodeTitle ? `- ${currentEpisodeTitle}` : ""}
-          </Text>
-          {lineLabel ? (
-            <Text style={styles.lineLabel}>{lineLabel}</Text>
-          ) : null}
-        </View>
+        <Text style={styles.controlTitle}>
+          {videoTitle} {currentEpisodeTitle ? `- ${currentEpisodeTitle}` : ""}{" "}
+          {currentSourceName ? `(${currentSourceName})` : ""}
+        </Text>
       </View>
 
       <View style={styles.bottomControlsContainer}>
@@ -95,46 +89,39 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
         </ThemedText>
 
         <View style={styles.bottomControls}>
-            <TouchableOpacity onPress={setIntroEndTime} style={styles.controlButton}>
-              <Text style={{color: "white", fontSize: 16}}>片头</Text>
-              <Text style={styles.timeLabel}>{formatTime(introEndTime || 0)}</Text>
-            </TouchableOpacity>
+          <MediaButton onPress={setIntroEndTime} timeLabel={introEndTime ? formatTime(introEndTime) : undefined}>
+            <Text style={styles.controlButtonText}>片头</Text>
+          </MediaButton>
 
-            <TouchableOpacity onPress={togglePlayPause} style={styles.controlButton}>
-              <Text style={{color: "white", fontSize: 24}}>{status?.isLoaded && status.isPlaying ? "||" : "▶"}</Text>
-            </TouchableOpacity>
+          <MediaButton onPress={togglePlayPause} hasTVPreferredFocus={showControls}>
+            <Text style={[styles.controlButtonText, {fontSize: 24}]}>{status?.isLoaded && status.isPlaying ? "||" : "▶"}</Text>
+          </MediaButton>
 
-            <TouchableOpacity onPress={onPlayNextEpisode} style={styles.controlButton} disabled={!hasNextEpisode}>
-              <Text style={{color: hasNextEpisode ? "white" : "#666", fontSize: 24}}>▶▶</Text>
-            </TouchableOpacity>
+          <MediaButton onPress={onPlayNextEpisode} disabled={!hasNextEpisode}>
+            <Text style={[styles.controlButtonText, {fontSize: 24, color: hasNextEpisode ? "white" : "#666"}]}>▶▶</Text>
+          </MediaButton>
 
-            <TouchableOpacity onPress={setOutroStartTime} style={styles.controlButton}>
-              <Text style={{color: "white", fontSize: 16}}>片尾</Text>
-              <Text style={styles.timeLabel}>{formatTime(outroStartTime || 0)}</Text>
-            </TouchableOpacity>
+          <MediaButton onPress={setOutroStartTime} timeLabel={outroStartTime ? formatTime(outroStartTime) : undefined}>
+            <Text style={styles.controlButtonText}>片尾</Text>
+          </MediaButton>
 
-            <TouchableOpacity onPress={() => setShowEpisodeModal(true)} style={styles.controlButton}>
-              <Icon name="list" color="white" size={24} />
-              <Text style={{color: "white", fontSize: 16, marginLeft: 4}}>剧集</Text>
-            </TouchableOpacity>
+          <MediaButton onPress={() => setShowEpisodeModal(true)}>
+            <Text style={styles.controlButtonText}>剧集</Text>
+          </MediaButton>
 
-            <TouchableOpacity onPress={() => setShowSpeedModal(true)} style={styles.controlButton}>
-              <Icon name="speedometer" color="white" size={24} />
-              <Text style={{color: "white", fontSize: 16, marginLeft: 4}}>倍速</Text>
-              {playbackRate !== 1.0 && <Text style={styles.timeLabel}>{playbackRate}x</Text>}
-            </TouchableOpacity>
+          <MediaButton onPress={() => setShowSpeedModal(true)} timeLabel={playbackRate !== 1.0 ? `${playbackRate}x` : undefined}>
+            <Text style={styles.controlButtonText}>倍速</Text>
+          </MediaButton>
 
-            <TouchableOpacity onPress={() => setShowSourceModal(true)} style={styles.controlButton}>
-              <Icon name="videocam" color="white" size={24} />
-              <Text style={{color: "white", fontSize: 16, marginLeft: 4}}>播放源</Text>
-            </TouchableOpacity>
+          <MediaButton onPress={() => setShowSourceModal(true)}>
+            <Text style={styles.controlButtonText}>播放源</Text>
+          </MediaButton>
 
-            <TouchableOpacity onPress={() => setShowLineModal(true)} style={styles.controlButton} disabled={!hasMultipleLines}>
-              <Icon name="cable" color={hasMultipleLines ? "white" : "#666"} size={24} />
-              <Text style={{color: hasMultipleLines ? "white" : "#666", fontSize: 16, marginLeft: 4}}>线路</Text>
-              {lineLabel ? <Text style={styles.timeLabel}>{selectedLineIndex + 1}</Text> : null}
-            </TouchableOpacity>
-          </View>
+          <MediaButton onPress={() => setShowLineModal(true)} disabled={!hasMultipleLines}>
+            <Text style={[styles.controlButtonText, {color: hasMultipleLines ? "white" : "#666"}]}>线路</Text>
+            {hasMultipleLines && <Text style={styles.timeLabel}>{selectedLineIndex + 1}</Text>}
+          </MediaButton>
+        </View>
       </View>
     </View>
   );
@@ -159,22 +146,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
     marginHorizontal: 10,
-  },
-  titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-  },
-  lineLabel: {
-    color: "#00bb5e",
-    fontSize: 14,
-    fontWeight: "bold",
-    marginLeft: 10,
-    backgroundColor: "rgba(0, 187, 94, 0.2)",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
   },
   bottomControlsContainer: {
     width: "100%",
@@ -217,31 +188,16 @@ const styles = StyleSheet.create({
     top: -10,
     zIndex: 10,
   },
-  controlButton: {
-    padding: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    minWidth: 44,
-    justifyContent: "center",
+  controlButtonText: {
+    color: "white",
+    fontSize: 16,
   },
   timeLabel: {
     color: "white",
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  topRightContainer: {
-    padding: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 44,
-  },
-  resolutionText: {
-    color: "white",
-    fontSize: 16,
+    fontSize: 10,
     fontWeight: "bold",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 4,
+    borderRadius: 3,
   },
 });
