@@ -1,4 +1,30 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// 兼容性检查
+const safeAsyncStorage = {
+  getItem: async (key: string) => {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (error) {
+      console.warn('AsyncStorage getItem error:', error);
+      return null;
+    }
+  },
+  setItem: async (key: string, value: string) => {
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (error) {
+      console.warn('AsyncStorage setItem error:', error);
+    }
+  },
+  removeItem: async (key: string) => {
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (error) {
+      console.warn('AsyncStorage removeItem error:', error);
+    }
+  }
+};
 import { apiRequest, apiResponse, logPerformance } from "./../utils/debugUtils";
 
 // region: --- Interface Definitions ---
@@ -134,7 +160,8 @@ export class API {
     // 获取认证cookie
     let authCookies = '';
     try {
-      authCookies = await AsyncStorage.getItem('authCookies') || '';
+      authCookies = await safeAsyncStorage.getItem('authCookies') || '';
+      console.debug('API: 读取到的认证cookie', { hasAuthCookies: !!authCookies, cookieLength: authCookies.length });
     } catch (error) {
       console.debug('API: 读取认证cookie失败', error);
     }
@@ -143,14 +170,19 @@ export class API {
     const headers = {
       ...options.headers,
       'Content-Type': 'application/json',
-      'Cookie': authCookies,
     };
+    
+    // 如果有认证cookie，设置为user_auth
+    if (authCookies) {
+      headers['Cookie'] = `user_auth=${authCookies}`;
+    }
     
     const requestOptions: RequestInit = {
       ...options,
       headers,
-      credentials: 'include',
     };
+    
+    console.debug('API: 请求选项', { method, url, hasBody: !!options.body, hasCookie: !!authCookies });
     
     // 记录请求
     const requestBody = options.body ? JSON.parse(options.body as string) : undefined;
@@ -171,6 +203,12 @@ export class API {
       if (response.status === 401) {
         const errMsg = "UNAUTHORIZED";
         console.error("API Error:", errMsg);
+        // 清除可能过期的认证信息
+        try {
+          await safeAsyncStorage.removeItem('authCookies');
+        } catch (error) {
+          console.error("Failed to remove authCookies:", error);
+        }
         throw new Error(errMsg);
       }
 
@@ -196,20 +234,34 @@ export class API {
     });
 
     // 存储cookie到AsyncStorage
-    const cookies = response.headers.get("Set-Cookie");
-    if (cookies) {
-      await AsyncStorage.setItem("authCookies", cookies);
+    let authCookieValue = '';
+    response.headers.forEach((value, name) => {
+      if (name.toLowerCase() === 'set-cookie') {
+        // 提取user_auth cookie的值
+        if (value.startsWith('user_auth=')) {
+          const parts = value.split(';');
+          authCookieValue = parts[0].substring('user_auth='.length).trim();
+        }
+      }
+    });
+    
+    if (authCookieValue) {
+      await safeAsyncStorage.setItem("authCookies", authCookieValue);
+      console.debug('API: 登录成功，存储user_auth Cookie', { 
+        cookieValue: authCookieValue.substring(0, 50) + '...' // 只显示前50个字符
+      });
     }
     
     // 如果提供了用户名，将其存储到AsyncStorage中
     if (username) {
-      await AsyncStorage.setItem("loginUsername", username);
+      await safeAsyncStorage.setItem("loginUsername", username);
       console.debug('API: 登录成功，将用户名存储到本地', { username });
     }
     
     // 清除会员信息缓存，确保登录后获取最新会员状态
     try {
-      await AsyncStorage.removeItem('cached_membership');
+      // 使用safeAsyncStorage的removeItem方法
+      await safeAsyncStorage.removeItem('cached_membership');
       console.debug('API: 登录后清除会员信息缓存');
     } catch (error) {
       console.debug('API: 清除缓存失败', error);
@@ -222,12 +274,13 @@ export class API {
     const response = await this._fetch("/api/logout", {
       method: "POST",
     });
-    await AsyncStorage.setItem("authCookies", '');
+    await safeAsyncStorage.setItem("authCookies", '');
     
     // 清除会员信息缓存和存储的用户名，确保登出后清除会员状态
     try {
-      await AsyncStorage.removeItem('cached_membership');
-      await AsyncStorage.removeItem('loginUsername');
+      // 使用safeAsyncStorage的removeItem方法
+      await safeAsyncStorage.removeItem('cached_membership');
+      await safeAsyncStorage.removeItem('loginUsername');
       console.debug('API: 登出后清除会员信息缓存和存储的用户名');
     } catch (error) {
       console.debug('API: 清除缓存失败', error);
@@ -241,49 +294,136 @@ export class API {
     console.debug('API: 开始卡券登录', { code });
     
     try {
-      const response = await this._fetch("/api/login/card", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      });
+      // 尝试多个可能的API端点
+      const endpoints = ['/api/login/card', '/api/card/login', '/api/auth/login/card'];
+      let response: Response | undefined;
+      let data: any;
       
-      const data = await response.json();
+      for (const endpoint of endpoints) {
+        try {
+          console.debug(`API: 尝试卡券登录端点: ${endpoint}`);
+          response = await this._fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code, couponCode: code }), // 支持多种参数名
+          });
+          
+          if (response.ok) {
+            data = await response.json();
+            console.debug(`API: 从端点 ${endpoint} 成功获取响应`, { status: response.status });
+            break;
+          } else {
+            console.debug(`API: 端点 ${endpoint} 返回错误: ${response.status} ${response.statusText}`);
+          }
+        } catch (endpointError) {
+          console.debug(`API: 端点 ${endpoint} 调用失败`, endpointError);
+        }
+      }
+      
+      if (!data) {
+        console.error('API: 所有卡券登录端点都失败');
+        return { 
+          success: false, 
+          message: '登录失败，请稍后重试', 
+          membership: null 
+        };
+      }
+      
       console.debug('API: 卡券登录响应', JSON.stringify(data, null, 2));
       
       // 存储cookie到AsyncStorage
-      const cookies = response.headers.get("Set-Cookie");
-      if (cookies) {
-        await AsyncStorage.setItem("authCookies", cookies);
+      if (response) {
+        // 获取所有的Set-Cookie头（可能有多个）
+        let authCookieValue = '';
+        response.headers.forEach((value, name) => {
+          if (name.toLowerCase() === 'set-cookie') {
+            // 提取user_auth cookie的值
+            if (value.startsWith('user_auth=')) {
+              const parts = value.split(';');
+              authCookieValue = parts[0].substring('user_auth='.length).trim();
+            }
+          }
+        });
+        
+        console.debug('API: 响应中的Cookie', { 
+          hasAuthCookie: !!authCookieValue
+        });
+        
+        if (authCookieValue) {
+          await safeAsyncStorage.setItem("authCookies", authCookieValue);
+          console.debug('API: 卡券登录成功，存储user_auth Cookie', { 
+            cookieValue: authCookieValue.substring(0, 50) + '...' // 只显示前50个字符
+          });
+          
+          // 验证存储是否成功
+          const storedCookie = await safeAsyncStorage.getItem('authCookies');
+          console.debug('API: 验证Cookie存储', { 
+            stored: !!storedCookie, 
+            storedLength: storedCookie?.length,
+            originalCookieLength: authCookieValue.length,
+            lengthMatch: storedCookie?.length === authCookieValue.length
+          });
+        } else {
+          console.warn('API: 响应中没有user_auth Cookie');
+        }
       }
       
       // 清除会员信息缓存，确保获取最新数据
-      try {
-        await AsyncStorage.removeItem('cached_membership');
-        console.debug('API: 卡券登录后清除缓存');
-      } catch (cacheError) {
-        console.debug('API: 清除缓存失败', cacheError);
-      }
+    try {
+      // 使用safeAsyncStorage的removeItem方法
+      await safeAsyncStorage.removeItem('cached_membership');
+      console.debug('API: 卡券登录后清除缓存');
+    } catch (cacheError) {
+      console.debug('API: 清除缓存失败', cacheError);
+    }
       
       // 处理响应数据
-      if (data.success && data.data) {
+      if (data.success) {
         // 尝试提取会员信息
         let membershipData = null;
-        if (data.data.membership) {
+        console.debug('API: 检查响应数据结构', {
+          hasDataMembership: !!data.data?.membership,
+          hasDataUser: !!data.data?.user,
+          hasDirectMembership: !!data.membership,
+          hasDirectUser: !!data.user,
+          hasData: !!data.data
+        });
+        
+        if (data.data?.membership) {
           membershipData = data.data.membership;
-        } else if (data.data.user) {
+          console.debug('API: 使用data.data.membership');
+        } else if (data.membership) {
+          membershipData = data.membership;
+          console.debug('API: 使用data.membership');
+        } else if (data.data?.user) {
           membershipData = data.data.user;
+          console.debug('API: 使用data.data.user');
+        } else if (data.user) {
+          membershipData = data.user;
+          console.debug('API: 使用data.user');
         } else {
-          membershipData = data.data;
+          membershipData = data.data || data;
+          console.debug('API: 使用data.data或data');
+        }
+        
+        // 确保会员数据包含userName字段
+        if (membershipData && membershipData.username && !membershipData.userName) {
+          membershipData.userName = membershipData.username;
+          console.debug('API: 将会员数据中的username字段转换为userName');
         }
         
         if (membershipData) {
+          console.debug('API: 开始映射会员信息', { membershipData });
           // 映射会员信息
           const mappedResult = await this._mapLunaTVMembership(membershipData);
+          console.debug('API: 映射结果', { mappedMembership: mappedResult.membership });
           return { 
             success: true, 
             message: data.message || '登录成功', 
             membership: mappedResult.membership 
           };
+        } else {
+          console.warn('API: 无法提取会员信息');
         }
         
         return { 
@@ -433,7 +573,7 @@ export class API {
     try {
       // 增强: 先尝试从缓存获取，但添加过期检查
       try {
-        const cached = await AsyncStorage.getItem('cached_membership');
+        const cached = await safeAsyncStorage.getItem('cached_membership');
         if (cached) {
           console.debug('API: 从缓存获取会员信息');
           const parsed = JSON.parse(cached);
@@ -448,7 +588,8 @@ export class API {
             return { membership: parsed };
           } else {
             console.debug('API: 缓存已过期，需要重新获取');
-            await AsyncStorage.removeItem('cached_membership');
+            // 使用safeAsyncStorage的removeItem方法
+            await safeAsyncStorage.removeItem('cached_membership');
           }
         }
       } catch (cacheError) {
@@ -512,7 +653,7 @@ export class API {
                 ...result.membership,
                 _cacheTimestamp: Date.now()
               };
-              await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
+              await safeAsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
             } catch (cacheError) {
               console.debug('API: 缓存写入失败', cacheError);
             }
@@ -529,18 +670,18 @@ export class API {
         console.debug('API: 检测到直接会员数据格式');
         const result = await this._mapLunaTVMembership(data);
         // 缓存结果，添加时间戳
-        if (result.membership) {
-          try {
-            // 添加缓存时间戳，用于后续过期检查
-            const cachedWithTimestamp = {
-              ...result.membership,
-              _cacheTimestamp: Date.now()
-            };
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
-          } catch (cacheError) {
-            console.debug('API: 缓存写入失败', cacheError);
+          if (result.membership) {
+            try {
+              // 添加缓存时间戳，用于后续过期检查
+              const cachedWithTimestamp = {
+                ...result.membership,
+                _cacheTimestamp: Date.now()
+              };
+              await safeAsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
+            } catch (cacheError) {
+              console.debug('API: 缓存写入失败', cacheError);
+            }
           }
-        }
         return result;
       }
       
@@ -549,18 +690,18 @@ export class API {
         console.debug('API: 检测到data.user格式');
         const result = await this._mapLunaTVMembership(data.data.user);
         // 缓存结果，添加时间戳
-        if (result.membership) {
-          try {
-            // 添加缓存时间戳，用于后续过期检查
-            const cachedWithTimestamp = {
-              ...result.membership,
-              _cacheTimestamp: Date.now()
-            };
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
-          } catch (cacheError) {
-            console.debug('API: 缓存写入失败', cacheError);
+          if (result.membership) {
+            try {
+              // 添加缓存时间戳，用于后续过期检查
+              const cachedWithTimestamp = {
+                ...result.membership,
+                _cacheTimestamp: Date.now()
+              };
+              await safeAsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
+            } catch (cacheError) {
+              console.debug('API: 缓存写入失败', cacheError);
+            }
           }
-        }
         return result;
       }
       
@@ -569,18 +710,18 @@ export class API {
         console.debug('API: 检测到直接的membership字段');
         const result = await this._mapLunaTVMembership(data.membership);
         // 缓存结果，添加时间戳
-        if (result.membership) {
-          try {
-            // 添加缓存时间戳，用于后续过期检查
-            const cachedWithTimestamp = {
-              ...result.membership,
-              _cacheTimestamp: Date.now()
-            };
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
-          } catch (cacheError) {
-            console.debug('API: 缓存写入失败', cacheError);
+          if (result.membership) {
+            try {
+              // 添加缓存时间戳，用于后续过期检查
+              const cachedWithTimestamp = {
+                ...result.membership,
+                _cacheTimestamp: Date.now()
+              };
+              await safeAsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
+            } catch (cacheError) {
+              console.debug('API: 缓存写入失败', cacheError);
+            }
           }
-        }
         return result;
       }
       
@@ -590,7 +731,7 @@ export class API {
       if (directResult.membership) {
         // 缓存结果
         try {
-          await AsyncStorage.setItem('cached_membership', JSON.stringify(directResult.membership));
+          await safeAsyncStorage.setItem('cached_membership', JSON.stringify(directResult.membership));
         } catch (cacheError) {
           console.debug('API: 缓存写入失败', cacheError);
         }
@@ -610,7 +751,7 @@ export class API {
           // 缓存结果
           if (isComplete) {
             try {
-              await AsyncStorage.setItem('cached_membership', JSON.stringify(membership));
+              await safeAsyncStorage.setItem('cached_membership', JSON.stringify(membership));
             } catch (cacheError) {
               console.debug('API: 缓存写入失败', cacheError);
             }
@@ -629,7 +770,7 @@ export class API {
       // 增强: 即使出错，也尝试从缓存获取信息
       try {
         console.debug('API: 尝试从缓存获取会员信息作为后备');
-        const cached = await AsyncStorage.getItem('cached_membership');
+        const cached = await safeAsyncStorage.getItem('cached_membership');
         if (cached) {
           const parsed = JSON.parse(cached);
           console.debug('API: 从缓存成功获取后备会员信息');
@@ -1042,12 +1183,13 @@ export class API {
     
     try {
       // 增强: 清除缓存，确保获取最新数据
-      try {
-        await AsyncStorage.removeItem('cached_membership');
-        console.debug('API: 卡券兑换前清除缓存');
-      } catch (cacheError) {
-        console.debug('API: 清除缓存失败', cacheError);
-      }
+    try {
+      // 使用safeAsyncStorage的removeItem方法
+      await safeAsyncStorage.removeItem('cached_membership');
+      console.debug('API: 卡券兑换前清除缓存');
+    } catch (cacheError) {
+      console.debug('API: 清除缓存失败', cacheError);
+    }
       
       // 使用正确的卡券兑换API地址
       let response, data;
@@ -1103,7 +1245,7 @@ export class API {
               ...result.membership,
               _cacheTimestamp: Date.now()
             };
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
+            await safeAsyncStorage.setItem('cached_membership', JSON.stringify(cachedWithTimestamp));
             console.debug('API: 卡券兑换后缓存会员信息');
           } catch (cacheError) {
             console.debug('API: 缓存写入失败', cacheError);
@@ -1120,7 +1262,7 @@ export class API {
         // 缓存结果
         if (result.membership) {
           try {
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
+            await safeAsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
           }
           catch (cacheError) {
             console.debug('API: 缓存写入失败', cacheError);
@@ -1136,7 +1278,7 @@ export class API {
         // 缓存结果
         if (result.membership) {
           try {
-            await AsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
+            await safeAsyncStorage.setItem('cached_membership', JSON.stringify(result.membership));
           }
           catch (cacheError) {
             console.debug('API: 缓存写入失败', cacheError);

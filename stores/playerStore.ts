@@ -4,6 +4,7 @@ import { AVPlaybackStatus, Video } from "expo-av";
 import { RefObject } from "react";
 import { PlayRecord, PlayRecordManager, PlayerSettingsManager } from "../services/storage";
 import useDetailStore, { episodesSelectorBySource } from "./detailStore";
+import { useAuthStore } from "./authStore";
 import Logger from "../utils/Logger";
 import { LineSpeedTest } from "../services/lineSpeedTest";
 
@@ -458,6 +459,14 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     } catch (error) {
       logger.error(`[ERROR] PlayerStore.loadVideo timeout or error:`, error);
       set({ isLoading: false });
+      
+      // 检查是否是401未授权错误
+      const errorMessage = error instanceof Error ? error.message : "加载失败";
+      if (errorMessage === 'UNAUTHORIZED') {
+        logger.error(`[ERROR] 401 Unauthorized error detected in PlayerStore.loadVideo`);
+        // 调用authStore的handleUnauthorized方法
+        useAuthStore.getState().handleUnauthorized();
+      }
       
       const perfEnd = performance.now();
       logger.info(`[PERF] PlayerStore.loadVideo TIMEOUT - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);

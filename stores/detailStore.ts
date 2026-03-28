@@ -3,6 +3,7 @@ import { SearchResult, api } from "../services/api";
 import { getResolutionFromM3U8 } from "../services/m3u8";
 import { useSettingsStore } from "./settingsStore";
 import { FavoriteManager } from "../services/storage";
+import { useAuthStore } from "./authStore";
 import Logger from "../utils/Logger";
 
 const logger = Logger.withTag('DetailStore');
@@ -173,6 +174,13 @@ const useDetailStore = create<DetailState>((set, get) => ({
               } catch (error) {
                 logger.warn(`[WARN] Search failed for ${resource.name}:`, error);
                 console.log(`=== 搜索 ${resource.name} 失败:`, error);
+                
+                // 检查是否是401未授权错误
+                if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+                  logger.error(`[ERROR] 401 Unauthorized error detected for ${resource.name}`);
+                  // 抛出错误以便上层处理
+                  throw error;
+                }
               }
             });
             
@@ -236,7 +244,19 @@ const useDetailStore = create<DetailState>((set, get) => ({
       if ((e as Error).name !== "AbortError") {
         logger.error(`[ERROR] DetailStore.init caught unexpected error:`, e);
         const errorMessage = e instanceof Error ? e.message : "获取数据失败";
-        set({ error: `搜索失败：${errorMessage}`, loading: false });
+        
+        // 检查是否是401未授权错误
+        if (errorMessage === 'UNAUTHORIZED') {
+          logger.error(`[ERROR] 401 Unauthorized error detected in DetailStore.init`);
+          set({ 
+            error: `登录已过期，请重新登录`, 
+            loading: false 
+          });
+          // 调用authStore的handleUnauthorized方法
+          await useAuthStore.getState().handleUnauthorized();
+        } else {
+          set({ error: `搜索失败：${errorMessage}`, loading: false });
+        }
       } else {
         logger.info(`[INFO] DetailStore.init aborted by user`);
       }
