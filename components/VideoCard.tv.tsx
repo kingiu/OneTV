@@ -227,7 +227,7 @@ const CARD_HEIGHT = 240;
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginHorizontal: 8,
+    // marginHorizontal: 8, // 移除默认边距，由 CustomScrollView 统一控制间距
   },
   pressable: {
     width: CARD_WIDTH + 20,

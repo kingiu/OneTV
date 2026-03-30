@@ -22,9 +22,14 @@ import { api } from "@/services/api";
 const logger = Logger.withTag("RootLayout");
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync().catch((error) => {
-  logger.warn(`Error preventing splash screen from hiding: ${error}`);
-});
+const preventAutoHide = async () => {
+  try {
+    await SplashScreen.preventAutoHideAsync();
+  } catch (error) {
+    logger.warn(`Error preventing splash screen from hiding: ${error}`);
+  }
+};
+preventAutoHide();
 
 export default function RootLayout() {
   const colorScheme = "dark";
@@ -67,7 +72,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded || error) {
-      SplashScreen.hideAsync();
+      const hideSplash = async () => {
+        try {
+          await SplashScreen.hideAsync();
+        } catch (error) {
+          logger.warn(`Error hiding splash screen: ${error}`);
+        }
+      };
+      hideSplash();
       if (error) {
         logger.warn(`Error in loading fonts: ${error}`);
       }

@@ -141,18 +141,16 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
       marginBottom: responsiveConfig.spacing,
     },
     fullRowContainer: {
-      justifyContent: "space-around",
-      marginRight: responsiveConfig.spacing / 2,
+      justifyContent: "space-between",
     },
     partialRowContainer: {
-      justifyContent: "flex-start",
+      justifyContent: "space-between",
     },
     itemContainer: {
       width: responsiveConfig.cardWidth,
     },
     itemWithMargin: {
       width: responsiveConfig.cardWidth,
-      marginRight: responsiveConfig.spacing,
     },
     scrollToTopButton: {
       position: 'absolute',
@@ -184,12 +182,12 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
                 <View key={rowIndex} style={[dynamicStyles.rowContainer, rowStyle]}>
                   {row.map((item, itemIndex) => {
                     const actualIndex = rowIndex * effectiveColumns + itemIndex;
-                    const isLastItemInPartialRow = !isFullRow && itemIndex === row.length - 1;
-                    const itemStyle = isLastItemInPartialRow ? dynamicStyles.itemContainer : dynamicStyles.itemWithMargin;
+                    const isLastItemInRow = itemIndex === row.length - 1;
+                    const itemStyle = isLastItemInRow ? dynamicStyles.itemContainer : dynamicStyles.itemWithMargin;
 
                     const cardProps = {
                       key: actualIndex,
-                      style: isFullRow ? dynamicStyles.itemContainer : itemStyle,
+                      style: itemStyle,
                     };
 
                     return (

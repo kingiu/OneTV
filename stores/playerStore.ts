@@ -53,6 +53,7 @@ interface PlayerState {
   isLoading: boolean;
   showControls: boolean;
   showEpisodeModal: boolean;
+  episodeModalInitialTab: 'episodes' | 'lines';
   showSourceModal: boolean;
   showSpeedModal: boolean;
   showNextEpisodeOverlay: boolean;
@@ -77,7 +78,7 @@ interface PlayerState {
   handlePlaybackStatusUpdate: (newStatus: AVPlaybackStatus) => void;
   setLoading: (loading: boolean) => void;
   setShowControls: (show: boolean) => void;
-  setShowEpisodeModal: (show: boolean) => void;
+  setShowEpisodeModal: (show: boolean, initialTab?: 'episodes' | 'lines') => void;
   setShowSourceModal: (show: boolean) => void;
   setShowSpeedModal: (show: boolean) => void;
   setShowNextEpisodeOverlay: (show: boolean) => void;
@@ -105,6 +106,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   isLoading: true,
   showControls: false,
   showEpisodeModal: false,
+  episodeModalInitialTab: 'episodes' as 'episodes' | 'lines',
   showSourceModal: false,
   showSpeedModal: false,
   showNextEpisodeOverlay: false,
@@ -485,7 +487,10 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setLoading: (loading) => set({ isLoading: loading }),
   setShowControls: (show) => set({ showControls: show }),
-  setShowEpisodeModal: (show) => set({ showEpisodeModal: show }),
+  setShowEpisodeModal: (show, initialTab) => set({ 
+    showEpisodeModal: show, 
+    episodeModalInitialTab: initialTab || 'episodes' 
+  }),
   setShowSourceModal: (show) => set({ showSourceModal: show }),
   setShowSpeedModal: (show) => set({ showSpeedModal: show }),
   setShowNextEpisodeOverlay: (show) => set({ showNextEpisodeOverlay: show }),

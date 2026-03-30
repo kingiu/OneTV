@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Modal, FlatList, ScrollView } from "react-native";
 import { StyledButton } from "./StyledButton";
 import usePlayerStore from "@/stores/playerStore";
@@ -7,15 +7,26 @@ import useDetailStore from "@/stores/detailStore";
 interface EpisodeSelectionModalProps {}
 
 export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () => {
-  const { showEpisodeModal, currentEpisodeIndex, playEpisode, setShowEpisodeModal, currentPlaySourceIndex, onLineChange } = usePlayerStore();
+  const { showEpisodeModal, currentEpisodeIndex, playEpisode, setShowEpisodeModal, currentPlaySourceIndex, onLineChange, episodeModalInitialTab } = usePlayerStore();
   const { detail } = useDetailStore();
   
-  // 使用第一个播放源的剧集作为剧集列表，这样剧集标签显示的内容就不会随线路切换而改变
   const episodes = detail?.play_sources && detail.play_sources.length > 0 ? detail.play_sources[0].episodes : [];
 
   const [episodeGroupSize] = useState(30);
   const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(Math.floor(currentEpisodeIndex / episodeGroupSize));
-  const [activeTab, setActiveTab] = useState<'episodes' | 'lines'>('episodes');
+  const [activeTab, setActiveTab] = useState<'episodes' | 'lines'>(episodeModalInitialTab);
+  
+  // 当 currentEpisodeIndex 变化时，更新选中的剧集分组
+  useEffect(() => {
+    setSelectedEpisodeGroup(Math.floor(currentEpisodeIndex / episodeGroupSize));
+  }, [currentEpisodeIndex, episodeGroupSize]);
+  
+  // Update activeTab when episodeModalInitialTab changes
+  useEffect(() => {
+    setActiveTab(episodeModalInitialTab);
+  }, [episodeModalInitialTab]);
+  
+  console.log('[DEBUG] EpisodeSelectionModal rendered, initialTab:', episodeModalInitialTab, 'activeTab:', activeTab);
 
   const onSelectEpisode = (index: number) => {
     playEpisode(index);
@@ -32,27 +43,10 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
     <Modal visible={showEpisodeModal} transparent={true} animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>选择剧集</Text>
+          <Text style={styles.modalTitle}>{activeTab === 'episodes' ? '选择剧集' : '选择线路'}</Text>
 
-          {/* 标签页切换 */}
-          <View style={styles.tabContainer}>
-            <StyledButton
-              text="剧集"
-              onPress={() => setActiveTab('episodes')}
-              isSelected={activeTab === 'episodes'}
-              style={styles.tabButton}
-              textStyle={styles.tabButtonText}
-            />
-            {playSources.length > 1 && (
-              <StyledButton
-                text="线路"
-                onPress={() => setActiveTab('lines')}
-                isSelected={activeTab === 'lines'}
-                style={styles.tabButton}
-                textStyle={styles.tabButtonText}
-              />
-            )}
-          </View>
+          {/* 标签页切换 - 完全隐藏 */}
+          {/* 现在通过不同按钮直接打开不同标签页，不需要标签切换 */}
 
           {activeTab === 'episodes' ? (
             <>

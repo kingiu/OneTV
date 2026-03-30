@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import { Pause, Play, SkipForward, List, Tv, ArrowDownToDot, ArrowUpFromDot, Gauge, Network } from "lucide-react-native";
+import { Pause, Play, SkipForward, List, Tv, ArrowDownToDot, ArrowUpFromDot, Gauge, Link } from "lucide-react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { MediaButton } from "@/components/MediaButton";
 
@@ -75,7 +75,8 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   };
 
   const onShowLines = () => {
-    setShowEpisodeModal(true);
+    console.log('[DEBUG] Network button clicked, opening lines tab');
+    setShowEpisodeModal(true, 'lines');
   };
 
   return (
@@ -138,7 +139,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
 
           {playSources.length > 1 && (
             <MediaButton onPress={onShowLines} timeLabel={currentLineName}>
-              <Network color="white" size={24} />
+              <Link color="white" size={24} />
             </MediaButton>
           )}
 
