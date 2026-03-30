@@ -28,17 +28,27 @@ export interface VideoDetail {
   remarks?: string;
 }
 
+export interface PlaySource {
+  name: string;
+  episodes: string[];
+  episodes_titles: string[];
+}
+
 export interface SearchResult {
   id: number;
   title: string;
   poster: string;
   episodes: string[];
+  episodes_titles: string[];
   source: string;
   source_name: string;
   class?: string;
   year: string;
   desc?: string;
   type_name?: string;
+  play_sources?: PlaySource[];
+  vod_play_from?: string;
+  vod_play_url?: string;
 }
 
 export interface Favorite {
@@ -105,6 +115,77 @@ interface LiveApiResponse<T> {
   data: T;
 }
 
+// region: --- Card and Membership Interfaces ---
+export interface Coupon {
+  id: string;
+  code: string;
+  type: 'membership' | 'discount' | 'trial';
+  tier: string;
+  tierName: string;
+  durationDays: number;
+  status: 'active' | 'used' | 'expired';
+  createdAt: number;
+  createdAtStr: string;
+  redeemedAt?: number;
+  redeemedAtStr: string;
+  redeemedBy?: string;
+  expireTime: number;
+  expireTimeStr: string;
+  isExpired: boolean;
+}
+
+export interface CouponBatch {
+  id: string;
+  name: string;
+  tier: string;
+  tierName: string;
+  count: number;
+  durationDays: number;
+  createdAt: number;
+  createdBy: string;
+  status: 'pending' | 'completed';
+}
+
+export interface MembershipTier {
+  id: string;
+  name: string;
+  displayName: string;
+  userGroup: string;
+  benefits: string[];
+  price?: number;
+  durationDays?: number;
+}
+
+export interface UserMembership {
+  tierId: string;
+  tierName: string;
+  status: 'active' | 'expired' | 'pending';
+  startDate: number;
+  endDate: number;
+  autoRenew: boolean;
+  source: string;
+  isActive: boolean;
+  tags: string[];
+}
+
+export interface MembershipConfig {
+  enabled: boolean;
+  tiers?: MembershipTier[];
+  levels?: Array<{
+    level: number;
+    name: string;
+    price: number;
+    duration: number;
+  }>;
+  benefits?: Record<string, string[]>;
+}
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message: string;
+  data?: T;
+}
+
 export class API {
   public baseURL: string = "";
 
@@ -115,6 +196,7 @@ export class API {
   }
 
   public setBaseUrl(url: string) {
+    console.log('Setting API base URL to:', url);
     this.baseURL = url;
   }
 
@@ -134,25 +216,50 @@ export class API {
 
     const headers = await this.buildHeaders(options.headers);
 
-    const response = await fetch(`${this.baseURL}${url}`, {
-      ...options,
-      headers,
-    });
+    try {
+      console.log('Fetching:', `${this.baseURL}${url}`);
+      const response = await fetch(`${this.baseURL}${url}`, {
+        ...options,
+        headers,
+      });
 
-    const latestCookies = response.headers.get("Set-Cookie");
-    if (latestCookies) {
-      await AsyncStorage.setItem("authCookies", latestCookies);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      const latestCookies = response.headers.get("Set-Cookie");
+      if (latestCookies) {
+        await AsyncStorage.setItem("authCookies", latestCookies);
+      }
+
+      if (response.status === 401) {
+        throw new Error("UNAUTHORIZED");
+      }
+
+      if (!response.ok) {
+        // 尝试获取错误响应的内容，以便更好地理解问题
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText.substring(0, 200)}`);
+      }
+
+      // 检查响应内容类型，跳过cron请求的检查
+      if (!url.includes("/api/cron/")) {
+        const contentType = response.headers.get("content-type");
+        console.log('Response content type:', contentType);
+        if (contentType && !contentType.includes("application/json")) {
+          const errorText = await response.text();
+          console.log('Response body:', errorText.substring(0, 500));
+          throw new Error(`Invalid content type: ${contentType}, body: ${errorText.substring(0, 200)}`);
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.log('Fetch error:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw error;
     }
-
-    if (response.status === 401) {
-      throw new Error("UNAUTHORIZED");
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return response;
   }
 
   async login(username?: string | undefined, password?: string): Promise<{ ok: boolean }> {
@@ -198,8 +305,12 @@ export class API {
     return payload.data?.programs || [];
   }
 
-  async triggerCron(password: string = "mtvpls"): Promise<boolean> {
-    const response = await this._fetch(`/api/cron/${encodeURIComponent(password)}`);
+  async triggerCron(password: string = "cron_secure_password"): Promise<boolean> {
+    const response = await this._fetch(`/api/cron/${encodeURIComponent(password)}`, {
+      headers: {
+        "Accept": "*/*"
+      }
+    });
     return response.ok;
   }
 
@@ -282,14 +393,111 @@ export class API {
   async searchVideos(query: string): Promise<{ results: SearchResult[] }> {
     const url = `/api/search?q=${encodeURIComponent(query)}`;
     const response = await this._fetch(url);
-    return response.json();
+    const data = await response.json();
+    // 处理 vod_play_from 和 vod_play_url 字段，转换为 play_sources
+    if (data.results) {
+      data.results = data.results.map((item: any) => {
+        if (item.vod_play_from && item.vod_play_url) {
+          const play_sources: { name: string; episodes: string[]; episodes_titles: string[] }[] = [];
+          const sources = item.vod_play_from.split('$$$');
+          const urls = item.vod_play_url.split('$$$');
+          
+          console.log('Processing sources:', sources);
+          console.log('Processing urls:', urls);
+          
+          sources.forEach((source: string, index: number) => {
+            if (urls[index]) {
+              const sourceName = source.replace(/\(.*\)/, '').trim();
+              const episodePairs = urls[index].split('#');
+              const episodes: string[] = [];
+              const episodes_titles: string[] = [];
+              
+              console.log('Processing source:', sourceName);
+              console.log('Processing episode pairs:', episodePairs);
+              
+              episodePairs.forEach((pair: string) => {
+                const parts = pair.split('$');
+                if (parts.length >= 2) {
+                  episodes_titles.push(parts[0].trim());
+                  episodes.push(parts[1].trim());
+                }
+              });
+              
+              if (episodes.length > 0) {
+                play_sources.push({ name: sourceName, episodes, episodes_titles });
+              }
+            }
+          });
+          
+          console.log('Parsed play_sources:', play_sources);
+          
+          if (play_sources.length > 0) {
+            item.play_sources = play_sources;
+            // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
+            if (!item.episodes || item.episodes.length === 0) {
+              item.episodes = play_sources[0].episodes;
+              item.episodes_titles = play_sources[0].episodes_titles;
+            }
+          }
+        }
+        return item;
+      });
+    }
+    return data;
   }
 
   async searchVideo(query: string, resourceId: string, signal?: AbortSignal): Promise<{ results: SearchResult[] }> {
     const url = `/api/search/one?q=${encodeURIComponent(query)}&resourceId=${encodeURIComponent(resourceId)}`;
     const response = await this._fetch(url, { signal });
     const { results } = await response.json();
-    return { results: results.filter((item: any) => item.title === query) };
+    // 处理 vod_play_from 和 vod_play_url 字段，转换为 play_sources
+    const processedResults = results.map((item: any) => {
+      if (item.vod_play_from && item.vod_play_url) {
+        const play_sources: { name: string; episodes: string[]; episodes_titles: string[] }[] = [];
+        const sources = item.vod_play_from.split('$$$');
+        const urls = item.vod_play_url.split('$$$');
+        
+        console.log('Processing sources:', sources);
+        console.log('Processing urls:', urls);
+        
+        sources.forEach((source: string, index: number) => {
+          if (urls[index]) {
+            const sourceName = source.replace(/\(.*\)/, '').trim();
+            const episodePairs = urls[index].split('#');
+            const episodes: string[] = [];
+            const episodes_titles: string[] = [];
+            
+            console.log('Processing source:', sourceName);
+            console.log('Processing episode pairs:', episodePairs);
+            
+            episodePairs.forEach((pair: string) => {
+              const parts = pair.split('$');
+              if (parts.length >= 2) {
+                episodes_titles.push(parts[0].trim());
+                episodes.push(parts[1].trim());
+              }
+            });
+            
+            if (episodes.length > 0) {
+              play_sources.push({ name: sourceName, episodes, episodes_titles });
+            }
+          }
+        });
+        
+        console.log('Parsed play_sources:', play_sources);
+        
+        if (play_sources.length > 0) {
+          item.play_sources = play_sources;
+          // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
+          if (!item.episodes || item.episodes.length === 0) {
+            item.episodes = play_sources[0].episodes;
+            item.episodes_titles = play_sources[0].episodes_titles;
+          }
+        }
+      }
+      return item;
+    });
+    return { results: processedResults };
   }
 
   async getResources(signal?: AbortSignal): Promise<ApiSite[]> {
@@ -302,6 +510,80 @@ export class API {
     const url = `/api/detail?source=${source}&id=${id}`;
     const response = await this._fetch(url);
     return response.json();
+  }
+
+  // region: --- Card and Membership API Methods ---
+
+  async getUserCoupons(): Promise<Coupon[]> {
+    const response = await this._fetch('/api/card/user');
+    const result: ApiResponse<{ data: Coupon[] }> = await response.json();
+    return result.data?.data || [];
+  }
+
+  async redeemCoupon(code: string): Promise<{ success: boolean; message: string }> {
+    const response = await this._fetch('/api/card/redeem', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    const result: ApiResponse = await response.json();
+    return {
+      success: result.success,
+      message: result.message || '兑换失败',
+    };
+  }
+
+  async getUserMembership(): Promise<{ membership: UserMembership | null; config: MembershipConfig | null }> {
+    const response = await this._fetch('/api/membership');
+    const result: ApiResponse<{ membership: any; config: any }> = await response.json();
+    
+    // 转换会员信息格式
+    const apiMembership = result.data?.membership;
+    const membership: UserMembership | null = apiMembership ? {
+      tierId: apiMembership.tierId,
+      tierName: apiMembership.tierName || apiMembership.tier || '普通会员',
+      status: apiMembership.status as 'active' | 'expired' | 'pending' || 'inactive',
+      startDate: apiMembership.startDate || 0,
+      endDate: apiMembership.endDate || 0,
+      autoRenew: apiMembership.autoRenew || false,
+      source: apiMembership.source || 'unknown',
+      isActive: apiMembership.status === 'active' && apiMembership.endDate > Date.now(),
+      tags: apiMembership.tags || []
+    } : null;
+    
+    // 转换配置格式
+    const apiConfig = result.data?.config;
+    const config: MembershipConfig | null = apiConfig ? {
+      enabled: true,
+      tiers: apiConfig.tiers || [],
+      levels: apiConfig.levels,
+      benefits: apiConfig.benefits
+    } : null;
+    
+    return { membership, config };
+  }
+
+  async getMembershipConfig(): Promise<MembershipConfig> {
+    try {
+      const response = await this._fetch('/api/membership?action=getConfig');
+      const result: ApiResponse<{ config: any }> = await response.json();
+      const apiConfig = result.data?.config || result.data;
+      
+      return {
+        enabled: true,
+        tiers: apiConfig?.tiers || [],
+        levels: apiConfig?.levels,
+        benefits: apiConfig?.benefits
+      };
+    } catch (error) {
+      // 如果获取配置失败，返回默认配置
+      return {
+        enabled: false,
+        tiers: [],
+        levels: [],
+        benefits: {}
+      };
+    }
   }
 }
 

@@ -22,7 +22,9 @@ import { api } from "@/services/api";
 const logger = Logger.withTag("RootLayout");
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch((error) => {
+  logger.warn(`Error preventing splash screen from hiding: ${error}`);
+});
 
 export default function RootLayout() {
   const colorScheme = "dark";
@@ -108,6 +110,7 @@ export default function RootLayout() {
             <Stack.Screen name="live" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
             <Stack.Screen name="favorites" options={{ headerShown: false }} />
+            <Stack.Screen name="card-membership" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
           </Stack>
         </View>

@@ -41,7 +41,7 @@ interface SettingsState {
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  apiBaseUrl: "",
+  apiBaseUrl: "https://onetv.aisxuexi.com",
   cronPassword: DEFAULT_CRON_PASSWORD,
   m3uUrl: "",
   remoteInputEnabled: false,
@@ -56,25 +56,30 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     sources: {},
   },
   loadSettings: async () => {
-    const settings = await SettingsManager.get();
-    set({
-      apiBaseUrl: settings.apiBaseUrl,
-      cronPassword: settings.cronPassword || DEFAULT_CRON_PASSWORD,
-      m3uUrl: settings.m3uUrl,
-      remoteInputEnabled: settings.remoteInputEnabled || false,
-      vodProxyEnabled: settings.vodProxyEnabled ?? settings.vodAdBlockEnabled ?? true,
-      liveAdBlockEnabled: settings.liveAdBlockEnabled ?? true,
-      vodAdBlockEnabled: settings.vodAdBlockEnabled ?? settings.vodProxyEnabled ?? true,
-      videoSource: settings.videoSource || {
-        enabledAll: true,
-        sources: {},
-      },
-    });
-    if (settings.apiBaseUrl) {
-      api.setBaseUrl(settings.apiBaseUrl);
-      await get().fetchServerConfig();
-    }
-  },
+      const settings = await SettingsManager.get();
+      console.log('Loaded settings:', settings);
+      // 只在 API base URL 为空时才设置，避免覆盖用户配置
+      if (settings.apiBaseUrl) {
+        api.setBaseUrl(settings.apiBaseUrl);
+      }
+      set({
+        apiBaseUrl: settings.apiBaseUrl || '',
+        cronPassword: settings.cronPassword || DEFAULT_CRON_PASSWORD,
+        m3uUrl: settings.m3uUrl,
+        remoteInputEnabled: settings.remoteInputEnabled || false,
+        vodProxyEnabled: settings.vodProxyEnabled ?? settings.vodAdBlockEnabled ?? true,
+        liveAdBlockEnabled: settings.liveAdBlockEnabled ?? true,
+        vodAdBlockEnabled: settings.vodAdBlockEnabled ?? settings.vodProxyEnabled ?? true,
+        videoSource: settings.videoSource || {
+          enabledAll: true,
+          sources: {},
+        },
+      });
+      // 只有在 API base URL 存在时才获取服务器配置
+      if (settings.apiBaseUrl) {
+        await get().fetchServerConfig();
+      }
+    },
   fetchServerConfig: async () => {
     set({ isLoadingServerConfig: true });
     try {
@@ -90,7 +95,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       set({ isLoadingServerConfig: false });
     }
   },
-  setApiBaseUrl: (url) => set({ apiBaseUrl: url }),
+  setApiBaseUrl: (url) => {
+    set({ apiBaseUrl: url });
+    api.setBaseUrl(url);
+  },
   setCronPassword: (password) => set({ cronPassword: password }),
   setM3uUrl: (url) => set({ m3uUrl: url }),
   setRemoteInputEnabled: (enabled) => set({ remoteInputEnabled: enabled }),
@@ -112,21 +120,23 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const currentSettings = await SettingsManager.get();
     const currentApiBaseUrl = currentSettings.apiBaseUrl;
     let processedApiBaseUrl = apiBaseUrl.trim();
-    if (processedApiBaseUrl.endsWith("/")) {
-      processedApiBaseUrl = processedApiBaseUrl.slice(0, -1);
-    }
+    if (processedApiBaseUrl) {
+      if (processedApiBaseUrl.endsWith("/")) {
+        processedApiBaseUrl = processedApiBaseUrl.slice(0, -1);
+      }
 
-    if (!/^https?:\/\//i.test(processedApiBaseUrl)) {
-      const hostPart = processedApiBaseUrl.split("/")[0];
-      // Simple check for IP address format.
-      const isIpAddress = /^((\d{1,3}\.){3}\d{1,3})(:\d+)?$/.test(hostPart);
-      // Check if the domain includes a port.
-      const hasPort = /:\d+/.test(hostPart);
+      if (!/^https?:\/\//i.test(processedApiBaseUrl)) {
+        const hostPart = processedApiBaseUrl.split("/")[0];
+        // Simple check for IP address format.
+        const isIpAddress = /^((\d{1,3}\.){3}\d{1,3})(:\d+)?$/.test(hostPart);
+        // Check if the domain includes a port.
+        const hasPort = /:\d+/.test(hostPart);
 
-      if (isIpAddress || hasPort) {
-        processedApiBaseUrl = "http://" + processedApiBaseUrl;
-      } else {
-        processedApiBaseUrl = "https://" + processedApiBaseUrl;
+        if (isIpAddress || hasPort) {
+          processedApiBaseUrl = "http://" + processedApiBaseUrl;
+        } else {
+          processedApiBaseUrl = "https://" + processedApiBaseUrl;
+        }
       }
     }
 

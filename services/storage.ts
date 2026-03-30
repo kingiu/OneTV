@@ -394,7 +394,7 @@ export class SearchHistoryManager {
 export class SettingsManager {
   static async get(): Promise<AppSettings> {
     const defaultSettings: AppSettings = {
-      apiBaseUrl: "",
+      apiBaseUrl: "https://onetv.aisxuexi.com",
       cronPassword: "cron_secure_password",
       vodProxyEnabled: true,
       remoteInputEnabled: true,

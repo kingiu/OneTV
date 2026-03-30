@@ -7,7 +7,9 @@ import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag('DetailStore');
 
-export type SearchResultWithResolution = SearchResult & { resolution?: string | null };
+import { PlaySource } from "@/services/api";
+
+export type SearchResultWithResolution = SearchResult & { resolution?: string | null; play_sources?: PlaySource[] };
 
 interface DetailState {
   q: string | null;
@@ -84,6 +86,9 @@ const useDetailStore = create<DetailState>((set, get) => ({
           }
           const m3u8End = performance.now();
           logger.info(`[PERF] M3U8 resolution for ${searchResult.source_name}: ${(m3u8End - m3u8Start).toFixed(2)}ms (${resolution || 'failed'})`);
+          logger.info(`[DEBUG] Play sources for ${searchResult.source_name}: ${searchResult.play_sources?.length || 0}`);
+          logger.info(`[DEBUG] vod_play_from: ${searchResult.vod_play_from}`);
+          logger.info(`[DEBUG] vod_play_url: ${searchResult.vod_play_url}`);
           return { ...searchResult, resolution };
         })
       );
@@ -125,6 +130,14 @@ const useDetailStore = create<DetailState>((set, get) => ({
         } catch (error) {
           preferredSearchError = error;
           logger.error(`[ERROR] API searchVideo (preferred) FAILED - source: ${preferredSource}, error:`, error);
+          // 检查是否是API_URL_NOT_SET错误
+          if ((error as Error).message === "API_URL_NOT_SET") {
+            set({ 
+              error: "API地址未设置，请在设置中配置API地址",
+              loading: false 
+            });
+            return;
+          }
         }
         
         const searchPreferredEnd = performance.now();
@@ -170,10 +183,18 @@ const useDetailStore = create<DetailState>((set, get) => ({
             }
           } catch (fallbackError) {
             logger.error(`[ERROR] FALLBACK search FAILED:`, fallbackError);
-            set({ 
-              error: `搜索失败：${fallbackError instanceof Error ? fallbackError.message : '网络错误，请稍后重试'}`,
-              loading: false 
-            });
+            // 检查是否是API_URL_NOT_SET错误
+            if ((fallbackError as Error).message === "API_URL_NOT_SET") {
+              set({ 
+                error: "API地址未设置，请在设置中配置API地址",
+                loading: false 
+              });
+            } else {
+              set({ 
+                error: `搜索失败：${fallbackError instanceof Error ? fallbackError.message : '网络错误，请稍后重试'}`,
+                loading: false 
+              });
+            }
           }
         }
         

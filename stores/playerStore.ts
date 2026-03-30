@@ -47,6 +47,7 @@ interface Episode {
 interface PlayerState {
   videoRef: RefObject<Video> | null;
   currentEpisodeIndex: number;
+  currentPlaySourceIndex: number;
   episodes: Episode[];
   status: AVPlaybackStatus | null;
   isLoading: boolean;
@@ -92,12 +93,14 @@ interface PlayerState {
   // Internal helper
   _savePlayRecord: (updates?: Partial<PlayRecord>, options?: { immediate?: boolean }) => void;
   handleVideoError: (errorType: "ssl" | "network" | "other", failedUrl: string) => Promise<void>;
+  onLineChange: (lineIndex: number) => void;
 }
 
 const usePlayerStore = create<PlayerState>((set, get) => ({
   videoRef: null,
   episodes: [],
   currentEpisodeIndex: -1,
+  currentPlaySourceIndex: 0,
   status: null,
   isLoading: true,
   showControls: false,
@@ -267,14 +270,17 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       );
 
       set({
-        isLoading: false,
-        currentEpisodeIndex: episodeIndex,
-        initialPosition: position || initialPositionFromRecord,
-        playbackRate: savedPlaybackRate,
-        episodes: mappedEpisodes,
-        introEndTime: playRecord?.introEndTime || playerSettings?.introEndTime,
-        outroStartTime: playRecord?.outroStartTime || playerSettings?.outroStartTime,
-      });
+      isLoading: false,
+      currentEpisodeIndex: episodeIndex,
+      currentPlaySourceIndex: 0,
+      initialPosition: position || initialPositionFromRecord,
+      playbackRate: savedPlaybackRate,
+      episodes: mappedEpisodes,
+      introEndTime: playRecord?.introEndTime || playerSettings?.introEndTime,
+      outroStartTime: playRecord?.outroStartTime || playerSettings?.outroStartTime,
+    });
+    
+    logger.info(`[DEBUG] Loaded video with play_sources: ${detail.play_sources?.length || 0}`);
 
       const perfEnd = performance.now();
       logger.info(`[PERF] PlayerStore.loadVideo COMPLETE - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
@@ -681,6 +687,36 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     } catch (error) {
       logger.error(`[VIDEO_ERROR] Failed to switch to fallback source:`, error);
       set({ isLoading: false });
+    }
+  },
+
+  onLineChange: (lineIndex: number) => {
+    const detail = useDetailStore.getState().detail;
+    if (!detail || !detail.play_sources || !detail.play_sources[lineIndex]) {
+      logger.warn(`[LINE_CHANGE] Invalid line index or no play sources available`);
+      return;
+    }
+
+    const selectedSource = detail.play_sources[lineIndex];
+    const { currentEpisodeIndex } = get();
+
+    if (selectedSource.episodes && selectedSource.episodes.length > currentEpisodeIndex) {
+      const mappedEpisodes = mapEpisodesForPlayback(selectedSource.episodes, detail.source);
+
+      set({
+        episodes: mappedEpisodes,
+        currentPlaySourceIndex: lineIndex,
+      });
+
+      logger.info(`[LINE_CHANGE] Switched to line ${lineIndex + 1}: ${selectedSource.name}`);
+
+      Toast.show({
+        type: "success",
+        text1: "已切换线路",
+        text2: `正在使用 ${selectedSource.name}`,
+      });
+    } else {
+      logger.error(`[LINE_CHANGE] Selected line doesn't have episode ${currentEpisodeIndex + 1}`);
     }
   },
 }));

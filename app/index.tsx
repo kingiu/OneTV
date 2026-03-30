@@ -6,7 +6,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { api } from "@/services/api";
 import VideoCard from "@/components/VideoCard";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Search, Settings, LogOut, Heart } from "lucide-react-native";
+import { Search, Settings, LogOut, Heart, CreditCard } from "lucide-react-native";
 import { StyledButton } from "@/components/StyledButton";
 import useHomeStore, { RowItem, Category } from "@/stores/homeStore";
 import useAuthStore from "@/stores/authStore";
@@ -221,9 +221,14 @@ export default function HomeScreen() {
             <Settings color={colorScheme === "dark" ? "white" : "black"} size={24} />
           </StyledButton>
           {isLoggedIn && (
-            <StyledButton style={dynamicStyles.iconButton} onPress={logout} variant="ghost">
-              <LogOut color={colorScheme === "dark" ? "white" : "black"} size={24} />
-            </StyledButton>
+            <>
+              <StyledButton style={dynamicStyles.iconButton} onPress={() => router.push("/card-membership")} variant="ghost">
+                <CreditCard color={colorScheme === "dark" ? "white" : "black"} size={24} />
+              </StyledButton>
+              <StyledButton style={dynamicStyles.iconButton} onPress={logout} variant="ghost">
+                <LogOut color={colorScheme === "dark" ? "white" : "black"} size={24} />
+              </StyledButton>
+            </>
           )}
         </View>
       </View>

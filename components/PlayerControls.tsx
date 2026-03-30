@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import { Pause, Play, SkipForward, List, Tv, ArrowDownToDot, ArrowUpFromDot, Gauge } from "lucide-react-native";
+import { Pause, Play, SkipForward, List, Tv, ArrowDownToDot, ArrowUpFromDot, Gauge, Network } from "lucide-react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { MediaButton } from "@/components/MediaButton";
 
@@ -33,6 +33,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
     refreshEpisodeUrls,
     introEndTime,
     outroStartTime,
+    currentPlaySourceIndex,
   } = usePlayerStore();
 
   const { detail } = useDetailStore();
@@ -45,6 +46,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   const currentSource = resources.find((r) => r.source === detail?.source);
   const currentSourceName = currentSource?.source_name;
   const hasNextEpisode = currentEpisodeIndex < (episodes.length || 0) - 1;
+  const playSources = detail?.play_sources || [];
+  const currentLineName = playSources.length > 0 ? `线路${currentPlaySourceIndex + 1}` : "";
+  
+  // 调试日志
+  console.log('Detail:', detail);
+  console.log('Play sources:', playSources);
+  console.log('Play sources length:', playSources.length);
+  console.log('Current line name:', currentLineName);
 
   const formatTime = (milliseconds: number) => {
     if (!milliseconds) return "00:00";
@@ -65,12 +74,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
     refreshEpisodeUrls();
   };
 
+  const onShowLines = () => {
+    setShowEpisodeModal(true);
+  };
+
   return (
     <View style={styles.controlsOverlay}>
       <View style={styles.topControls}>
         <Text style={styles.controlTitle}>
           {videoTitle} {currentEpisodeTitle ? `- ${currentEpisodeTitle}` : ""}{" "}
-          {currentSourceName ? `(${currentSourceName})` : ""}
+          {currentSourceName ? `(${currentSourceName})` : ""} {currentLineName ? `[${currentLineName}]` : ""}
         </Text>
       </View>
 
@@ -122,6 +135,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
           <MediaButton onPress={() => setShowSpeedModal(true)} timeLabel={playbackRate !== 1.0 ? `${playbackRate}x` : undefined}>
             <Gauge color="white" size={24} />
           </MediaButton>
+
+          {playSources.length > 1 && (
+            <MediaButton onPress={onShowLines} timeLabel={currentLineName}>
+              <Network color="white" size={24} />
+            </MediaButton>
+          )}
 
           <MediaButton onPress={onToggleVodAdBlock} isSelected={vodAdBlockEnabled}>
             <View style={[styles.adBlockIcon, vodAdBlockEnabled ? styles.adBlockIconEnabled : styles.adBlockIconDisabled]}>
