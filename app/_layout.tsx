@@ -122,7 +122,6 @@ export default function RootLayout() {
             <Stack.Screen name="live" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
             <Stack.Screen name="favorites" options={{ headerShown: false }} />
-            <Stack.Screen name="card-membership" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
           </Stack>
         </View>

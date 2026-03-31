@@ -31,25 +31,7 @@ export class ValidationError extends Error {
   }
 }
 
-export class CouponError extends Error {
-  constructor(
-    message: string,
-    public code?: string
-  ) {
-    super(message);
-    this.name = 'CouponError';
-  }
-}
 
-export class MembershipError extends Error {
-  constructor(
-    message: string,
-    public code?: string
-  ) {
-    super(message);
-    this.name = 'MembershipError';
-  }
-}
 
 export function handleAPIError(error: unknown): Error {
   if (error instanceof APIError) {
@@ -67,13 +49,7 @@ export function handleAPIError(error: unknown): Error {
       return new AuthenticationError();
     }
     
-    if (message.indexOf('卡券') !== -1 || message.indexOf('coupon') !== -1) {
-      return new CouponError(error.message);
-    }
-    
-    if (message.indexOf('会员') !== -1 || message.indexOf('membership') !== -1) {
-      return new MembershipError(error.message);
-    }
+
     
     return error;
   }
@@ -93,13 +69,7 @@ export function getErrorCode(error: unknown): string | undefined {
     return handledError.code;
   }
   
-  if (handledError instanceof CouponError) {
-    return handledError.code;
-  }
-  
-  if (handledError instanceof MembershipError) {
-    return handledError.code;
-  }
+
   
   return undefined;
 }
@@ -112,13 +82,7 @@ export function isAuthError(error: unknown): boolean {
   return handleAPIError(error) instanceof AuthenticationError;
 }
 
-export function isCouponError(error: unknown): boolean {
-  return handleAPIError(error) instanceof CouponError;
-}
 
-export function isMembershipError(error: unknown): boolean {
-  return handleAPIError(error) instanceof MembershipError;
-}
 
 export function shouldRetry(error: unknown): boolean {
   const handledError = handleAPIError(error);
