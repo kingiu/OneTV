@@ -2,6 +2,7 @@ import { create } from "zustand";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "@/services/api";
 import { useSettingsStore } from "./settingsStore";
+import useMembershipStore from "./membershipStore";
 import Logger from "@/utils/Logger";
 import { LoginCredentialsManager } from "@/services/storage";
 
@@ -36,15 +37,27 @@ const tryAutoLogin = async (storageType: string | undefined): Promise<boolean> =
   const savedCredentials = await LoginCredentialsManager.get();
 
   if (isLocalStorage) {
-    const loginResult = await api.login(undefined, savedCredentials?.password).catch(() => null);
-    return !!loginResult?.ok;
-  }
+      const loginResult = await api.login(undefined, savedCredentials?.password).catch(() => null);
+      if (loginResult?.ok) {
+        // 登录成功后获取会员信息和卡券列表
+        const membershipStore = useMembershipStore.getState();
+        membershipStore.fetchMembershipInfo();
+        membershipStore.fetchUserCoupons();
+      }
+      return !!loginResult?.ok;
+    }
 
   if (!savedCredentials?.username || !savedCredentials?.password) {
     return false;
   }
 
   const loginResult = await api.login(savedCredentials.username, savedCredentials.password).catch(() => null);
+  if (loginResult?.ok) {
+    // 登录成功后获取会员信息和卡券列表
+    const membershipStore = useMembershipStore.getState();
+    membershipStore.fetchMembershipInfo();
+    membershipStore.fetchUserCoupons();
+  }
   return !!loginResult?.ok;
 };
 
@@ -90,6 +103,10 @@ const useAuthStore = create<AuthState>((set) => ({
         const isSessionValid = await validateSession();
         if (isSessionValid) {
           set({ isLoggedIn: true, isLoginModalVisible: false });
+          // 登录成功后获取会员信息和卡券列表
+          const membershipStore = useMembershipStore.getState();
+          membershipStore.fetchMembershipInfo();
+          membershipStore.fetchUserCoupons();
           return;
         }
 
@@ -130,6 +147,9 @@ const useAuthStore = create<AuthState>((set) => ({
     try {
       await api.logout();
       set({ isLoggedIn: false, isLoginModalVisible: true });
+      // 登出时重置会员和卡券状态
+      const membershipStore = useMembershipStore.getState();
+      membershipStore.clearErrors();
     } catch (error) {
       logger.error("Failed to logout:", error);
     }

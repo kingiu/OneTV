@@ -1,128 +1,316 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // region: --- Interface Definitions ---
-export interface DoubanItem {
-  title: string;
-  poster: string;
-  rate?: string;
+
+// 会员相关类型
+export interface MembershipTier {
+  id?: string;
+  name: string;
+  displayName: string;
+  price: number;
+  description?: string;
+  features: string[];
+  durationDays?: number;
+  priority?: number;
+  permissions?: string[];
+  isDefault?: boolean;
+  userGroup?: string;
 }
 
-export interface DoubanResponse {
-  code: number;
+export interface UserMembership {
+  tierId: string;
+  startDate: number;
+  endDate: number;
+  status: 'active' | 'expired' | 'pending';
+  autoRenew: boolean;
+  source?: 'manual' | 'coupon' | 'system';
+  renewInfo?: {
+    enabled: boolean;
+    renewalTierId: string;
+    nextRenewalDate: number;
+  } | null;
+  lastUpdated?: number;
+  activationHistory?: Array<{
+    tierId: string;
+    startDate: number;
+    durationDays: number;
+    source: 'manual' | 'coupon' | 'system';
+    transactionId: string;
+  }>;
+}
+
+export interface MembershipConfig {
+  tiers: MembershipTier[];
+  defaultTierId?: string;
+  enableMembershipSystem?: boolean;
+  lastUpdated?: number;
+  defaultDurationDays?: number;
+}
+
+export interface MembershipResponse {
+  membership: UserMembership;
+  config: MembershipConfig;
+}
+
+// 卡券相关类型
+export interface Coupon {
+  code: string;
+  batchId: string;
+  type: string;
+  tier: string;
+  durationDays: number;
+  status: 'active' | 'used' | 'expired' | 'invalid';
+  createdAt: number;
+  redeemedAt?: number;
+  redeemedBy?: string;
+  expireTime: number;
+  expireDate?: number;
+  expireTimeStr?: string;
+  usedAt?: number;
+  usedBy?: string;
+  createDate?: number;
+  isExpired?: boolean;
+}
+
+export interface CouponBatch {
+  id: string;
+  name: string;
+  type: string;
+  tier: string;
+  durationDays: number;
+  quantity: number;
+  prefix: string;
+  status: 'active' | 'inactive';
+  createdAt: number;
+  expiredAt?: number;
+  startAt?: number;
+  endAt?: number;
+  totalRedeemed: number;
+  totalCreated: number;
+  createdBy?: string;
+  description?: string;
+}
+
+export interface RedeemResult {
+  success: boolean;
   message: string;
-  list: DoubanItem[];
+  data?: {
+    membership: UserMembership;
+    config: MembershipConfig;
+  };
+  error?: string;
 }
 
-export interface VideoDetail {
+// 直播源相关类型
+export interface LiveApiResponse<T> {
+  code: number;
+  data: T;
+  message: string;
+  total?: number;
+}
+
+export interface LiveSource {
+  id: string;
+  name: string;
+  url: string;
+  logo: string;
+  group: string;
+  delay?: number;
+  filter?: string;
+  sort?: number;
+  isOk?: boolean;
+  lastCheck?: number;
+}
+
+// 搜索相关类型
+export interface SearchResult {
   id: string;
   title: string;
-  poster: string;
-  source: string;
-  source_name: string;
-  desc?: string;
-  type?: string;
-  year?: string;
-  area?: string;
-  director?: string;
-  actor?: string;
-  remarks?: string;
-}
-
-export interface PlaySource {
-  name: string;
-  episodes: string[];
-  episodes_titles: string[];
-}
-
-export interface SearchResult {
-  id: number;
-  title: string;
-  poster: string;
-  episodes: string[];
-  episodes_titles: string[];
-  source: string;
-  source_name: string;
-  class?: string;
-  year: string;
-  desc?: string;
-  type_name?: string;
-  play_sources?: PlaySource[];
+  type: string;
+  cover: string;
+  rating?: number;
+  year?: number;
+  doubanId?: string;
+  imdbId?: string;
+  tmdbId?: string;
+  overview?: string;
+  genres?: string[];
+  tags?: string[];
+  actors?: string[];
+  directors?: string[];
+  countries?: string[];
+  languages?: string[];
+  releaseDate?: string;
+  runtime?: number;
+  status?: string;
+  network?: string;
+  seasons?: number;
+  episodes?: string[];
+  episodes_titles?: string[];
+  play_sources?: Array<{
+    name: string;
+    episodes: string[];
+    episodes_titles: string[];
+  }>;
   vod_play_from?: string;
   vod_play_url?: string;
 }
 
-export interface Favorite {
-  cover: string;
-  title: string;
-  source_name: string;
-  total_episodes: number;
-  search_title: string;
-  year: string;
-  save_time?: number;
-}
-
-export interface PlayRecord {
-  title: string;
-  source_name: string;
-  cover: string;
-  index: number;
-  total_episodes: number;
-  play_time: number;
-  total_time: number;
-  save_time: number;
-  year: string;
-}
-
-export interface ApiSite {
-  key: string;
-  api: string;
-  name: string;
-  detail?: string;
-}
-
-export interface ServerConfig {
-  SiteName: string;
-  StorageType: "localstorage" | "redis" | string;
-}
-
-export interface LiveSource {
-  key: string;
-  name: string;
-  url: string;
-  epg?: string;
-  ua?: string;
-  disabled?: boolean;
-}
-
-export interface LiveChannel {
+// 视频详情相关类型
+export interface VideoDetail {
   id: string;
-  tvgId: string;
+  title: string;
+  type: string;
+  cover: string;
+  rating?: number;
+  year?: number;
+  doubanId?: string;
+  imdbId?: string;
+  tmdbId?: string;
+  overview?: string;
+  genres?: string[];
+  tags?: string[];
+  actors?: string[];
+  directors?: string[];
+  countries?: string[];
+  languages?: string[];
+  releaseDate?: string;
+  runtime?: number;
+  status?: string;
+  network?: string;
+  seasons?: number;
+  episodes?: string[];
+  episodes_titles?: string[];
+  play_sources?: Array<{
+    name: string;
+    episodes: string[];
+    episodes_titles: string[];
+  }>;
+  vod_play_from?: string;
+  vod_play_url?: string;
+}
+
+// 搜索资源相关类型
+export interface ApiSite {
+  id: string;
   name: string;
-  logo: string;
-  group: string;
-  url: string;
+  key: string;
+  type: string;
+  api: string;
+  search: string;
+  quickSearch?: string;
+  categories?: Array<{
+    key: string;
+    name: string;
+  }>;
+  filters?: Array<{
+    key: string;
+    name: string;
+    values: Array<{
+      key: string;
+      name: string;
+    }>;
+  }>;
+  weight: number;
+  enabled: boolean;
+  searchable: boolean;
+  quickSearchable: boolean;
+  lang: string;
 }
 
-export interface LiveEpgProgram {
-  title?: string;
-  start?: string;
-  end?: string;
-  [key: string]: unknown;
+// 豆瓣相关类型
+export interface DoubanResponse {
+  items: Array<{
+    id: string;
+    title: string;
+    cover: string;
+    rating: number;
+    year: number;
+    type: string;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 }
 
-interface LiveApiResponse<T> {
-  success: boolean;
-  data: T;
+// 播放记录相关类型
+export interface PlayRecord {
+  key: string;
+  title: string;
+  cover: string;
+  currentTime: number;
+  totalTime: number;
+  lastPlayed: number;
+  save_time: number;
 }
 
-export interface ApiResponse<T = any> {
-  success: boolean;
-  message: string;
-  data?: T;
+// 收藏相关类型
+export interface Favorite {
+  key: string;
+  title: string;
+  cover: string;
+  type: string;
+  save_time: number;
 }
 
-export class API {
-  public baseURL: string = "";
+// 服务器配置相关类型
+export interface ServerConfig {
+  Version: string;
+  StorageType: string;
+  AuthConfig: {
+    Enable: boolean;
+    Password: string;
+  };
+  SiteConfig: {
+    Name: string;
+    Logo: string;
+    Favicon: string;
+  };
+  UserConfig: {
+    Enable: boolean;
+    Users: Array<{
+      username: string;
+      password: string;
+      role: 'admin' | 'user';
+      group: string;
+      expiredAt: number;
+      createdAt: number;
+      updatedAt: number;
+      banned: boolean;
+    }>;
+  };
+  ApiConfig: {
+    EnableSearch: boolean;
+    EnableLive: boolean;
+    EnableDouban: boolean;
+    EnableMembership: boolean;
+    EnableCoupon: boolean;
+    EnablePlayRecord: boolean;
+    EnableFavorite: boolean;
+    EnableSearchHistory: boolean;
+  };
+  MembershipConfig: {
+    Enable: boolean;
+    Tiers: Array<{
+      id: string;
+      name: string;
+      displayName: string;
+      price: number;
+      description: string;
+      features: string[];
+      durationDays: number;
+      priority: number;
+      permissions: string[];
+    }>;
+  };
+}
+
+// endregion
+
+// 主API类
+export class Api {
+  private baseURL: string;
 
   constructor(baseURL?: string) {
     if (baseURL) {
@@ -161,9 +349,12 @@ export class API {
       console.log('Response status:', response.status);
       console.log('Response headers:', response.headers);
 
-      const latestCookies = response.headers.get("Set-Cookie");
-      if (latestCookies) {
-        await AsyncStorage.setItem("authCookies", latestCookies);
+      // 处理 Set-Cookie 头 - 兼容 React Native
+      const setCookie = response.headers.get('Set-Cookie');
+      if (setCookie) {
+        // 提取 cookie 的名称和值部分（不包含 Path、Expires 等属性）
+        const cookieString = setCookie.split('; ')[0];
+        await AsyncStorage.setItem("authCookies", cookieString);
       }
 
       if (response.status === 401) {
@@ -176,23 +367,9 @@ export class API {
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText.substring(0, 200)}`);
       }
 
-      // 检查响应内容类型，跳过cron请求的检查
-      if (!url.includes("/api/cron/")) {
-        const contentType = response.headers.get("content-type");
-        console.log('Response content type:', contentType);
-        if (contentType && !contentType.includes("application/json")) {
-          const errorText = await response.text();
-          console.log('Response body:', errorText.substring(0, 500));
-          throw new Error(`Invalid content type: ${contentType}, body: ${errorText.substring(0, 200)}`);
-        }
-      }
-
       return response;
     } catch (error) {
-      console.log('Fetch error:', error);
-      if (error instanceof Error) {
-        throw error;
-      }
+      console.error('Fetch error:', error);
       throw error;
     }
   }
@@ -226,102 +403,8 @@ export class API {
     return payload.data || [];
   }
 
-  async getLiveChannels(source: string): Promise<LiveChannel[]> {
-    const response = await this._fetch(`/api/live/channels?source=${encodeURIComponent(source)}`);
-    const payload: LiveApiResponse<LiveChannel[]> = await response.json();
-    return payload.data || [];
-  }
-
-  async getLiveEpg(source: string, tvgId: string): Promise<LiveEpgProgram[]> {
-    const response = await this._fetch(
-      `/api/live/epg?source=${encodeURIComponent(source)}&tvgId=${encodeURIComponent(tvgId)}`,
-    );
-    const payload: LiveApiResponse<{ programs?: LiveEpgProgram[] }> = await response.json();
-    return payload.data?.programs || [];
-  }
-
-  async triggerCron(password: string = "cron_secure_password"): Promise<boolean> {
-    const response = await this._fetch(`/api/cron/${encodeURIComponent(password)}`, {
-      headers: {
-        "Accept": "*/*"
-      }
-    });
-    return response.ok;
-  }
-
-  async getFavorites(key?: string): Promise<Record<string, Favorite> | Favorite | null> {
-    const url = key ? `/api/favorites?key=${encodeURIComponent(key)}` : "/api/favorites";
-    const response = await this._fetch(url);
-    return response.json();
-  }
-
-  async addFavorite(key: string, favorite: Omit<Favorite, "save_time">): Promise<{ success: boolean }> {
-    const response = await this._fetch("/api/favorites", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, favorite }),
-    });
-    return response.json();
-  }
-
-  async deleteFavorite(key?: string): Promise<{ success: boolean }> {
-    const url = key ? `/api/favorites?key=${encodeURIComponent(key)}` : "/api/favorites";
-    const response = await this._fetch(url, { method: "DELETE" });
-    return response.json();
-  }
-
-  async getPlayRecords(): Promise<Record<string, PlayRecord>> {
-    const response = await this._fetch("/api/playrecords");
-    return response.json();
-  }
-
-  async savePlayRecord(key: string, record: Omit<PlayRecord, "save_time">): Promise<{ success: boolean }> {
-    const response = await this._fetch("/api/playrecords", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, record }),
-    });
-    return response.json();
-  }
-
-  async deletePlayRecord(key?: string): Promise<{ success: boolean }> {
-    const url = key ? `/api/playrecords?key=${encodeURIComponent(key)}` : "/api/playrecords";
-    const response = await this._fetch(url, { method: "DELETE" });
-    return response.json();
-  }
-
-  async getSearchHistory(): Promise<string[]> {
-    const response = await this._fetch("/api/searchhistory");
-    return response.json();
-  }
-
-  async addSearchHistory(keyword: string): Promise<string[]> {
-    const response = await this._fetch("/api/searchhistory", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keyword }),
-    });
-    return response.json();
-  }
-
-  async deleteSearchHistory(keyword?: string): Promise<{ success: boolean }> {
-    const url = keyword ? `/api/searchhistory?keyword=${keyword}` : "/api/searchhistory";
-    const response = await this._fetch(url, { method: "DELETE" });
-    return response.json();
-  }
-
-  getImageProxyUrl(imageUrl: string): string {
-    return `${this.baseURL}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
-  }
-
-  async getDoubanData(
-    type: "movie" | "tv",
-    tag: string,
-    pageSize: number = 16,
-    pageStart: number = 0,
-  ): Promise<DoubanResponse> {
-    const url = `/api/douban?type=${type}&tag=${encodeURIComponent(tag)}&pageSize=${pageSize}&pageStart=${pageStart}`;
-    const response = await this._fetch(url);
+  async getLiveCategories(): Promise<Array<{ name: string; key: string }>> {
+    const response = await this._fetch("/api/live/categories");
     return response.json();
   }
 
@@ -447,8 +530,122 @@ export class API {
     return response.json();
   }
 
+  // 会员相关方法
+  async getMembershipConfig(): Promise<MembershipConfig> {
+    const response = await this._fetch("/api/membership?action=getConfig");
+    const data = await response.json();
+    return data.config;
+  }
 
+  async getMembershipInfo(): Promise<MembershipResponse> {
+    const response = await this._fetch("/api/membership");
+    const data = await response.json();
+    return data.data;
+  }
+
+  // 卡券相关方法
+  async getUserCoupons(): Promise<Coupon[]> {
+    const response = await this._fetch("/api/card/user");
+    const data = await response.json();
+    return data.data;
+  }
+
+  async redeemCard(code: string): Promise<RedeemResult> {
+    const response = await this._fetch("/api/card/redeem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    return response.json();
+  }
+
+  // 播放记录相关方法
+  async getPlayRecords(): Promise<Record<string, PlayRecord>> {
+    const response = await this._fetch("/api/playrecords");
+    return response.json();
+  }
+
+  async savePlayRecord(key: string, record: Omit<PlayRecord, "save_time">): Promise<{ success: boolean }> {
+    const response = await this._fetch("/api/playrecords", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, record }),
+    });
+    return response.json();
+  }
+
+  async deletePlayRecord(key?: string): Promise<{ success: boolean }> {
+    const url = key ? `/api/playrecords?key=${encodeURIComponent(key)}` : "/api/playrecords";
+    const response = await this._fetch(url, { method: "DELETE" });
+    return response.json();
+  }
+
+  // 收藏相关方法
+  async getFavorites(): Promise<Favorite[]> {
+    const response = await this._fetch("/api/favorites");
+    return response.json();
+  }
+
+  async addFavorite(key: string, favorite: Omit<Favorite, "save_time">): Promise<{ success: boolean }> {
+    const response = await this._fetch("/api/favorites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, favorite }),
+    });
+    return response.json();
+  }
+
+  async deleteFavorite(key?: string): Promise<{ success: boolean }> {
+    const url = key ? `/api/favorites?key=${encodeURIComponent(key)}` : "/api/favorites";
+    const response = await this._fetch(url, { method: "DELETE" });
+    return response.json();
+  }
+
+  // 搜索历史相关方法
+  async getSearchHistory(): Promise<string[]> {
+    const response = await this._fetch("/api/searchhistory");
+    return response.json();
+  }
+
+  async addSearchHistory(keyword: string): Promise<string[]> {
+    const response = await this._fetch("/api/searchhistory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword }),
+    });
+    return response.json();
+  }
+
+  async deleteSearchHistory(keyword?: string): Promise<{ success: boolean }> {
+    const url = keyword ? `/api/searchhistory?keyword=${keyword}` : "/api/searchhistory";
+    const response = await this._fetch(url, { method: "DELETE" });
+    return response.json();
+  }
+
+  getImageProxyUrl(imageUrl: string): string {
+    return `${this.baseURL}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`;
+  }
+
+  async getDoubanData(
+    type: "movie" | "tv",
+    tag: string,
+    pageSize: number = 16,
+    pageStart: number = 0,
+  ): Promise<DoubanResponse> {
+    const url = `/api/douban?type=${type}&tag=${encodeURIComponent(tag)}&pageSize=${pageSize}&pageStart=${pageStart}`;
+    const response = await this._fetch(url);
+    return response.json();
+  }
+
+  async triggerCron(password: string): Promise<{ success: boolean }> {
+    const response = await this._fetch("/api/cron", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    return response.json();
+  }
 }
 
-// 默认实例
-export let api = new API();
+// 导出单例
+export const api = new Api();

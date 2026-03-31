@@ -58,12 +58,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   loadSettings: async () => {
       const settings = await SettingsManager.get();
       console.log('Loaded settings:', settings);
-      // 只在 API base URL 为空时才设置，避免覆盖用户配置
-      if (settings.apiBaseUrl) {
-        api.setBaseUrl(settings.apiBaseUrl);
-      }
+      
+      // 无论如何都先尝试使用存储的 URL
+      let apiUrl = settings.apiBaseUrl || "https://onetv.aisxuexi.com";
+      api.setBaseUrl(apiUrl);
+      
       set({
-        apiBaseUrl: settings.apiBaseUrl || '',
+        apiBaseUrl: apiUrl,
         cronPassword: settings.cronPassword || DEFAULT_CRON_PASSWORD,
         m3uUrl: settings.m3uUrl,
         remoteInputEnabled: settings.remoteInputEnabled || false,
@@ -75,9 +76,24 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           sources: {},
         },
       });
-      // 只有在 API base URL 存在时才获取服务器配置
-      if (settings.apiBaseUrl) {
+      
+      // 尝试获取服务器配置
+      try {
         await get().fetchServerConfig();
+      } catch (error) {
+        logger.error("Failed to fetch server config with stored URL, falling back to default:", error);
+        // 切换到默认 URL 并尝试获取配置
+        const defaultUrl = "https://onetv.aisxuexi.com";
+        api.setBaseUrl(defaultUrl);
+        set({ apiBaseUrl: defaultUrl });
+        
+        try {
+          await get().fetchServerConfig();
+          // 如果默认 URL 成功，保存默认 URL 到存储
+          await SettingsManager.save({ apiBaseUrl: defaultUrl });
+        } catch (defaultError) {
+          logger.error("Failed to fetch server config with default URL:", defaultError);
+        }
       }
     },
   fetchServerConfig: async () => {
@@ -87,10 +103,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       if (config) {
         storageConfig.setStorageType(config.StorageType);
         set({ serverConfig: config });
+      } else {
+        throw new Error("Server config is null");
       }
     } catch (error) {
       set({ serverConfig: null });
       logger.error("Failed to fetch server config:", error);
+      throw error; // 重新抛出错误，让调用者知道发生了错误
     } finally {
       set({ isLoadingServerConfig: false });
     }
@@ -156,7 +175,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     api.setBaseUrl(processedApiBaseUrl);
     // Also update the URL in the state so the input field shows the processed URL
     set({ isModalVisible: false, apiBaseUrl: processedApiBaseUrl });
-    await get().fetchServerConfig();
+    // 尝试获取服务器配置，但即使失败也不影响设置保存
+    try {
+      await get().fetchServerConfig();
+    } catch (error) {
+      logger.error("Failed to fetch server config after saving settings:", error);
+      // 不抛出错误，允许设置保存成功
+    }
   },
   showModal: () => set({ isModalVisible: true }),
   hideModal: () => set({ isModalVisible: false }),
