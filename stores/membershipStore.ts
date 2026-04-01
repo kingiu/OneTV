@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api, MembershipResponse, Coupon, RedeemResult } from "@/services/api";
 import Logger from "@/utils/Logger";
+import { LoginCredentialsManager } from "@/services/storage";
 
 const logger = Logger.withTag("MembershipStore");
 
@@ -52,7 +53,16 @@ const useMembershipStore = create<MembershipState>((set, get) => ({
     set({ isLoadingCoupons: true, couponsError: null });
     try {
       const userCoupons = await api.getUserCoupons();
-      set({ userCoupons, isLoadingCoupons: false });
+      // 获取当前登录用户的用户名
+      const savedCredentials = await LoginCredentialsManager.get();
+      const currentUsername = savedCredentials?.username;
+      
+      // 过滤卡券列表，只显示当前登录用户的卡券
+      const filteredCoupons = currentUsername 
+        ? userCoupons.filter(coupon => coupon.usedBy === currentUsername || coupon.redeemedBy === currentUsername)
+        : userCoupons;
+      
+      set({ userCoupons: filteredCoupons, isLoadingCoupons: false });
     } catch (error) {
       logger.error("Failed to fetch user coupons:", error);
       set({ 

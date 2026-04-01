@@ -73,7 +73,13 @@ const CardLoginModal = () => {
           text1: "卡券登录成功",
           text2: result.message 
         });
-        // 卡券登录成功后，设置登录状态为已登录
+        // 卡券登录成功后，保存用户名到LoginCredentialsManager
+        if (result.username) {
+          await import("@/services/storage").then(module => 
+            module.LoginCredentialsManager.save({ username: result.username, password: "" })
+          );
+        }
+        // 设置登录状态为已登录
         setLoginStatus(true);
         setIsModalReady(false);
         Keyboard.dismiss();
