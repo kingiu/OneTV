@@ -82,7 +82,7 @@ export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({
     return pathname.startsWith(route);
   };
 
-  const activeColor = colorScheme === 'dark' ? '#007AFF' : '#007AFF';
+  const activeColor = colorScheme === 'dark' ? '#34C759' : '#34C759';
   const inactiveColor = colorScheme === 'dark' ? '#8E8E93' : '#8E8E93';
   const backgroundColor = colorScheme === 'dark' ? '#1C1C1E' : '#F2F2F7';
 

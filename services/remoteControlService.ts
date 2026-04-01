@@ -16,8 +16,8 @@ const getRemotePageHTML = () => {
       h3 { color: #eee; }
       #container { display: flex; flex-direction: column; align-items: center; width: 90%; max-width: 400px; }
       #text { width: 100%; padding: 15px; font-size: 16px; border-radius: 8px; border: 1px solid #333; background-color: #2a2a2a; color: white; margin-bottom: 20px; box-sizing: border-box; }
-      button { width: 100%; padding: 15px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; background-color: #007AFF; color: white; cursor: pointer; }
-      button:active { background-color: #0056b3; }
+      button { width: 100%; padding: 15px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; background-color: #34C759; color: white; cursor: pointer; }
+      button:active { background-color: #28a745; }
     </style>
   </head>
   <body>

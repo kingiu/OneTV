@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   sectionFocused: {
     borderColor: Colors.dark.primary,
-    backgroundColor: "#007AFF10",
+    backgroundColor: "#34C75910",
   },
   sectionPressable: {
     width: "100%",

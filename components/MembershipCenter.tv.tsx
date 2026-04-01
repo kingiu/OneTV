@@ -175,7 +175,7 @@ const MembershipCenter: React.FC = () => {
     if (isLoadingMembership) {
       return (
         <ThemedView style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={Colors.success} />
           <Text style={[styles.loadingText, { color: textColor }]}>加载会员信息中...</Text>
         </ThemedView>
       );
@@ -293,7 +293,7 @@ const MembershipCenter: React.FC = () => {
           
           {isLoadingCoupons ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={Colors.primary} />
+              <ActivityIndicator size="large" color={Colors.success} />
             </View>
           ) : couponsError ? (
             <Text style={[styles.errorText, { color: textColor }]}>{couponsError}</Text>
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: Colors.success,
     maxWidth: screenWidth * 0.6,
     alignSelf: 'center',
   },
@@ -525,14 +525,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: screenHeight * 0.02,
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: Colors.success,
     backgroundColor: 'rgba(0, 122, 255, 0.05)',
   },
   listSection: {
     padding: screenWidth * 0.03,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: Colors.primary,
+    borderColor: Colors.success,
     backgroundColor: 'rgba(0, 122, 255, 0.05)',
   },
   sectionTitle: {
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
   },
   redeemButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.success,
     padding: screenWidth * 0.025,
     borderRadius: 8,
     alignItems: 'center',
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: screenHeight * 0.02,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: Colors.success,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   couponHeader: {

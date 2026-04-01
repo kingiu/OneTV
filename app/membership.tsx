@@ -79,14 +79,14 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: "#007AFF",
+    borderBottomColor: "#34C759",
   },
   tabText: {
     fontSize: 16,
   },
   activeTabText: {
     fontWeight: "bold",
-    color: "#007AFF",
+    color: "#34C759",
   },
   content: {
     flex: 1,

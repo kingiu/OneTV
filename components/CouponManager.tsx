@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   redeemButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.success,
     padding: 12,
     borderRadius: 4,
     alignItems: "center",
