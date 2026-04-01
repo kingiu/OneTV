@@ -4,10 +4,19 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import MembershipInfo from "@/components/MembershipInfo";
 import CouponManager from "@/components/CouponManager";
+import MembershipCenterTV from "@/components/MembershipCenter.tv";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 const MembershipScreen: React.FC = () => {
+  const { deviceType } = useResponsiveLayout();
   const [activeTab, setActiveTab] = React.useState<"membership" | "coupon">('membership');
 
+  // 电视端使用专门的TV组件
+  if (deviceType === 'tv') {
+    return <MembershipCenterTV />;
+  }
+
+  // 其他设备使用原始布局
   return (
     <View style={styles.container}>
       <ThemedView style={styles.header}>
