@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabButtonActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.success,
   },
   tabButtonFocused: {
     borderWidth: 3,
@@ -439,8 +439,8 @@ const styles = StyleSheet.create({
     padding: screenWidth * 0.03,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: Colors.primary,
-    backgroundColor: 'rgba(0, 122, 255, 0.05)',
+    borderColor: Colors.success,
+    backgroundColor: 'rgba(52, 199, 89, 0.05)',
   },
   membershipTitle: {
     fontSize: screenWidth * 0.03,
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     marginBottom: screenHeight * 0.03,
     paddingBottom: screenHeight * 0.01,
     borderBottomWidth: 2,
-    borderBottomColor: Colors.primary,
+    borderBottomColor: Colors.success,
   },
   tierName: {
     fontSize: screenWidth * 0.035,
