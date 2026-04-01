@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Modal, View, TextInput, StyleSheet, ActivityIndicator, Keyboard } from "react-native";
+import { Modal, View, TextInput, StyleSheet, ActivityIndicator, Keyboard, TouchableOpacity } from "react-native";
 import { usePathname } from "expo-router";
 import Toast from "react-native-toast-message";
 import useAuthStore from "@/stores/authStore";
@@ -10,9 +10,10 @@ import { LoginCredentialsManager } from "@/services/storage";
 import { ThemedView } from "./ThemedView";
 import { ThemedText } from "./ThemedText";
 import { StyledButton } from "./StyledButton";
+import CardLoginModal from "./CardLoginModal";
 
 const LoginModal = () => {
-  const { isLoginModalVisible, hideLoginModal, checkLoginStatus } = useAuthStore();
+  const { isLoginModalVisible, hideLoginModal, checkLoginStatus, loginMode, setLoginMode } = useAuthStore();
   const { serverConfig, apiBaseUrl } = useSettingsStore();
   const { refreshPlayRecords } = useHomeStore();
   const [username, setUsername] = useState("");
@@ -117,52 +118,64 @@ const LoginModal = () => {
   };
 
   return (
-    <Modal
-      transparent={true}
-      visible={isLoginModalVisible && !isSettingsPage}
-      animationType="fade"
-      onRequestClose={hideLoginModal}
-    >
-      <View style={styles.overlay}>
-        <ThemedView style={styles.container}>
-          <ThemedText style={styles.title}>需要登录</ThemedText>
-          <ThemedText style={styles.subtitle}>服务器需要验证您的身份</ThemedText>
-          {serverConfig?.StorageType !== "localstorage" && (
-            <TextInput
-              ref={usernameInputRef}
-              style={styles.input}
-              placeholder="请输入用户名"
-              placeholderTextColor="#888"
-              value={username}
-              onChangeText={setUsername}
-              returnKeyType="next"
-              onSubmitEditing={handleUsernameSubmit}
-              blurOnSubmit={false}
-            />
-          )}
-          <TextInput
-            ref={passwordInputRef}
-            style={styles.input}
-            placeholder="请输入密码"
-            placeholderTextColor="#888"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            returnKeyType="go"
-            onSubmitEditing={handleLogin}
-          />
-          <StyledButton
-            text={isLoading ? "" : "登录"}
-            onPress={handleLogin}
-            disabled={isLoading}
-            style={styles.button}
-            hasTVPreferredFocus={!serverConfig || serverConfig.StorageType === "localstorage"}
-          >
-            {isLoading && <ActivityIndicator color="#fff" />}
-          </StyledButton>
-        </ThemedView>
-      </View>
-    </Modal>
+    <>
+      {loginMode === 'card' ? (
+        <CardLoginModal />
+      ) : (
+        <Modal
+          transparent={true}
+          visible={isLoginModalVisible && !isSettingsPage}
+          animationType="fade"
+          onRequestClose={hideLoginModal}
+        >
+          <View style={styles.overlay}>
+            <ThemedView style={styles.container}>
+              <ThemedText style={styles.title}>密码登录</ThemedText>
+              <ThemedText style={styles.subtitle}>服务器需要验证您的身份</ThemedText>
+              {serverConfig?.StorageType !== "localstorage" && (
+                <TextInput
+                  ref={usernameInputRef}
+                  style={styles.input}
+                  placeholder="请输入用户名"
+                  placeholderTextColor="#888"
+                  value={username}
+                  onChangeText={setUsername}
+                  returnKeyType="next"
+                  onSubmitEditing={handleUsernameSubmit}
+                  blurOnSubmit={false}
+                />
+              )}
+              <TextInput
+                ref={passwordInputRef}
+                style={styles.input}
+                placeholder="请输入密码"
+                placeholderTextColor="#888"
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                returnKeyType="go"
+                onSubmitEditing={handleLogin}
+              />
+              <StyledButton
+                text={isLoading ? "" : "登录"}
+                onPress={handleLogin}
+                disabled={isLoading}
+                style={styles.button}
+                hasTVPreferredFocus={!serverConfig || serverConfig.StorageType === "localstorage"}
+              >
+                {isLoading && <ActivityIndicator color="#fff" />}
+              </StyledButton>
+              <TouchableOpacity
+                style={styles.switchButton}
+                onPress={() => setLoginMode('card')}
+              >
+                <ThemedText style={styles.switchText}>使用卡券登录</ThemedText>
+              </TouchableOpacity>
+            </ThemedView>
+          </View>
+        </Modal>
+      )}
+    </>
   );
 };
 
@@ -206,6 +219,15 @@ const styles = StyleSheet.create({
   button: {
     width: "100%",
     height: 50,
+  },
+  switchButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+  },
+  switchText: {
+    fontSize: 14,
+    color: "#007AFF",
+    textDecorationLine: "underline",
   },
 });
 

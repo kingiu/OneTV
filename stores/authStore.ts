@@ -64,8 +64,11 @@ const tryAutoLogin = async (storageType: string | undefined): Promise<boolean> =
 interface AuthState {
   isLoggedIn: boolean;
   isLoginModalVisible: boolean;
+  loginMode: 'password' | 'card';
   showLoginModal: () => void;
   hideLoginModal: () => void;
+  setLoginMode: (mode: 'password' | 'card') => void;
+  setLoginStatus: (isLoggedIn: boolean) => void;
   checkLoginStatus: (apiBaseUrl?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -73,8 +76,11 @@ interface AuthState {
 const useAuthStore = create<AuthState>((set) => ({
   isLoggedIn: false,
   isLoginModalVisible: false,
+  loginMode: 'card',
   showLoginModal: () => set({ isLoginModalVisible: true }),
   hideLoginModal: () => set({ isLoginModalVisible: false }),
+  setLoginMode: (mode) => set({ loginMode: mode }),
+  setLoginStatus: (isLoggedIn: boolean) => set({ isLoggedIn, isLoginModalVisible: false }),
   checkLoginStatus: async (apiBaseUrl?: string) => {
     if (!apiBaseUrl) {
       set({ isLoggedIn: false, isLoginModalVisible: false });

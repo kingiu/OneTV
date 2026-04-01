@@ -384,6 +384,16 @@ export class Api {
     return response.json();
   }
 
+  async cardLogin(code: string): Promise<{ success: boolean; message: string; username?: string; redeemSuccess?: boolean; redeemMessage?: string; data?: any; cardStatus?: string }> {
+    const response = await this._fetch("/api/login/card", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+
+    return response.json();
+  }
+
   async logout(): Promise<{ ok: boolean }> {
     const response = await this._fetch("/api/logout", {
       method: "POST",
