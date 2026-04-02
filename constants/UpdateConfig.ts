@@ -7,7 +7,7 @@ export const UPDATE_CONFIG = {
 
   // GitHub相关URL
   GITHUB_RAW_URL:
-    `https://ghfast.top/raw.githubusercontent.com/kingiu/OneTV/refs/heads/master/package.json?t=${Date.now()}`,
+    `https://ghfast.top/raw.githubusercontent.com/kingiu/OneTV/main/package.json?t=${Date.now()}`,
 
   // 获取平台特定的下载URL
   getDownloadUrl(version: string): string {
