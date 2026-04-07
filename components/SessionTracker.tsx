@@ -36,7 +36,7 @@ export function SessionTracker() {
               // 清除认证信息
               try {
                 await api.logout();
-                await AsyncStorage.setItem('mytv_login_credentials', '');
+                await AsyncStorage.removeItem('mytv_login_credentials');
               } catch (error) {
                 console.error('注销请求失败:', error);
               }

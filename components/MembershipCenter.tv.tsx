@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from "react-native";
 import useMembershipStore from "@/stores/membershipStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -19,6 +20,13 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// tvOS design constants
+const TVOS_SPACING = screenWidth * 0.04;
+const TVOS_BORDER_RADIUS = 12;
+const TVOS_FOCUS_SCALE = 1.05;
+const TVOS_FOCUS_BORDER_WIDTH = 3;
+const TVOS_FOCUS_ANIMATION_DURATION = 200;
 
 const MembershipCenter: React.FC = () => {
   const { 
@@ -53,7 +61,7 @@ const MembershipCenter: React.FC = () => {
     };
     
     getUsername();
-  }, []);
+  }, [isLoggedIn]);
   
   const [couponCode, setCouponCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -489,34 +497,38 @@ const MembershipCenter: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: screenWidth * 0.03,
+    padding: TVOS_SPACING,
   },
   tabContainer: {
     flexDirection: 'row',
-    marginBottom: screenHeight * 0.02,
-    borderRadius: 10,
+    marginBottom: screenHeight * 0.03,
+    borderRadius: TVOS_BORDER_RADIUS,
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: Colors.success,
-    maxWidth: screenWidth * 0.6,
+    maxWidth: screenWidth * 0.7,
     alignSelf: 'center',
   },
   tabButton: {
     flex: 1,
-    paddingVertical: screenHeight * 0.015,
+    paddingVertical: screenHeight * 0.025,
+    paddingHorizontal: screenWidth * 0.05,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 60,
   },
   tabButtonActive: {
     backgroundColor: Colors.success,
   },
   tabButtonFocused: {
-    borderWidth: 3,
+    borderWidth: TVOS_FOCUS_BORDER_WIDTH,
     borderColor: Colors.success,
+    transform: [{ scale: TVOS_FOCUS_SCALE }],
   },
   tabText: {
-    fontSize: screenWidth * 0.022,
-    fontWeight: '500',
+    fontSize: screenWidth * 0.03,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   tabTextActive: {
     color: '#FFFFFF',
@@ -525,74 +537,80 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: screenHeight * 0.03,
+    paddingBottom: screenHeight * 0.05,
   },
   membershipCard: {
-    padding: screenWidth * 0.03,
-    borderRadius: 16,
+    padding: TVOS_SPACING,
+    borderRadius: TVOS_BORDER_RADIUS,
     borderWidth: 2,
     borderColor: Colors.success,
     backgroundColor: 'rgba(52, 199, 89, 0.05)',
+    marginBottom: screenHeight * 0.03,
   },
   membershipTitle: {
-    fontSize: screenWidth * 0.03,
+    fontSize: screenWidth * 0.04,
     fontWeight: 'bold',
-    marginBottom: screenHeight * 0.02,
+    marginBottom: screenHeight * 0.03,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   membershipHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: screenHeight * 0.03,
-    paddingBottom: screenHeight * 0.01,
+    marginBottom: screenHeight * 0.04,
+    paddingBottom: screenHeight * 0.02,
     borderBottomWidth: 2,
     borderBottomColor: Colors.success,
   },
   tierName: {
-    fontSize: screenWidth * 0.035,
+    fontSize: screenWidth * 0.045,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   statusText: {
-    fontSize: screenWidth * 0.025,
-    fontWeight: '600',
-    paddingHorizontal: screenWidth * 0.015,
-    paddingVertical: screenHeight * 0.008,
-    borderRadius: 8,
+    fontSize: screenWidth * 0.03,
+    fontWeight: '700',
+    paddingHorizontal: screenWidth * 0.03,
+    paddingVertical: screenHeight * 0.015,
+    borderRadius: 10,
     backgroundColor: 'rgba(0, 122, 255, 0.1)',
   },
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: screenHeight * 0.03,
+    marginBottom: screenHeight * 0.04,
   },
   infoItem: {
-    width: '31%',
-    marginBottom: screenHeight * 0.02,
-    padding: screenWidth * 0.02,
-    borderRadius: 8,
+    width: '48%',
+    marginBottom: screenHeight * 0.03,
+    padding: TVOS_SPACING,
+    borderRadius: TVOS_BORDER_RADIUS,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   infoLabel: {
-    fontSize: screenWidth * 0.022,
-    marginBottom: screenHeight * 0.005,
+    fontSize: screenWidth * 0.028,
+    marginBottom: screenHeight * 0.01,
     color: Colors.gray,
+    letterSpacing: 0.3,
   },
   infoValue: {
-    fontSize: screenWidth * 0.025,
+    fontSize: screenWidth * 0.035,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   featuresSection: {
-    marginTop: screenHeight * 0.02,
+    marginTop: screenHeight * 0.03,
   },
   featuresTitle: {
-    fontSize: screenWidth * 0.025,
-    fontWeight: '600',
-    marginBottom: screenHeight * 0.015,
-    paddingBottom: screenHeight * 0.01,
+    fontSize: screenWidth * 0.035,
+    fontWeight: '700',
+    marginBottom: screenHeight * 0.02,
+    paddingBottom: screenHeight * 0.015,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    letterSpacing: 0.5,
   },
   featuresGrid: {
     flexDirection: 'row',
@@ -600,102 +618,113 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   featureItem: {
-    width: '31%',
-    marginBottom: screenHeight * 0.015,
-    padding: screenWidth * 0.02,
-    borderRadius: 6,
+    width: '48%',
+    marginBottom: screenHeight * 0.02,
+    padding: TVOS_SPACING,
+    borderRadius: TVOS_BORDER_RADIUS,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   featureText: {
-    fontSize: screenWidth * 0.022,
+    fontSize: screenWidth * 0.03,
+    letterSpacing: 0.3,
   },
   couponContainer: {
     width: '100%',
   },
   redeemSection: {
-    padding: screenWidth * 0.03,
-    borderRadius: 16,
-    marginBottom: screenHeight * 0.02,
+    padding: TVOS_SPACING,
+    borderRadius: TVOS_BORDER_RADIUS,
+    marginBottom: screenHeight * 0.03,
     borderWidth: 2,
     borderColor: Colors.success,
     backgroundColor: 'rgba(0, 122, 255, 0.05)',
   },
   listSection: {
-    padding: screenWidth * 0.03,
-    borderRadius: 16,
+    padding: TVOS_SPACING,
+    borderRadius: TVOS_BORDER_RADIUS,
     borderWidth: 2,
     borderColor: Colors.success,
     backgroundColor: 'rgba(0, 122, 255, 0.05)',
   },
   sectionTitle: {
-    fontSize: screenWidth * 0.03,
+    fontSize: screenWidth * 0.04,
     fontWeight: 'bold',
-    marginBottom: screenHeight * 0.02,
+    marginBottom: screenHeight * 0.03,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   input: {
     borderWidth: 2,
     borderColor: Colors.border,
-    borderRadius: 8,
-    padding: screenWidth * 0.025,
-    fontSize: screenWidth * 0.025,
-    marginBottom: screenHeight * 0.02,
+    borderRadius: TVOS_BORDER_RADIUS,
+    padding: screenWidth * 0.035,
+    fontSize: screenWidth * 0.035,
+    marginBottom: screenHeight * 0.03,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    minHeight: 60,
   },
   inputFocused: {
     borderColor: Colors.success,
-    borderWidth: 3,
+    borderWidth: TVOS_FOCUS_BORDER_WIDTH,
+    transform: [{ scale: TVOS_FOCUS_SCALE }],
   },
   redeemButton: {
     backgroundColor: Colors.success,
-    padding: screenWidth * 0.025,
-    borderRadius: 8,
+    padding: screenWidth * 0.035,
+    borderRadius: TVOS_BORDER_RADIUS,
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 60,
   },
   redeemButtonDisabled: {
     opacity: 0.6,
   },
   buttonFocused: {
-    borderWidth: 3,
+    borderWidth: TVOS_FOCUS_BORDER_WIDTH,
     borderColor: Colors.success,
+    transform: [{ scale: TVOS_FOCUS_SCALE }],
   },
   redeemButtonText: {
     color: 'white',
-    fontSize: screenWidth * 0.025,
-    fontWeight: '600',
+    fontSize: screenWidth * 0.035,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   loadingContainer: {
-    padding: screenHeight * 0.05,
+    padding: screenHeight * 0.08,
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: screenHeight * 0.01,
-    fontSize: screenWidth * 0.022,
+    marginTop: screenHeight * 0.02,
+    fontSize: screenWidth * 0.03,
+    letterSpacing: 0.3,
   },
   errorContainer: {
-    padding: screenHeight * 0.03,
+    padding: screenHeight * 0.05,
     alignItems: 'center',
   },
   errorText: {
     color: Colors.error,
-    fontSize: screenWidth * 0.025,
+    fontSize: screenWidth * 0.035,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   emptyContainer: {
-    padding: screenHeight * 0.05,
+    padding: screenHeight * 0.08,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: screenWidth * 0.025,
+    fontSize: screenWidth * 0.035,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   couponList: {
     width: '100%',
   },
   couponCard: {
-    padding: screenWidth * 0.03,
-    borderRadius: 12,
-    marginBottom: screenHeight * 0.02,
+    padding: TVOS_SPACING,
+    borderRadius: TVOS_BORDER_RADIUS,
+    marginBottom: screenHeight * 0.03,
     borderWidth: 1,
     borderColor: Colors.success,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -704,52 +733,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: screenHeight * 0.015,
-    paddingBottom: screenHeight * 0.01,
+    marginBottom: screenHeight * 0.02,
+    paddingBottom: screenHeight * 0.015,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   couponCode: {
-    fontSize: screenWidth * 0.025,
+    fontSize: screenWidth * 0.035,
     fontWeight: '600',
+    letterSpacing: 0.3,
   },
   couponStatus: {
-    fontSize: screenWidth * 0.022,
-    fontWeight: '600',
-    paddingHorizontal: screenWidth * 0.015,
-    paddingVertical: screenHeight * 0.005,
-    borderRadius: 6,
+    fontSize: screenWidth * 0.03,
+    fontWeight: '700',
+    paddingHorizontal: screenWidth * 0.025,
+    paddingVertical: screenHeight * 0.01,
+    borderRadius: 8,
     backgroundColor: 'rgba(0, 122, 255, 0.1)',
   },
   couponInfo: {
-    marginBottom: screenHeight * 0.015,
+    marginBottom: screenHeight * 0.02,
   },
   couponType: {
-    fontSize: screenWidth * 0.022,
-    marginBottom: screenHeight * 0.005,
+    fontSize: screenWidth * 0.03,
+    marginBottom: screenHeight * 0.01,
+    letterSpacing: 0.3,
   },
   couponTier: {
-    fontSize: screenWidth * 0.022,
-    marginBottom: screenHeight * 0.005,
+    fontSize: screenWidth * 0.03,
+    marginBottom: screenHeight * 0.01,
+    letterSpacing: 0.3,
   },
   couponDuration: {
-    fontSize: screenWidth * 0.022,
+    fontSize: screenWidth * 0.03,
+    letterSpacing: 0.3,
   },
   couponFooter: {
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    paddingTop: screenHeight * 0.015,
+    paddingTop: screenHeight * 0.02,
   },
   couponDate: {
-    fontSize: screenWidth * 0.02,
-    marginBottom: screenHeight * 0.005,
+    fontSize: screenWidth * 0.028,
+    marginBottom: screenHeight * 0.01,
+    letterSpacing: 0.2,
   },
   couponRedeemed: {
-    fontSize: screenWidth * 0.02,
-    marginBottom: screenHeight * 0.005,
+    fontSize: screenWidth * 0.028,
+    marginBottom: screenHeight * 0.01,
+    letterSpacing: 0.2,
   },
   couponExpire: {
-    fontSize: screenWidth * 0.02,
+    fontSize: screenWidth * 0.028,
+    letterSpacing: 0.2,
   },
 });
 

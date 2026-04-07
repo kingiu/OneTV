@@ -123,7 +123,7 @@ export class Api {
                   "Content-Type": "application/json",
                   "X-Auth-Password": authInfo.password
                 },
-                body: JSON.stringify({ password: authInfo.password }),
+                body: JSON.stringify({ username: authInfo.username || "", password: authInfo.password }),
               });
             } else if (authInfo.username) {
               // 使用用户名登录 - 使用原始fetch，避免递归调用
@@ -173,13 +173,15 @@ export class Api {
 
   async login(username?: string | undefined, password?: string): Promise<{ ok: boolean }> {
     try {
+      // 确保 username 不是 undefined，而是空字符串
+      const loginUsername = username || "";
       const response = await this._fetch("/api/login", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
           "X-Login-Request": "true"
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: loginUsername, password }),
       }, 0, true);
 
       return response.json();
