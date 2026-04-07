@@ -63,25 +63,14 @@ const useMembershipStore = create<MembershipState>((set, get) => ({
     set({ isLoadingCoupons: true, couponsError: null });
     try {
       const userCoupons = await api.getUserCoupons();
-      // 获取当前登录用户的用户名
-      let currentUsername = null;
-      try {
-        const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
-        if (credentialsStr) {
-          const credentials = JSON.parse(credentialsStr);
-          currentUsername = credentials.username;
-        }
-      } catch (storageError) {
-        logger.error("Failed to get login credentials:", storageError);
-      }
+      // 过滤卡券列表，只显示已激活的卡券
+      const filteredCoupons = userCoupons.filter(coupon => coupon.status === 'active');
+      // 按过期时间排序，最近过期的排在前面
+      const sortedCoupons = filteredCoupons.sort((a, b) => a.expireTime - b.expireTime);
+      // 只保留前3张卡券
+      const limitedCoupons = sortedCoupons.slice(0, 3);
       
-      // 过滤卡券列表，只显示当前登录用户的卡券
-      // 适配 LunaTV API - 使用 coupon.username 属性
-      const filteredCoupons = currentUsername 
-        ? userCoupons.filter(coupon => coupon.username === currentUsername)
-        : userCoupons;
-      
-      set({ userCoupons: filteredCoupons, isLoadingCoupons: false });
+      set({ userCoupons: limitedCoupons, isLoadingCoupons: false });
     } catch (error) {
       logger.debug("Failed to fetch user coupons:", error);
       // 提供更友好的错误信息

@@ -526,18 +526,39 @@ export class Api {
     try {
       const response = await this._fetch("/api/coupon");
       const data = await response.json();
+      const now = Date.now();
+      
       // 转换为前端期望的格式
-      return (data.data || []).map((coupon: any) => ({
-        code: coupon.code,
-        batchId: coupon.batchId || "",
-        type: coupon.typeName || coupon.typeId || "", // 使用 LunaTV 返回的类型名称
-        tier: coupon.levelName || coupon.memberLevelId || "", // 使用 LunaTV 返回的等级名称
-        durationDays: coupon.validityDays || 30,
-        status: coupon.status === 0 ? "inactive" : coupon.status === 1 ? "active" : "used",
-        createdAt: new Date(coupon.createdAt).getTime(),
-        expireTime: coupon.validityDays ? new Date(Date.now() + coupon.validityDays * 24 * 60 * 60 * 1000).getTime() : 0,
-        username: coupon.username || ""
-      }));
+      const coupons = (data.data || []).map((coupon: any) => {
+        // 计算过期时间
+        const expireTime = coupon.expiryTime ? new Date(coupon.expiryTime).getTime() : coupon.validityDays ? new Date(Date.now() + coupon.validityDays * 24 * 60 * 60 * 1000).getTime() : Date.now() + 30 * 24 * 60 * 60 * 1000;
+        // 检查是否过期
+        const isExpired = expireTime < now;
+        // 确定卡券状态
+        let status: 'active' | 'used' | 'expired' | 'invalid' = 'invalid';
+        
+        if (isExpired) {
+          status = 'expired';
+        } else if (coupon.status === 0) {
+          status = 'invalid';
+        } else if (coupon.status === 1) {
+          status = 'active';
+        } else {
+          status = 'used';
+        }
+        
+        return {
+          code: coupon.code,
+          batchId: coupon.batchId || "",
+          type: coupon.typeName || coupon.typeId || coupon.type || coupon.name || "卡券", // 使用 LunaTV 返回的类型名称
+          tier: coupon.levelName || coupon.memberLevelId || coupon.tier || "", // 使用 LunaTV 返回的等级名称
+          durationDays: coupon.validityDays || coupon.durationDays || 30,
+          status,
+          createdAt: coupon.createdAt ? new Date(coupon.createdAt).getTime() : Date.now(),
+          expireTime
+        };
+      });
+      return coupons;
     } catch (error) {
       // 如果 API 调用失败，返回空数组
       return [];
