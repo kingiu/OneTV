@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { api, SearchResult, PlayRecord } from "@/services/api";
 import { PlayRecordManager } from "@/services/storage";
-import useAuthStore from "./authStore";
+import { useAuthStore } from "./authStore";
 import { useSettingsStore } from "./settingsStore";
 
 export type RowItem = (SearchResult | PlayRecord) & {

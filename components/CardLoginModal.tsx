@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Modal, View, TextInput, StyleSheet, ActivityIndicator, Keyboard, TouchableOpacity } from "react-native";
 import Toast from "react-native-toast-message";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import useAuthStore from "@/stores/authStore";
 import useMembershipStore from "@/stores/membershipStore";
 import { api } from "@/services/api";
@@ -73,11 +74,13 @@ const CardLoginModal = () => {
           text1: "卡券登录成功",
           text2: result.message 
         });
-        // 卡券登录成功后，保存用户名到LoginCredentialsManager
+        // 卡券登录成功后，保存用户名到本地存储
         if (result.username) {
-          await import("@/services/storage").then(module => 
-            module.LoginCredentialsManager.save({ username: result.username, password: "" })
-          );
+          try {
+            await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username: result.username, password: "" }));
+          } catch (storageError) {
+            console.error("Failed to save login credentials:", storageError);
+          }
         }
         // 设置登录状态为已登录
         setLoginStatus(true);

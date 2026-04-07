@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api, PlayRecord as ApiPlayRecord, Favorite as ApiFavorite } from "./api";
+import { api } from "./api";
+import { PlayRecord, Favorite } from "./types";
 import { storageConfig } from "./storageConfig";
 import Logger from "@/utils/Logger";
 
@@ -13,16 +14,7 @@ const STORAGE_KEYS = {
   LIVE_FAVORITES: "mytv_live_favorites",
   PLAY_RECORDS: "mytv_play_records",
   SEARCH_HISTORY: "mytv_search_history",
-  LOGIN_CREDENTIALS: "mytv_login_credentials",
 } as const;
-
-// --- Type Definitions (aligned with api.ts) ---
-// Re-exporting for consistency, though they are now primarily API types
-export type PlayRecord = ApiPlayRecord & {
-  introEndTime?: number;
-  outroStartTime?: number;
-};
-export type Favorite = ApiFavorite;
 
 export interface PlayerSettings {
   introEndTime?: number;
@@ -407,8 +399,8 @@ export class SettingsManager {
       m3uUrl: "",
     };
     try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
-      return data ? { ...defaultSettings, ...JSON.parse(data) } : defaultSettings;
+      // 强制使用默认的API基础URL，忽略存储的设置
+      return defaultSettings;
     } catch (error) {
       logger.info("Failed to get settings:", error);
       return defaultSettings;
@@ -426,31 +418,4 @@ export class SettingsManager {
   }
 }
 
-// --- LoginCredentialsManager (Uses AsyncStorage) ---
-export class LoginCredentialsManager {
-  static async get(): Promise<LoginCredentials | null> {
-    try {
-      const data = await AsyncStorage.getItem(STORAGE_KEYS.LOGIN_CREDENTIALS);
-      return data ? JSON.parse(data) : null;
-    } catch (error) {
-      logger.info("Failed to get login credentials:", error);
-      return null;
-    }
-  }
 
-  static async save(credentials: LoginCredentials): Promise<void> {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.LOGIN_CREDENTIALS, JSON.stringify(credentials));
-    } catch (error) {
-      logger.error("Failed to save login credentials:", error);
-    }
-  }
-
-  static async clear(): Promise<void> {
-    try {
-      await AsyncStorage.removeItem(STORAGE_KEYS.LOGIN_CREDENTIALS);
-    } catch (error) {
-      logger.error("Failed to clear login credentials:", error);
-    }
-  }
-}

@@ -89,6 +89,8 @@ export const useApiConfig = () => {
   useEffect(() => {
     if (isLoadingServerConfig) {
       setValidationState(prev => ({ ...prev, isValidating: true, error: null }));
+    } else {
+      setValidationState(prev => ({ ...prev, isValidating: false }));
     }
   }, [isLoadingServerConfig]);
 

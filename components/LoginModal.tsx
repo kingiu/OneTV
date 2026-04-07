@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { Modal, View, TextInput, StyleSheet, ActivityIndicator, Keyboard, TouchableOpacity } from "react-native";
 import { usePathname } from "expo-router";
 import Toast from "react-native-toast-message";
-import useAuthStore from "@/stores/authStore";
+import { useAuthStore } from "@/stores/authStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import useHomeStore from "@/stores/homeStore";
 import { api } from "@/services/api";
-import { LoginCredentialsManager } from "@/services/storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedView } from "./ThemedView";
 import { ThemedText } from "./ThemedText";
 import { StyledButton } from "./StyledButton";
@@ -33,10 +33,15 @@ const LoginModal = () => {
       Keyboard.dismiss();
 
       const loadCredentials = async () => {
-        const savedCredentials = await LoginCredentialsManager.get();
-        if (savedCredentials) {
-          setUsername(savedCredentials.username);
-          setPassword(savedCredentials.password);
+        try {
+          const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
+          if (credentialsStr) {
+            const savedCredentials = JSON.parse(credentialsStr);
+            setUsername(savedCredentials.username);
+            setPassword(savedCredentials.password);
+          }
+        } catch (storageError) {
+          console.error("Failed to get login credentials:", storageError);
         }
       };
       loadCredentials();
@@ -92,7 +97,11 @@ const LoginModal = () => {
       await refreshPlayRecords();
 
       // Save credentials on successful login
-      await LoginCredentialsManager.save({ username, password });
+      try {
+        await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
+      } catch (storageError) {
+        console.error("Failed to save login credentials:", storageError);
+      }
 
       Toast.show({ type: "success", text1: "登录成功" });
       hideLoginModal();

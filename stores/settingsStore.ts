@@ -56,15 +56,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     sources: {},
   },
   loadSettings: async () => {
+      // 根据环境区分API地址
+      const defaultUrl = __DEV__ ? "http://192.168.100.101:3000" : "https://onetv.aisxuexi.com";
+      api.setBaseUrl(defaultUrl);
+      
       const settings = await SettingsManager.get();
       console.log('Loaded settings:', settings);
       
-      // 无论如何都先尝试使用存储的 URL
-      let apiUrl = settings.apiBaseUrl || "https://onetv.aisxuexi.com";
-      api.setBaseUrl(apiUrl);
-      
       set({
-        apiBaseUrl: apiUrl,
+        apiBaseUrl: defaultUrl,
         cronPassword: settings.cronPassword || DEFAULT_CRON_PASSWORD,
         m3uUrl: settings.m3uUrl,
         remoteInputEnabled: settings.remoteInputEnabled || false,
@@ -77,24 +77,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         },
       });
       
-      // 尝试获取服务器配置
-      try {
-        await get().fetchServerConfig();
-      } catch (error) {
-        logger.error("Failed to fetch server config with stored URL, falling back to default:", error);
-        // 切换到默认 URL 并尝试获取配置
-        const defaultUrl = "https://onetv.aisxuexi.com";
-        api.setBaseUrl(defaultUrl);
-        set({ apiBaseUrl: defaultUrl });
-        
-        try {
-          await get().fetchServerConfig();
-          // 如果默认 URL 成功，保存默认 URL 到存储
-          await SettingsManager.save({ apiBaseUrl: defaultUrl });
-        } catch (defaultError) {
-          logger.error("Failed to fetch server config with default URL:", defaultError);
-        }
-      }
+      // 尝试获取服务器配置（异步执行，不阻塞主流程）
+      get().fetchServerConfig().catch((error) => {
+        logger.error("Failed to fetch server config:", error);
+      });
     },
   fetchServerConfig: async () => {
     set({ isLoadingServerConfig: true });
@@ -170,6 +156,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       videoSource,
     });
     if (currentApiBaseUrl !== processedApiBaseUrl) {
+      // 清除登录凭证和 authCookies
+      try {
+        await AsyncStorage.removeItem("mytv_login_credentials");
+      } catch (storageError) {
+        logger.error("Failed to clear login credentials:", storageError);
+      }
       await AsyncStorage.setItem("authCookies", "");
     }
     api.setBaseUrl(processedApiBaseUrl);

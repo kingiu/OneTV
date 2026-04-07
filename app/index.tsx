@@ -9,7 +9,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Search, Settings, LogOut, Heart, User } from "lucide-react-native";
 import { StyledButton } from "@/components/StyledButton";
 import useHomeStore, { RowItem, Category } from "@/stores/homeStore";
-import useAuthStore from "@/stores/authStore";
+import { useAuthStore } from "@/stores/authStore";
 import CustomScrollView from "@/components/CustomScrollView";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
@@ -44,7 +44,7 @@ export default function HomeScreen() {
     refreshPlayRecords,
     clearError,
   } = useHomeStore();
-  const { isLoggedIn, logout } = useAuthStore();
+  const { isLoggedIn, logout, autoLogin } = useAuthStore();
   const apiConfigStatus = useApiConfig();
 
   useFocusEffect(
@@ -52,6 +52,11 @@ export default function HomeScreen() {
       refreshPlayRecords();
     }, [refreshPlayRecords])
   );
+
+  // 应用启动时自动登录
+  useEffect(() => {
+    autoLogin();
+  }, [autoLogin]);
 
     // 双击返回退出逻辑（只限当前页面）
   const backPressTimeRef = useRef<number | null>(null);

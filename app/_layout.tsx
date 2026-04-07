@@ -11,13 +11,14 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useRemoteControlStore } from "@/stores/remoteControlStore";
 import LoginModal from "@/components/LoginModal";
-import useAuthStore from "@/stores/authStore";
+import { useAuthStore } from "@/stores/authStore";
 import { useUpdateStore, initUpdateStore } from "@/stores/updateStore";
 import { UpdateModal } from "@/components/UpdateModal";
 import { UPDATE_CONFIG } from "@/constants/UpdateConfig";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import Logger from "@/utils/Logger";
 import { api } from "@/services/api";
+import { SessionTracker } from "@/components/SessionTracker";
 
 const logger = Logger.withTag("RootLayout");
 
@@ -38,7 +39,7 @@ export default function RootLayout() {
   });
   const { loadSettings, remoteInputEnabled, apiBaseUrl, cronPassword } = useSettingsStore();
   const { startServer, stopServer } = useRemoteControlStore();
-  const { checkLoginStatus } = useAuthStore();
+  const { autoLogin } = useAuthStore();
   const { checkForUpdate, lastCheckTime } = useUpdateStore();
   const responsiveConfig = useResponsiveLayout();
   const hasTriggeredCronRef = useRef(false);
@@ -54,10 +55,10 @@ export default function RootLayout() {
   }, [loadSettings]);
 
   useEffect(() => {
-    if (isSettingsReady && apiBaseUrl) {
-      checkLoginStatus(apiBaseUrl);
+    if (isSettingsReady) {
+      autoLogin();
     }
-  }, [apiBaseUrl, checkLoginStatus, isSettingsReady]);
+  }, [autoLogin, isSettingsReady]);
 
   useEffect(() => {
     if (!isSettingsReady || !apiBaseUrl || !cronPassword || hasTriggeredCronRef.current) {
@@ -128,6 +129,7 @@ export default function RootLayout() {
         <Toast />
         <LoginModal />
         <UpdateModal />
+        <SessionTracker />
       </ThemeProvider>
     </SafeAreaProvider>
   );

@@ -1,15 +1,8 @@
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-} from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
 import useMembershipStore from "@/stores/membershipStore";
+import { useAuthStore } from "@/stores/authStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 import { Colors } from "@/constants/Colors";
@@ -19,9 +12,25 @@ const CouponManager: React.FC = () => {
   const [couponCode, setCouponCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
 
+  const { isLoggedIn, autoLogin } = useAuthStore();
+  const { serverConfig } = useSettingsStore();
+
   useEffect(() => {
-    fetchUserCoupons();
-  }, []);
+    const initCoupons = async () => {
+      // 确保用户已登录
+      if (!isLoggedIn) {
+        await autoLogin();
+      }
+      // 检查服务器是否启用了卡券系统
+      const isCouponEnabled = serverConfig?.ApiConfig?.EnableCoupon;
+      if (isCouponEnabled) {
+        // 登录后获取卡券列表
+        fetchUserCoupons();
+      }
+    };
+    
+    initCoupons();
+  }, [isLoggedIn, autoLogin, serverConfig]);
 
   const handleRedeem = async () => {
     if (!couponCode.trim()) {
@@ -82,6 +91,17 @@ const CouponManager: React.FC = () => {
         return "未知";
     }
   };
+
+  // 检查服务器是否启用了卡券系统
+  const isCouponEnabled = serverConfig?.ApiConfig?.EnableCoupon;
+  
+  if (!isCouponEnabled) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText style={styles.errorText}>卡券系统暂未启用</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>

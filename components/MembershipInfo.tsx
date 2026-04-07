@@ -1,16 +1,44 @@
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import useMembershipStore from "@/stores/membershipStore";
+import { useAuthStore } from "@/stores/authStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
 import { Colors } from "@/constants/Colors";
 
 const MembershipInfo: React.FC = () => {
   const { membershipInfo, isLoadingMembership, membershipError, fetchMembershipInfo } = useMembershipStore();
+  const { isLoggedIn, autoLogin } = useAuthStore();
+  const { serverConfig } = useSettingsStore();
 
   useEffect(() => {
-    fetchMembershipInfo();
-  }, []);
+    const initMembership = async () => {
+      // 确保用户已登录
+      if (!isLoggedIn) {
+        await autoLogin();
+      }
+      // 检查服务器是否启用了会员系统
+      const isMembershipEnabled = serverConfig?.ApiConfig?.EnableMembership || serverConfig?.MembershipConfig?.Enable;
+      if (isMembershipEnabled) {
+        // 登录后获取会员信息
+        fetchMembershipInfo();
+      }
+    };
+    
+    initMembership();
+  }, [isLoggedIn, autoLogin, serverConfig]);
+
+  // 检查服务器是否启用了会员系统
+  const isMembershipEnabled = serverConfig?.ApiConfig?.EnableMembership || serverConfig?.MembershipConfig?.Enable;
+  
+  if (!isMembershipEnabled) {
+    return (
+      <ThemedView style={styles.container}>
+        <ThemedText style={styles.errorText}>会员系统暂未启用</ThemedText>
+      </ThemedView>
+    );
+  }
 
   if (isLoadingMembership) {
     return (

@@ -11,9 +11,12 @@ import {
   Dimensions,
 } from "react-native";
 import useMembershipStore from "@/stores/membershipStore";
+import { useAuthStore } from "@/stores/authStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { ThemedView } from "./ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useThemeColor } from "@/hooks/useThemeColor";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -29,6 +32,28 @@ const MembershipCenter: React.FC = () => {
     fetchUserCoupons, 
     redeemCoupon 
   } = useMembershipStore();
+  
+  const { isLoggedIn, autoLogin, isLoading: isAuthLoading } = useAuthStore();
+  const { serverConfig } = useSettingsStore();
+  
+  // 获取当前登录用户的用户名
+  const [currentUsername, setCurrentUsername] = useState<string>('');
+  
+  useEffect(() => {
+    const getUsername = async () => {
+      try {
+        const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
+        if (credentialsStr) {
+          const credentials = JSON.parse(credentialsStr);
+          setCurrentUsername(credentials.username);
+        }
+      } catch (error) {
+        console.error('Failed to get username:', error);
+      }
+    };
+    
+    getUsername();
+  }, []);
   
   const [couponCode, setCouponCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -47,9 +72,23 @@ const MembershipCenter: React.FC = () => {
   const borderColor = useThemeColor({}, 'border');
 
   useEffect(() => {
-    fetchMembershipInfo();
-    fetchUserCoupons();
-  }, []);
+    const initMembership = async () => {
+      // 确保用户已登录
+      if (!isLoggedIn) {
+        await autoLogin();
+      }
+      // 检查服务器是否启用了会员系统
+      // 适配 LunaTV 服务器 - 如果没有 ApiConfig 字段，默认启用会员系统
+      const isMembershipEnabled = serverConfig?.ApiConfig?.EnableMembership || serverConfig?.MembershipConfig?.Enable || !serverConfig?.ApiConfig;
+      if (isMembershipEnabled) {
+        // 登录后获取会员信息和卡券
+        fetchMembershipInfo();
+        fetchUserCoupons();
+      }
+    };
+    
+    initMembership();
+  }, [isLoggedIn, autoLogin, serverConfig, fetchMembershipInfo, fetchUserCoupons]);
 
   // 处理遥控器导航
   const handleKeyDown = (event: any) => {
@@ -172,6 +211,18 @@ const MembershipCenter: React.FC = () => {
   };
 
   const renderMembershipInfo = () => {
+    // 检查服务器是否启用了会员系统
+    // 适配 LunaTV 服务器 - 如果没有 ApiConfig 字段，默认启用会员系统
+    const isMembershipEnabled = serverConfig?.ApiConfig?.EnableMembership || serverConfig?.MembershipConfig?.Enable || !serverConfig?.ApiConfig;
+    
+    if (!isMembershipEnabled) {
+      return (
+        <ThemedView style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: textColor }]}>会员系统暂未启用</Text>
+        </ThemedView>
+      );
+    }
+
     if (isLoadingMembership) {
       return (
         <ThemedView style={styles.loadingContainer}>
@@ -198,10 +249,20 @@ const MembershipCenter: React.FC = () => {
     }
 
     const { membership, config } = membershipInfo;
-    const currentTier = config?.tiers?.find((tier) => tier.name === membership.tierId) || {
-      displayName: membership.tierId || '未知',
+    // 添加日志，查看membership对象的具体内容
+    console.log('Membership object:', membership);
+    console.log('Config:', config);
+    
+    const currentTier = config?.levels?.find((tier) => tier.name === membership.tierId || tier.id === membership.tierId) || {
+      displayName: membership.tierName || (membership.tierId === "0" || !membership.tierId ? '普通用户' : 
+                  membership.tierId === "1" ? '高级会员' : 
+                  membership.tierId === "2" ? 'VIP会员' : 
+                  membership.tierId === "3" ? '超级会员' : membership.tierId),
       features: [],
     };
+    
+    // 添加日志，查看currentTier的具体内容
+    console.log('Current tier:', currentTier);
 
     return (
       <ThemedView style={styles.membershipCard}>
@@ -213,15 +274,17 @@ const MembershipCenter: React.FC = () => {
             {membership.status === "active" ? "活跃" : "已过期"}
           </Text>
         </View>
+        
+        <View style={[styles.infoGrid, { marginBottom: 16 }]}>
+          <ThemedView style={styles.infoItem}>
+            <Text style={[styles.infoLabel, { color: grayColor }]}>用户名</Text>
+            <Text style={[styles.infoValue, { color: textColor }]}>{currentUsername || "未知"}</Text>
+          </ThemedView>
+        </View>
 
         <View style={styles.infoGrid}>
           <ThemedView style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: grayColor }]}>开始日期</Text>
-            <Text style={[styles.infoValue, { color: textColor }]}>{formatDate(membership.startDate || 0)}</Text>
-          </ThemedView>
-          
-          <ThemedView style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: grayColor }]}>到期日期</Text>
+            <Text style={[styles.infoLabel, { color: grayColor }]}>有效期至</Text>
             <Text style={[styles.infoValue, { color: membership.status === "active" ? Colors.success : Colors.error }]}>
               {formatDate(membership.endDate || 0)}
             </Text>
@@ -250,6 +313,35 @@ const MembershipCenter: React.FC = () => {
   };
 
   const renderCouponManager = () => {
+    // 检查服务器是否启用了卡券系统
+    // 适配 LunaTV 服务器 - 如果没有 ApiConfig 字段，默认启用卡券系统
+    const isCouponEnabled = serverConfig?.ApiConfig?.EnableCoupon || !serverConfig?.ApiConfig;
+    
+    if (!isCouponEnabled) {
+      return (
+        <ThemedView style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: textColor }]}>卡券系统暂未启用</Text>
+        </ThemedView>
+      );
+    }
+
+    if (isLoadingCoupons) {
+      return (
+        <ThemedView style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.success} />
+          <Text style={[styles.loadingText, { color: textColor }]}>加载卡券列表中...</Text>
+        </ThemedView>
+      );
+    }
+
+    if (couponsError) {
+      return (
+        <ThemedView style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: textColor }]}>{couponsError}</Text>
+        </ThemedView>
+      );
+    }
+
     return (
       <View style={styles.couponContainer}>
         {/* 卡券兑换 */}

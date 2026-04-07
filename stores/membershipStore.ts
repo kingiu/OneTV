@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { api, MembershipResponse, Coupon, RedeemResult } from "@/services/api";
 import Logger from "@/utils/Logger";
-import { LoginCredentialsManager } from "@/services/storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useSettingsStore } from "./settingsStore";
 
 const logger = Logger.withTag("MembershipStore");
 
@@ -41,32 +42,59 @@ const useMembershipStore = create<MembershipState>((set, get) => ({
       const membershipInfo = await api.getMembershipInfo();
       set({ membershipInfo, isLoadingMembership: false });
     } catch (error) {
-      logger.error("Failed to fetch membership info:", error);
+      logger.debug("Failed to fetch membership info:", error);
+      // 提供更友好的错误信息
+      let errorMessage = "获取会员信息失败";
+      if (error instanceof Error) {
+        if (error.message.includes("401") || error.message.includes("UNAUTHORIZED")) {
+          errorMessage = "未登录或登录已过期";
+        } else if (error.message.includes("404")) {
+          errorMessage = "会员系统暂未启用";
+        }
+      }
       set({ 
-        membershipError: error instanceof Error ? error.message : "获取会员信息失败", 
+        membershipError: errorMessage, 
         isLoadingMembership: false 
       });
     }
   },
-  
+
   fetchUserCoupons: async () => {
     set({ isLoadingCoupons: true, couponsError: null });
     try {
       const userCoupons = await api.getUserCoupons();
       // 获取当前登录用户的用户名
-      const savedCredentials = await LoginCredentialsManager.get();
-      const currentUsername = savedCredentials?.username;
+      let currentUsername = null;
+      try {
+        const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
+        if (credentialsStr) {
+          const credentials = JSON.parse(credentialsStr);
+          currentUsername = credentials.username;
+        }
+      } catch (storageError) {
+        logger.error("Failed to get login credentials:", storageError);
+      }
       
       // 过滤卡券列表，只显示当前登录用户的卡券
+      // 适配 LunaTV API - 使用 coupon.username 属性
       const filteredCoupons = currentUsername 
-        ? userCoupons.filter(coupon => coupon.usedBy === currentUsername || coupon.redeemedBy === currentUsername)
+        ? userCoupons.filter(coupon => coupon.username === currentUsername)
         : userCoupons;
       
       set({ userCoupons: filteredCoupons, isLoadingCoupons: false });
     } catch (error) {
-      logger.error("Failed to fetch user coupons:", error);
+      logger.debug("Failed to fetch user coupons:", error);
+      // 提供更友好的错误信息
+      let errorMessage = "获取卡券列表失败";
+      if (error instanceof Error) {
+        if (error.message.includes("401") || error.message.includes("UNAUTHORIZED")) {
+          errorMessage = "未登录或登录已过期";
+        } else if (error.message.includes("404")) {
+          errorMessage = "卡券系统暂未启用";
+        }
+      }
       set({ 
-        couponsError: error instanceof Error ? error.message : "获取卡券列表失败", 
+        couponsError: errorMessage, 
         isLoadingCoupons: false 
       });
     }
