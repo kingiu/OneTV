@@ -399,8 +399,8 @@ export class SettingsManager {
       m3uUrl: "",
     };
     try {
-      // 强制使用默认的API基础URL，忽略存储的设置
-      return defaultSettings;
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
+      return data ? JSON.parse(data) : defaultSettings;
     } catch (error) {
       logger.info("Failed to get settings:", error);
       return defaultSettings;

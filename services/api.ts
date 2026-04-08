@@ -94,6 +94,7 @@ export class Api {
       const response = await fetch(`${this.baseURL}${url}`, {
         ...options,
         headers,
+        signal: options.signal,
       });
 
       console.log('Response status:', response.status);
@@ -265,7 +266,15 @@ export class Api {
     // 处理 vod_play_from 和 vod_play_url 字段，转换为 play_sources
     if (data.results) {
       data.results = data.results.map((item: any) => {
-        if (item.vod_play_from && item.vod_play_url) {
+        // 优先使用 API 返回的 lines 字段（LunaTV 格式）
+        if (item.lines && Array.isArray(item.lines) && item.lines.length > 0) {
+          console.log('Using lines from API:', item.lines);
+          item.play_sources = item.lines.map((line: any) => ({
+            name: line.name || '未知线路',
+            episodes: line.episodes || [],
+            episodes_titles: line.episodes_titles || [],
+          }));
+        } else if (item.vod_play_from && item.vod_play_url) {
           const play_sources: { name: string; episodes: string[]; episodes_titles: string[] }[] = [];
           const sources = item.vod_play_from.split('$$$');
           const urls = item.vod_play_url.split('$$$');
@@ -291,9 +300,8 @@ export class Api {
                 }
               });
               
-              if (episodes.length > 0) {
-                play_sources.push({ name: sourceName, episodes, episodes_titles });
-              }
+              // 即使没有剧集，也添加线路信息
+              play_sources.push({ name: sourceName, episodes, episodes_titles });
             }
           });
           
@@ -301,13 +309,15 @@ export class Api {
           
           if (play_sources.length > 0) {
             item.play_sources = play_sources;
-            // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
-            if (!item.episodes || item.episodes.length === 0) {
-              item.episodes = play_sources[0].episodes;
-              item.episodes_titles = play_sources[0].episodes_titles;
-            }
           }
         }
+        
+        // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
+        if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
+          item.episodes = item.play_sources[0].episodes;
+          item.episodes_titles = item.play_sources[0].episodes_titles;
+        }
+        
         return item;
       });
     }
@@ -320,7 +330,15 @@ export class Api {
     const { results } = await response.json();
     // 处理 vod_play_from 和 vod_play_url 字段，转换为 play_sources
     const processedResults = results.map((item: any) => {
-      if (item.vod_play_from && item.vod_play_url) {
+      // 优先使用 API 返回的 lines 字段（LunaTV 格式）
+      if (item.lines && Array.isArray(item.lines) && item.lines.length > 0) {
+        console.log('Using lines from API:', item.lines);
+        item.play_sources = item.lines.map((line: any) => ({
+          name: line.name || '未知线路',
+          episodes: line.episodes || [],
+          episodes_titles: line.episodes_titles || [],
+        }));
+      } else if (item.vod_play_from && item.vod_play_url) {
         const play_sources: { name: string; episodes: string[]; episodes_titles: string[] }[] = [];
         const sources = item.vod_play_from.split('$$$');
         const urls = item.vod_play_url.split('$$$');
@@ -346,9 +364,8 @@ export class Api {
               }
             });
             
-            if (episodes.length > 0) {
-              play_sources.push({ name: sourceName, episodes, episodes_titles });
-            }
+            // 即使没有剧集，也添加线路信息
+            play_sources.push({ name: sourceName, episodes, episodes_titles });
           }
         });
         
@@ -356,13 +373,15 @@ export class Api {
         
         if (play_sources.length > 0) {
           item.play_sources = play_sources;
-          // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
-          if (!item.episodes || item.episodes.length === 0) {
-            item.episodes = play_sources[0].episodes;
-            item.episodes_titles = play_sources[0].episodes_titles;
-          }
         }
       }
+      
+      // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
+      if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
+        item.episodes = item.play_sources[0].episodes;
+        item.episodes_titles = item.play_sources[0].episodes_titles;
+      }
+      
       return item;
     });
     return { results: processedResults };

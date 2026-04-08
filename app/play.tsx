@@ -146,9 +146,13 @@ export default function PlayScreen() {
     const perfEnd = performance.now();
     logger.info(`[PERF] PlayScreen useEffect END - took ${(perfEnd - perfStart).toFixed(2)}ms`);
 
-    return () => {
+    return async () => {
       logger.info(`[PERF] PlayScreen unmounting - calling reset()`);
-      reset(); // Reset state when component unmounts
+      try {
+        await reset(); // Reset state when component unmounts
+      } catch (error) {
+        logger.debug("Error during reset:", error);
+      }
     };
   }, [episodeIndex, source, position, setVideoRef, reset, loadVideo, id, title]);
 

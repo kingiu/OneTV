@@ -7,7 +7,11 @@ import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag('DetailStore');
 
-import { PlaySource } from "@/services/api";
+export interface PlaySource {
+  name: string;
+  episodes: string[];
+  episodes_titles: string[];
+}
 
 export type SearchResultWithResolution = SearchResult & { resolution?: string | null; play_sources?: PlaySource[] };
 

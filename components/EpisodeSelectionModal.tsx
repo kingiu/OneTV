@@ -7,10 +7,13 @@ import useDetailStore from "@/stores/detailStore";
 interface EpisodeSelectionModalProps {}
 
 export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () => {
-  const { showEpisodeModal, currentEpisodeIndex, playEpisode, setShowEpisodeModal, currentPlaySourceIndex, onLineChange, episodeModalInitialTab } = usePlayerStore();
+  const { showEpisodeModal, currentEpisodeIndex, playEpisode, setShowEpisodeModal, currentPlaySourceIndex, onLineChange, episodeModalInitialTab, episodes: playerEpisodes } = usePlayerStore();
   const { detail } = useDetailStore();
   
-  const episodes = detail?.play_sources && detail.play_sources.length > 0 ? detail.play_sources[0].episodes : [];
+  // 优先使用 detail.play_sources 中的剧集，如果没有则使用 playerStore 中的剧集
+  const playSources = detail?.play_sources || [];
+  const playSourceEpisodes = playSources.length > 0 && currentPlaySourceIndex < playSources.length && playSources[currentPlaySourceIndex]?.episodes ? playSources[currentPlaySourceIndex].episodes : [];
+  const episodes = playSourceEpisodes.length > 0 ? playSourceEpisodes : playerEpisodes;
 
   const [episodeGroupSize] = useState(30);
   const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(Math.floor(currentEpisodeIndex / episodeGroupSize));
@@ -36,8 +39,6 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
   const onClose = () => {
     setShowEpisodeModal(false);
   };
-
-  const playSources = detail?.play_sources || [];
 
   return (
     <Modal visible={showEpisodeModal} transparent={true} animationType="slide" onRequestClose={onClose}>
@@ -77,9 +78,11 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
                 keyExtractor={(_, index) => `episode-${selectedEpisodeGroup * episodeGroupSize + index}`}
                 renderItem={({ item, index }) => {
                   const absoluteIndex = selectedEpisodeGroup * episodeGroupSize + index;
+                  // 处理不同的数据结构：playerStore 中的剧集是对象，detail.play_sources 中的剧集是字符串
+                  const episodeTitle = typeof item === 'string' ? `第 ${absoluteIndex + 1} 集` : (item.title || `第 ${absoluteIndex + 1} 集`);
                   return (
                     <StyledButton
-                      text={item.title || `第 ${absoluteIndex + 1} 集`}
+                      text={episodeTitle}
                       onPress={() => onSelectEpisode(absoluteIndex)}
                       isSelected={currentEpisodeIndex === absoluteIndex}
                       hasTVPreferredFocus={currentEpisodeIndex === absoluteIndex}
@@ -92,16 +95,20 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
             </>
           ) : (
             <ScrollView contentContainerStyle={styles.linesList}>
-              {playSources.map((source, index) => (
-                <StyledButton
-                  key={index}
-                  text={`线路${index + 1}`}
-                  onPress={() => onLineChange(index)}
-                  isSelected={currentPlaySourceIndex === index}
-                  style={styles.lineItem}
-                  textStyle={styles.lineItemText}
-                />
-              ))}
+              {playSources.length > 0 ? (
+                playSources.map((source, index) => (
+                  <StyledButton
+                    key={index}
+                    text={source.name}
+                    onPress={() => onLineChange(index)}
+                    isSelected={currentPlaySourceIndex === index}
+                    style={styles.lineItem}
+                    textStyle={styles.lineItemText}
+                  />
+                ))
+              ) : (
+                <Text style={{ color: 'white', textAlign: 'center', marginTop: 20 }}>暂无可用线路</Text>
+              )}
             </ScrollView>
           )}
         </View>

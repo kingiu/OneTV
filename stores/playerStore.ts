@@ -10,7 +10,7 @@ import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag("PlayerStore");
 
-const getEpisodeTitle = (index: number) => `Episode ${index + 1}`;
+const getEpisodeTitle = (index: number) => `第 ${index + 1} 集`;
 
 const mapEpisodesForPlayback = (episodeUrls: string[], sourceKey: string) => {
   const { apiBaseUrl, vodAdBlockEnabled } = useSettingsStore.getState();
@@ -609,7 +609,15 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     return true;
   },
 
-  reset: () => {
+  reset: async () => {
+    const { videoRef } = get();
+    try {
+      if (videoRef?.current) {
+        await videoRef.current.unloadAsync();
+      }
+    } catch (error) {
+      logger.debug("Failed to unload video:", error);
+    }
     set({
       episodes: [],
       currentEpisodeIndex: 0,

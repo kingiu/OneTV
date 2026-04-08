@@ -47,13 +47,14 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   const currentSourceName = currentSource?.source_name;
   const hasNextEpisode = currentEpisodeIndex < (episodes.length || 0) - 1;
   const playSources = detail?.play_sources || [];
-  const currentLineName = playSources.length > 0 ? `线路${currentPlaySourceIndex + 1}` : "";
+  const currentLineName = playSources.length > 0 && currentPlaySourceIndex < playSources.length ? playSources[currentPlaySourceIndex].name : "";
   
   // 调试日志
   console.log('Detail:', detail);
   console.log('Play sources:', playSources);
   console.log('Play sources length:', playSources.length);
   console.log('Current line name:', currentLineName);
+  console.log('Detail has play_sources:', !!detail?.play_sources);
 
   const formatTime = (milliseconds: number) => {
     if (!milliseconds) return "00:00";
@@ -129,7 +130,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
             <ArrowUpFromDot color="white" size={24} />
           </MediaButton>
 
-          <MediaButton onPress={() => setShowEpisodeModal(true)}>
+          <MediaButton onPress={() => setShowEpisodeModal(true, 'episodes')}>
             <List color="white" size={24} />
           </MediaButton>
 
@@ -137,7 +138,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
             <Gauge color="white" size={24} />
           </MediaButton>
 
-          {playSources.length > 1 && (
+          {detail && (
             <MediaButton onPress={onShowLines} timeLabel={currentLineName}>
               <Link color="white" size={24} />
             </MediaButton>
