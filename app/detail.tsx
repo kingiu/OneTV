@@ -178,17 +178,6 @@ export default function DetailScreen() {
                         </Text>
                       </View>
                     )}
-                    {item.resolution && (
-                      <View
-                        style={[
-                          dynamicStyles.badge,
-                          { backgroundColor: "#666" },
-                          isSelected && dynamicStyles.selectedBadge,
-                        ]}
-                      >
-                        <Text style={dynamicStyles.badgeText}>{item.resolution}</Text>
-                      </View>
-                    )}
                   </StyledButton>
                 );
               })}
@@ -272,17 +261,6 @@ export default function DetailScreen() {
                           <Text style={dynamicStyles.badgeText}>
                             {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
                           </Text>
-                        </View>
-                      )}
-                      {item.resolution && (
-                        <View
-                          style={[
-                            dynamicStyles.badge,
-                            { backgroundColor: "#666" },
-                            isSelected && dynamicStyles.selectedBadge,
-                          ]}
-                        >
-                          <Text style={dynamicStyles.badgeText}>{item.resolution}</Text>
                         </View>
                       )}
                     </StyledButton>

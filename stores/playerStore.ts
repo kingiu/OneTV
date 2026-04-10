@@ -95,6 +95,8 @@ interface PlayerState {
   _savePlayRecord: (updates?: Partial<PlayRecord>, options?: { immediate?: boolean }) => void;
   handleVideoError: (errorType: "ssl" | "network" | "other", failedUrl: string) => Promise<void>;
   onLineChange: (lineIndex: number) => void;
+  testLineSpeed: (url: string) => Promise<number>;
+  selectBestLine: (playSources: any[]) => Promise<number>;
 }
 
 const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -121,6 +123,87 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   _isRecordSaveThrottled: false,
 
   setVideoRef: (ref) => set({ videoRef: ref }),
+
+  // 测试线路速度的函数
+  testLineSpeed: async (url: string): Promise<number> => {
+    try {
+      const startTime = performance.now();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        method: 'HEAD', // 使用HEAD请求，只获取头信息，不下载内容
+        redirect: 'follow',
+      });
+
+      clearTimeout(timeoutId);
+      const endTime = performance.now();
+      const latency = endTime - startTime;
+
+      return latency;
+    } catch (error) {
+      logger.warn(`[SPEED_TEST] Failed to test speed for ${url}:`, error);
+      return Infinity; // 失败的线路设为无限大延迟
+    }
+  },
+
+  // 选择最佳线路的函数
+  selectBestLine: async (playSources: any[]): Promise<number> => {
+    if (!playSources || playSources.length === 0) {
+      return 0;
+    }
+
+    if (playSources.length === 1) {
+      return 0;
+    }
+
+    logger.info(`[LINE_SELECTION] Testing ${playSources.length} lines for speed and quality`);
+
+    // 对每个线路进行速度测试
+    const lineTests = await Promise.all(
+      playSources.map(async (source, index) => {
+        if (!source.episodes || source.episodes.length === 0) {
+          return { index, latency: Infinity, quality: 0 };
+        }
+
+        const testUrl = source.episodes[0];
+        const latency = await get().testLineSpeed(testUrl);
+
+        // 简单的质量评分：基于线路名称中的清晰度标识
+        let quality = 0;
+        const sourceName = source.name.toLowerCase();
+        if (sourceName.includes('1080') || sourceName.includes('fullhd')) quality = 4;
+        else if (sourceName.includes('720') || sourceName.includes('hd')) quality = 3;
+        else if (sourceName.includes('480') || sourceName.includes('sd')) quality = 2;
+        else if (sourceName.includes('360')) quality = 1;
+
+        logger.info(`[LINE_SELECTION] Line ${index + 1} (${source.name}): latency = ${latency.toFixed(2)}ms, quality = ${quality}`);
+        return { index, latency, quality };
+      })
+    );
+
+    // 过滤掉失败的线路
+    const validLines = lineTests.filter(line => line.latency < Infinity);
+    if (validLines.length === 0) {
+      logger.warn(`[LINE_SELECTION] All lines failed speed test, using first line`);
+      return 0;
+    }
+
+    // 排序：优先考虑质量，然后考虑速度
+    validLines.sort((a, b) => {
+      // 质量优先
+      if (b.quality !== a.quality) {
+        return b.quality - a.quality;
+      }
+      // 质量相同时，速度优先
+      return a.latency - b.latency;
+    });
+
+    const bestLineIndex = validLines[0].index;
+    logger.info(`[LINE_SELECTION] Selected best line: ${bestLineIndex + 1} (${playSources[bestLineIndex].name})`);
+    return bestLineIndex;
+  },
 
   loadVideo: async ({ source, id, episodeIndex, position, title }) => {
     const perfStart = performance.now();
@@ -262,6 +345,17 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       const initialPositionFromRecord = playRecord?.play_time ? playRecord.play_time * 1000 : 0;
       const savedPlaybackRate = playerSettings?.playbackRate || 1.0;
 
+      // 自动选择最佳线路
+      let currentPlaySourceIndex = 0;
+      if (detail.play_sources && detail.play_sources.length > 1) {
+        currentPlaySourceIndex = await get().selectBestLine(detail.play_sources);
+        // 如果选择了非默认线路，更新episodes
+        if (currentPlaySourceIndex > 0 && detail.play_sources[currentPlaySourceIndex].episodes) {
+          episodes = detail.play_sources[currentPlaySourceIndex].episodes;
+          logger.info(`[LINE_SELECTION] Updated episodes to best line: ${detail.play_sources[currentPlaySourceIndex].name}`);
+        }
+      }
+
       const episodesMappingStart = performance.now();
       const mappedEpisodes = mapEpisodesForPlayback(episodes, detail.source);
       const episodesMappingEnd = performance.now();
@@ -274,7 +368,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       set({
       isLoading: false,
       currentEpisodeIndex: episodeIndex,
-      currentPlaySourceIndex: 0,
+      currentPlaySourceIndex: currentPlaySourceIndex,
       initialPosition: position || initialPositionFromRecord,
       playbackRate: savedPlaybackRate,
       episodes: mappedEpisodes,
@@ -282,7 +376,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       outroStartTime: playRecord?.outroStartTime || playerSettings?.outroStartTime,
     });
     
-    logger.info(`[DEBUG] Loaded video with play_sources: ${detail.play_sources?.length || 0}`);
+    logger.info(`[DEBUG] Loaded video with play_sources: ${detail.play_sources?.length || 0}, selected line: ${currentPlaySourceIndex + 1}`);
 
       const perfEnd = performance.now();
       logger.info(`[PERF] PlayerStore.loadVideo COMPLETE - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
