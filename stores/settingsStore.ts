@@ -2,11 +2,20 @@ import { create } from "zustand";
 import { SettingsManager } from "@/services/storage";
 import { api, ServerConfig } from "@/services/api";
 import { storageConfig } from "@/services/storageConfig";
+import { proxyService } from "@/services/proxyService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag("SettingsStore");
 const DEFAULT_CRON_PASSWORD = "cron_secure_password";
+
+interface ProxyConfig {
+  enabled: boolean;
+  useBackendProxy: boolean;
+  proxyUrl?: string;
+  cacheEnabled: boolean;
+  cacheTTL: number;
+}
 
 interface SettingsState {
   apiBaseUrl: string;
@@ -22,6 +31,7 @@ interface SettingsState {
       [key: string]: boolean;
     };
   };
+  proxyConfig: ProxyConfig;
   isModalVisible: boolean;
   serverConfig: ServerConfig | null;
   isLoadingServerConfig: boolean;
@@ -34,6 +44,7 @@ interface SettingsState {
   setVodProxyEnabled: (enabled: boolean) => void;
   setLiveAdBlockEnabled: (enabled: boolean) => void;
   setVodAdBlockEnabled: (enabled: boolean) => void;
+  setProxyConfig: (config: Partial<ProxyConfig>) => void;
   saveSettings: () => Promise<void>;
   setVideoSource: (config: { enabledAll: boolean; sources: { [key: string]: boolean } }) => void;
   showModal: () => void;
@@ -55,6 +66,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     enabledAll: true,
     sources: {},
   },
+  proxyConfig: {
+    enabled: false,
+    useBackendProxy: true,
+    cacheEnabled: true,
+    cacheTTL: 3600,
+  },
   loadSettings: async () => {
       // 根据环境区分API地址
       const defaultUrl = __DEV__ ? "http://192.168.100.101:3000" : "https://onetv.aisxuexi.com";
@@ -62,6 +79,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       
       const settings = await SettingsManager.get();
       console.log('Loaded settings:', settings);
+      
+      // 加载代理配置
+      const proxyConfig = await proxyService.getConfig();
       
       set({
         apiBaseUrl: defaultUrl,
@@ -75,6 +95,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           enabledAll: true,
           sources: {},
         },
+        proxyConfig,
       });
       
       // 尝试获取服务器配置（异步执行，不阻塞主流程）
@@ -111,6 +132,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setLiveAdBlockEnabled: (enabled) => set({ liveAdBlockEnabled: enabled }),
   setVodAdBlockEnabled: (enabled) => set({ vodAdBlockEnabled: enabled, vodProxyEnabled: enabled }),
   setVideoSource: (config) => set({ videoSource: config }),
+  setProxyConfig: (config) => {
+    set((state) => ({
+      proxyConfig: { ...state.proxyConfig, ...config },
+    }));
+  },
   saveSettings: async () => {
     const {
       apiBaseUrl,
@@ -121,6 +147,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       liveAdBlockEnabled,
       vodAdBlockEnabled,
       videoSource,
+      proxyConfig,
     } = get();
     const currentSettings = await SettingsManager.get();
     const currentApiBaseUrl = currentSettings.apiBaseUrl;
@@ -155,6 +182,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       vodAdBlockEnabled,
       videoSource,
     });
+    
+    // 保存代理配置
+    await proxyService.saveConfig(proxyConfig);
+    
     if (currentApiBaseUrl !== processedApiBaseUrl) {
       // 清除登录凭证和 authCookies
       try {

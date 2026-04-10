@@ -297,19 +297,29 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       logger.info(`[PERF] Skipping DetailStore.init - using cached data`);
 
       // Even with cached data, ensure episodes are loaded from the right source.
-      if (detail && detail.source && detail.source !== source) {
+    if (detail && detail.source && detail.source !== source) {
+      logger.info(
+        `[INFO] Cached detail source "${detail.source}" differs from provided source "${source}", updating episodes`
+      );
+      // 从 searchResults 中找到对应的 source 的 detail 对象
+      const detailStoreState = useDetailStore.getState();
+      const sourceDetail = detailStoreState.searchResults.find(r => r.source === source);
+      if (sourceDetail) {
         logger.info(
-          `[INFO] Cached detail source "${detail.source}" differs from provided source "${source}", updating episodes`
+          `[INFO] Found detail for source "${source}", updating DetailStore`
+        );
+        useDetailStore.getState().setDetail(sourceDetail);
+        detail = sourceDetail;
+      }
+      episodes = episodesSelectorBySource(source)(useDetailStore.getState());
+
+      if (!episodes || episodes.length === 0) {
+        logger.warn(
+          `[WARN] Provided source "${source}" has no episodes, trying cached source "${detail.source}"`
         );
         episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
-
-        if (!episodes || episodes.length === 0) {
-          logger.warn(
-            `[WARN] Cached detail source "${detail.source}" has no episodes, trying provided source "${source}"`
-          );
-          episodes = episodesSelectorBySource(source)(useDetailStore.getState());
-        }
       }
+    }
     }
 
     // Final validation.

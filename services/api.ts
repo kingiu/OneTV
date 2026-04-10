@@ -92,86 +92,118 @@ export class Api {
     const headers = await this.buildHeaders(options.headers);
 
     try {
-      console.log('Fetching:', `${this.baseURL}${url}`);
+      const fullUrl = `${this.baseURL}${url}`;
+      console.log('Fetching:', fullUrl);
       console.log('Request headers:', headers);
-      const response = await fetch(`${this.baseURL}${url}`, {
-        ...options,
-        headers,
-        signal: options.signal,
-      });
+      
+      // 尝试使用代理服务
+      try {
+        const { proxyService } = await import('./proxyService');
+        proxyService.setBaseUrl(this.baseURL);
+        const response = await proxyService.fetch(fullUrl, {
+          ...options,
+          headers,
+          signal: options.signal,
+        });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
+        console.log('Response status:', response.status);
+        console.log('Response headers:', response.headers);
 
-      // 处理 Set-Cookie 头 - 兼容 React Native
-      const setCookie = response.headers.get('Set-Cookie');
-      if (setCookie) {
-        // 提取 cookie 的名称和值部分（不包含 Path、Expires 等属性）
-        const cookieString = setCookie.split('; ')[0];
-        await AsyncStorage.setItem("authCookies", cookieString);
-        console.log('Set authCookies:', cookieString);
-      }
-
-      if (response.status === 401 && retryCount < 1 && !avoidReLogin) {
-        // 尝试自动重新登录
-        try {
-          const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
-          if (credentialsStr) {
-            const authInfo = JSON.parse(credentialsStr);
-            let loginResponse;
-            
-            if (authInfo.password) {
-              // 使用密码登录 - 使用原始fetch，避免递归调用
-              loginResponse = await fetch(`${this.baseURL}/api/login`, {
-                method: "POST",
-                headers: { 
-                  "Content-Type": "application/json",
-                  "X-Auth-Password": authInfo.password,
-                  "X-Auth-Username": authInfo.username || ""
-                },
-                body: JSON.stringify({ username: authInfo.username || "", password: authInfo.password }),
-              });
-            } else if (authInfo.username) {
-              // 使用用户名登录 - 使用原始fetch，避免递归调用
-              loginResponse = await fetch(`${this.baseURL}/api/login`, {
-                method: "POST",
-                headers: { 
-                  "Content-Type": "application/json",
-                  "X-Auth-Username": authInfo.username,
-                  ...(authInfo.signature && { "X-Auth-Signature": authInfo.signature }),
-                  ...(authInfo.timestamp && { "X-Auth-Timestamp": authInfo.timestamp.toString() })
-                },
-                body: JSON.stringify({ username: authInfo.username }),
-              });
-            }
-
-            if (loginResponse && loginResponse.ok) {
-              console.log('重新登录成功，重试原请求...');
-              // 处理登录响应的 Set-Cookie 头
-              const loginSetCookie = loginResponse.headers.get('Set-Cookie');
-              if (loginSetCookie) {
-                const cookieString = loginSetCookie.split('; ')[0];
-                await AsyncStorage.setItem("authCookies", cookieString);
-                console.log('Set authCookies after login:', cookieString);
-              }
-              // 重新尝试原请求
-              return this._fetch(url, options, retryCount + 1);
-            }
-          }
-        } catch (loginError) {
-          console.warn("Auto re-login failed:", loginError);
+        // 处理 Set-Cookie 头 - 兼容 React Native
+        const setCookie = response.headers.get('Set-Cookie');
+        if (setCookie) {
+          // 提取 cookie 的名称和值部分（不包含 Path、Expires 等属性）
+          const cookieString = setCookie.split('; ')[0];
+          await AsyncStorage.setItem("authCookies", cookieString);
+          console.log('Set authCookies:', cookieString);
         }
-        // 重新登录失败，抛出错误
-        throw new Error("UNAUTHORIZED");
-      }
 
-      if (!response.ok) {
-        // 尝试获取错误响应的内容，以便更好地理解问题
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText.substring(0, 200)}`);
-      }
+        if (response.status === 401 && retryCount < 1 && !avoidReLogin) {
+          // 尝试自动重新登录
+          try {
+            const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
+            if (credentialsStr) {
+              const authInfo = JSON.parse(credentialsStr);
+              let loginResponse;
+              
+              if (authInfo.password) {
+                // 使用密码登录 - 使用原始fetch，避免递归调用
+                loginResponse = await fetch(`${this.baseURL}/api/login`, {
+                  method: "POST",
+                  headers: { 
+                    "Content-Type": "application/json",
+                    "X-Auth-Password": authInfo.password,
+                    "X-Auth-Username": authInfo.username || ""
+                  },
+                  body: JSON.stringify({ username: authInfo.username || "", password: authInfo.password }),
+                });
+              } else if (authInfo.username) {
+                // 使用用户名登录 - 使用原始fetch，避免递归调用
+                loginResponse = await fetch(`${this.baseURL}/api/login`, {
+                  method: "POST",
+                  headers: { 
+                    "Content-Type": "application/json",
+                    "X-Auth-Username": authInfo.username,
+                    ...(authInfo.signature && { "X-Auth-Signature": authInfo.signature }),
+                    ...(authInfo.timestamp && { "X-Auth-Timestamp": authInfo.timestamp.toString() })
+                  },
+                  body: JSON.stringify({ username: authInfo.username }),
+                });
+              }
 
-      return response;
+              if (loginResponse && loginResponse.ok) {
+                console.log('重新登录成功，重试原请求...');
+                // 处理登录响应的 Set-Cookie 头
+                const loginSetCookie = loginResponse.headers.get('Set-Cookie');
+                if (loginSetCookie) {
+                  const cookieString = loginSetCookie.split('; ')[0];
+                  await AsyncStorage.setItem("authCookies", cookieString);
+                  console.log('Set authCookies after login:', cookieString);
+                }
+                // 重新尝试原请求
+                return this._fetch(url, options, retryCount + 1);
+              }
+            }
+          } catch (loginError) {
+            console.warn("Auto re-login failed:", loginError);
+          }
+          // 重新登录失败，抛出错误
+          throw new Error("UNAUTHORIZED");
+        }
+
+        if (!response.ok) {
+          // 尝试获取错误响应的内容，以便更好地理解问题
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText.substring(0, 200)}`);
+        }
+
+        return response;
+      } catch (proxyError) {
+        console.warn('Proxy fetch failed, falling back to direct fetch:', proxyError);
+        // 代理失败，回退到直接请求
+        const response = await fetch(fullUrl, {
+          ...options,
+          headers,
+          signal: options.signal,
+        });
+
+        console.log('Direct fetch response status:', response.status);
+
+        // 处理 Set-Cookie 头 - 兼容 React Native
+        const setCookie = response.headers.get('Set-Cookie');
+        if (setCookie) {
+          const cookieString = setCookie.split('; ')[0];
+          await AsyncStorage.setItem("authCookies", cookieString);
+          console.log('Set authCookies:', cookieString);
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText.substring(0, 200)}`);
+        }
+
+        return response;
+      }
     } catch (error) {
       console.error('Fetch error:', error);
       throw error;
