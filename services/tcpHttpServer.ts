@@ -98,6 +98,45 @@ class TCPHttpServer {
     this.requestHandler = handler;
   }
 
+  private async cleanupExistingServer(): Promise<void> {
+    return new Promise((resolve) => {
+      try {
+        // 尝试连接本地端口，如果成功说明有旧服务器在运行，发送关闭信号
+        const cleanupSocket = TcpSocket.createConnection(
+          {
+            port: PORT,
+            host: '127.0.0.1',
+          },
+          () => {
+            logger.debug('[TCPHttpServer] Found existing server, sending shutdown signal');
+            // 发送特殊的关闭请求
+            cleanupSocket.write('GET /__shutdown HTTP/1.1\r\n\r\n');
+            cleanupSocket.end();
+          }
+        );
+
+        cleanupSocket.setTimeout(1000);
+
+        cleanupSocket.on('error', () => {
+          // 连接失败说明没有旧服务器，这是正常的
+          resolve();
+        });
+
+        cleanupSocket.on('timeout', () => {
+          cleanupSocket.destroy();
+          resolve();
+        });
+
+        cleanupSocket.on('close', () => {
+          // 给旧服务器一点时间关闭
+          setTimeout(resolve, 500);
+        });
+      } catch {
+        resolve();
+      }
+    });
+  }
+
   public async start(): Promise<string> {
     const netState = await NetInfo.fetch();
     let ipAddress: string | null = null;
@@ -114,6 +153,9 @@ class TCPHttpServer {
       logger.debug('[TCPHttpServer] Server is already running.');
       return `http://${ipAddress}:${PORT}`;
     }
+
+    // 清理可能存在的旧服务器实例
+    await this.cleanupExistingServer();
 
     return new Promise((resolve, reject) => {
       try {

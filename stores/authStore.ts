@@ -67,6 +67,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           // 尝试使用保存的凭证登录
           const response = await api.login(credentials.username, credentials.password);
           if (response.ok) {
+            // 手动设置 authCookies，确保认证信息能够被正确发送
+            try {
+              const authData = { password: credentials.password, role: 'user' };
+              const cookieValue = encodeURIComponent(JSON.stringify(authData));
+              await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
+            } catch (storageError) {
+              logger.error("Failed to save auth cookies:", storageError);
+            }
             set({ isLoggedIn: true, isLoading: false });
             return true;
           } else {
@@ -78,6 +86,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 // 重新注册成功，保存凭证
                 try {
                   await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify(credentials));
+                  // 手动设置 authCookies，确保认证信息能够被正确发送
+                  const authData = { password: credentials.password, role: 'user' };
+                  const cookieValue = encodeURIComponent(JSON.stringify(authData));
+                  await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
                 } catch (storageError) {
                   logger.error("Failed to save login credentials:", storageError);
                 }
@@ -221,6 +233,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               // 登录成功，保存凭证
               try {
                 await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
+                // 手动设置 authCookies，确保认证信息能够被正确发送
+                const authData = { password, role: 'user' };
+                const cookieValue = encodeURIComponent(JSON.stringify(authData));
+                await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
               } catch (storageError) {
                 logger.error("Failed to save login credentials:", storageError);
               }
@@ -234,6 +250,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                   // 自动注册成功，保存凭证
                   try {
                     await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
+                    // 手动设置 authCookies，确保认证信息能够被正确发送
+                    const authData = { password, role: 'user' };
+                    const cookieValue = encodeURIComponent(JSON.stringify(authData));
+                    await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
                   } catch (storageError) {
                     logger.error("Failed to save login credentials:", storageError);
                   }
@@ -263,6 +283,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                     // 登录成功，保存凭证
                     try {
                       await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
+                      // 手动设置 authCookies，确保认证信息能够被正确发送
+                      const authData = { password, role: 'user' };
+                      const cookieValue = encodeURIComponent(JSON.stringify(authData));
+                      await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
                     } catch (storageError) {
                       logger.error("Failed to save login credentials:", storageError);
                     }
@@ -379,6 +403,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // 保存登录凭证
         try {
           await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
+          // 手动设置 authCookies，确保认证信息能够被正确发送
+          const authData = { password, role: 'user' };
+          const cookieValue = encodeURIComponent(JSON.stringify(authData));
+          await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
         } catch (storageError) {
           logger.error("Failed to save login credentials:", storageError);
         }

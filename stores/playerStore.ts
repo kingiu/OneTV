@@ -411,6 +411,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     const { immediate = false } = options;
     if (!immediate) {
       if (get()._isRecordSaveThrottled) {
+        logger.info(`[DEBUG] playerStore._savePlayRecord - throttled, returning early`);
         return;
       }
       set({ _isRecordSaveThrottled: true });
@@ -421,7 +422,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
     const { detail } = useDetailStore.getState();
     const { currentEpisodeIndex, episodes, status, introEndTime, outroStartTime } = get();
+    logger.info(`[DEBUG] playerStore._savePlayRecord - detail: ${!!detail}, status.isLoaded: ${status?.isLoaded}`);
     if (detail && status?.isLoaded) {
+      logger.info(`[DEBUG] playerStore._savePlayRecord - saving play record for ${detail.title}`);
       const existingRecord = {
         introEndTime,
         outroStartTime,
@@ -438,6 +441,13 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         ...existingRecord,
         ...updates,
       });
+    } else {
+      if (!detail) {
+        logger.info(`[DEBUG] playerStore._savePlayRecord - no detail, returning early`);
+      }
+      if (!status?.isLoaded) {
+        logger.info(`[DEBUG] playerStore._savePlayRecord - status not loaded, returning early`);
+      }
     }
   },
 
@@ -449,6 +459,10 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       set({ status: newStatus });
       return;
     }
+
+    // 先更新 status，确保 _savePlayRecord 能获取到最新的状态
+    const progressPosition = newStatus.durationMillis ? newStatus.positionMillis / newStatus.durationMillis : 0;
+    set({ status: newStatus, progressPosition });
 
     const { currentEpisodeIndex, episodes, outroStartTime, playEpisode } = get();
     const detail = useDetailStore.getState().detail;
@@ -465,6 +479,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     }
 
     if (detail && newStatus.durationMillis) {
+      logger.info(`[DEBUG] playerStore.handlePlaybackStatusUpdate - calling _savePlayRecord`);
       get()._savePlayRecord();
 
       const isNearEnd = newStatus.positionMillis / newStatus.durationMillis > 0.95;
@@ -480,9 +495,6 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         playEpisode(currentEpisodeIndex + 1);
       }
     }
-
-    const progressPosition = newStatus.durationMillis ? newStatus.positionMillis / newStatus.durationMillis : 0;
-    set({ status: newStatus, progressPosition });
   },
 
   setLoading: (loading) => set({ isLoading: loading }),

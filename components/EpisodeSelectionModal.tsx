@@ -10,10 +10,9 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
   const { showEpisodeModal, currentEpisodeIndex, playEpisode, setShowEpisodeModal, currentPlaySourceIndex, onLineChange, episodeModalInitialTab, episodes: playerEpisodes } = usePlayerStore();
   const { detail } = useDetailStore();
   
-  // 优先使用 detail.play_sources 中的剧集，如果没有则使用 playerStore 中的剧集
-  const playSources = detail?.play_sources || [];
-  const playSourceEpisodes = playSources.length > 0 && currentPlaySourceIndex < playSources.length && playSources[currentPlaySourceIndex]?.episodes ? playSources[currentPlaySourceIndex].episodes : [];
-  const episodes = playSourceEpisodes.length > 0 ? playSourceEpisodes : playerEpisodes;
+  // 使用 playerStore 中的剧集数据，因为它已经处理了加载和映射
+  const playSources: Array<{ name: string; episodes: string[]; episodes_titles: string[] }> = detail?.play_sources || [];
+  const episodes = playerEpisodes;
 
   const [episodeGroupSize] = useState(30);
   const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(Math.floor(currentEpisodeIndex / episodeGroupSize));
@@ -96,10 +95,10 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
           ) : (
             <ScrollView contentContainerStyle={styles.linesList}>
               {playSources.length > 0 ? (
-                playSources.map((source, index) => (
+                playSources.map((source: any, index) => (
                   <StyledButton
                     key={index}
-                    text={source.name}
+                    text={source.name || `线路${index + 1}`}
                     onPress={() => onLineChange(index)}
                     isSelected={currentPlaySourceIndex === index}
                     style={styles.lineItem}

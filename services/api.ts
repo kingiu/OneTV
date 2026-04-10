@@ -56,6 +56,8 @@ export class Api {
           const authInfo = JSON.parse(credentialsStr);
           if (authInfo.password) {
             requestHeaders.set('X-Auth-Password', authInfo.password);
+            // 确保设置 X-Auth-Username，即使是空字符串
+            requestHeaders.set('X-Auth-Username', authInfo.username || "");
           } else if (authInfo.username && authInfo.signature) {
             requestHeaders.set('X-Auth-Username', authInfo.username);
             requestHeaders.set('X-Auth-Signature', authInfo.signature);
@@ -91,6 +93,7 @@ export class Api {
 
     try {
       console.log('Fetching:', `${this.baseURL}${url}`);
+      console.log('Request headers:', headers);
       const response = await fetch(`${this.baseURL}${url}`, {
         ...options,
         headers,
@@ -106,6 +109,7 @@ export class Api {
         // 提取 cookie 的名称和值部分（不包含 Path、Expires 等属性）
         const cookieString = setCookie.split('; ')[0];
         await AsyncStorage.setItem("authCookies", cookieString);
+        console.log('Set authCookies:', cookieString);
       }
 
       if (response.status === 401 && retryCount < 1 && !avoidReLogin) {
@@ -122,7 +126,8 @@ export class Api {
                 method: "POST",
                 headers: { 
                   "Content-Type": "application/json",
-                  "X-Auth-Password": authInfo.password
+                  "X-Auth-Password": authInfo.password,
+                  "X-Auth-Username": authInfo.username || ""
                 },
                 body: JSON.stringify({ username: authInfo.username || "", password: authInfo.password }),
               });
@@ -139,7 +144,7 @@ export class Api {
                 body: JSON.stringify({ username: authInfo.username }),
               });
             }
-            
+
             if (loginResponse && loginResponse.ok) {
               console.log('重新登录成功，重试原请求...');
               // 处理登录响应的 Set-Cookie 头
@@ -147,6 +152,7 @@ export class Api {
               if (loginSetCookie) {
                 const cookieString = loginSetCookie.split('; ')[0];
                 await AsyncStorage.setItem("authCookies", cookieString);
+                console.log('Set authCookies after login:', cookieString);
               }
               // 重新尝试原请求
               return this._fetch(url, options, retryCount + 1);
@@ -703,7 +709,7 @@ export class Api {
   }
 
   // 收藏相关方法
-  async getFavorites(): Promise<Favorite[]> {
+  async getFavorites(): Promise<Record<string, Favorite>> {
     const response = await this._fetch("/api/favorites");
     return response.json();
   }
