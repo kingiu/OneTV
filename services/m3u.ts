@@ -336,10 +336,8 @@ export const getPlaybackUrlCandidates = (
 ): string[] => {
   const fallbackCandidates = originalUrl ? [originalUrl] : [];
   const adFilteredCandidates = getAdFilteredM3u8Candidates(originalUrl, apiBaseUrl, sourceKey, proxyToken);
-  const prioritizedAdFilteredCandidates =
-    adFilteredCandidates.length > 1
-      ? [adFilteredCandidates[1], adFilteredCandidates[0]]
-      : adFilteredCandidates;
+  // 保持 modernProxyUrl 优先于 legacyProxyUrl
+  const prioritizedAdFilteredCandidates = adFilteredCandidates;
 
   const orderedCandidates = adBlockEnabled
     ? [...prioritizedAdFilteredCandidates, ...fallbackCandidates]
