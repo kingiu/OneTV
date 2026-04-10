@@ -145,12 +145,9 @@ const useHomeStore = create<HomeState>((set, get) => ({
 
     try {
       if (selectedCategory.type === "record") {
-        const { isLoggedIn } = useAuthStore.getState();
-        if (!isLoggedIn) {
-          set({ contentData: [], hasMore: false });
-          return;
-        }
+        console.log(`[DEBUG] homeStore.loadMoreData - fetching play records`);
         const records = await PlayRecordManager.getAll();
+        console.log(`[DEBUG] homeStore.loadMoreData - received ${Object.keys(records).length} play records`);
         const rowItems = Object.entries(records)
           .map(([key, record]) => {
             const [source, id] = key.split("+");
@@ -169,8 +166,8 @@ const useHomeStore = create<HomeState>((set, get) => ({
           })
           // .filter((record) => record.progress !== undefined && record.progress > 0 && record.progress < 1)
           .sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
-
-        set({ contentData: rowItems, hasMore: false });
+        console.log(`[DEBUG] homeStore.loadMoreData - created ${rowItems.length} row items`);
+        set({ contentData: rowItems, hasMore: false, loading: false, loadingMore: false, error: null });
       } else if (selectedCategory.type && selectedCategory.tag) {
         const result = await api.getDoubanData(
           selectedCategory.type,
@@ -310,36 +307,11 @@ const useHomeStore = create<HomeState>((set, get) => ({
   },
 
   refreshPlayRecords: async () => {
-    const { apiBaseUrl } = useSettingsStore.getState();
-    await useAuthStore.getState().checkLoginStatus(apiBaseUrl);
-    const { isLoggedIn } = useAuthStore.getState();
-    if (!isLoggedIn) {
-      set((state) => {
-        const recordCategoryExists = state.categories.some((c) => c.type === "record");
-        if (recordCategoryExists) {
-          const newCategories = state.categories.filter((c) => c.type !== "record");
-          if (state.selectedCategory.type === "record") {
-            get().selectCategory(newCategories[0] || null);
-          }
-          return { categories: newCategories };
-        }
-        return {};
-      });
-      return;
-    }
-    const records = await PlayRecordManager.getAll();
-    const hasRecords = Object.keys(records).length > 0;
+    // 无论登录状态如何，始终显示最近播放分类
     set((state) => {
       const recordCategoryExists = state.categories.some((c) => c.type === "record");
-      if (hasRecords && !recordCategoryExists) {
+      if (!recordCategoryExists) {
         return { categories: [initialCategories[0], ...state.categories] };
-      }
-      if (!hasRecords && recordCategoryExists) {
-        const newCategories = state.categories.filter((c) => c.type !== "record");
-        if (state.selectedCategory.type === "record") {
-          get().selectCategory(newCategories[0] || null);
-        }
-        return { categories: newCategories };
       }
       return {};
     });

@@ -47,16 +47,20 @@ export default function HomeScreen() {
   const { isLoggedIn, logout, autoLogin } = useAuthStore();
   const apiConfigStatus = useApiConfig();
 
+  // 应用启动时自动登录并刷新播放记录
+  useEffect(() => {
+    const init = async () => {
+      await autoLogin();
+      await refreshPlayRecords();
+    };
+    init();
+  }, [autoLogin, refreshPlayRecords]);
+
   useFocusEffect(
     useCallback(() => {
       refreshPlayRecords();
     }, [refreshPlayRecords])
   );
-
-  // 应用启动时自动登录
-  useEffect(() => {
-    autoLogin();
-  }, [autoLogin]);
 
     // 双击返回退出逻辑（只限当前页面）
   const backPressTimeRef = useRef<number | null>(null);
@@ -374,7 +378,7 @@ export default function HomeScreen() {
             error={error}
             onEndReached={loadMoreData}
             loadMoreThreshold={LOAD_MORE_THRESHOLD}
-            emptyMessage={selectedCategory?.tags ? "请选择一个子分类" : "该分类下暂无内容"}
+            emptyMessage={selectedCategory?.type === "record" ? "暂无播放记录" : (selectedCategory?.tags ? "请选择一个子分类" : "该分类下暂无内容")}
             ListFooterComponent={renderFooter}
           />
         </Animated.View>

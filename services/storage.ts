@@ -119,32 +119,75 @@ export class FavoriteManager {
   }
 
   static async getAll(): Promise<Record<string, Favorite>> {
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    
+    // 始终从本地存储获取收藏，确保能够显示
+    let favorites: Record<string, Favorite> = {};
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
+      favorites = data ? JSON.parse(data) : {};
+    } catch (error) {
+      logger.info("Failed to get all local favorites:", error);
+      favorites = {};
+    }
+
+    // 如果存储类型不是本地存储，也尝试从 API 获取收藏
+    if (storageType && storageType !== "localstorage") {
       try {
-        const data = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
-        return data ? JSON.parse(data) : {};
+        const apiData = await api.getFavorites();
+        // 合并 API 数据和本地数据，优先使用 API 数据
+        // 只有当 API 数据不为空时才合并，避免覆盖本地数据
+        if (Object.keys(apiData).length > 0) {
+          favorites = { ...favorites, ...apiData };
+        }
       } catch (error) {
-        logger.info("Failed to get all local favorites:", error);
-        return {};
+        logger.info("Failed to get favorites from API:", error);
+        // 继续使用本地数据
       }
     }
-    return (await api.getFavorites()) as Record<string, Favorite>;
+
+    return favorites;
   }
 
   static async save(source: string, id: string, item: Favorite): Promise<void> {
     const key = generateKey(source, id);
-    if (this.getStorageType() === "localstorage") {
-      const allFavorites = await this.getAll();
+    const storageType = this.getStorageType();
+    
+    // 始终保存到本地存储，确保收藏能够显示
+    try {
+      const allFavorites = await this.getAllLocal();
       allFavorites[key] = { ...item, save_time: Date.now() };
       await AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(allFavorites));
-      return;
+    } catch (error) {
+      logger.info("Failed to save favorite to local storage:", error);
     }
-    await api.addFavorite(key, item);
+    
+    // 如果存储类型不是本地存储，也尝试保存到 API
+    if (storageType && storageType !== "localstorage") {
+      try {
+        await api.addFavorite(key, item);
+      } catch (error) {
+        logger.info("Failed to save favorite to API:", error);
+      }
+    }
+  }
+  
+  // 从本地存储获取所有收藏
+  static async getAllLocal(): Promise<Record<string, Favorite>> {
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      logger.info("Failed to get all local favorites:", error);
+      return {};
+    }
   }
 
   static async remove(source: string, id: string): Promise<void> {
     const key = generateKey(source, id);
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
+    if (!storageType || storageType === "localstorage") {
       const allFavorites = await this.getAll();
       delete allFavorites[key];
       await AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(allFavorites));
@@ -155,12 +198,14 @@ export class FavoriteManager {
 
   static async isFavorited(source: string, id: string): Promise<boolean> {
     const key = generateKey(source, id);
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
+    if (!storageType || storageType === "localstorage") {
       const allFavorites = await this.getAll();
       return !!allFavorites[key];
     }
-    const favorite = await api.getFavorites(key);
-    return favorite !== null;
+    const favorites = await api.getFavorites();
+    return !!favorites[key];
   }
 
   static async toggle(source: string, id: string, item: Favorite): Promise<boolean> {
@@ -175,7 +220,9 @@ export class FavoriteManager {
   }
 
   static async clearAll(): Promise<void> {
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
+    if (!storageType || storageType === "localstorage") {
       await AsyncStorage.removeItem(STORAGE_KEYS.FAVORITES);
       return;
     }
@@ -244,19 +291,38 @@ export class PlayRecordManager {
     logger.info(`[PERF] PlayRecordManager.getAll START - storageType: ${storageType}`);
 
     let apiRecords: Record<string, PlayRecord> = {};
-    if (storageType === "localstorage") {
-      try {
-        const data = await AsyncStorage.getItem(STORAGE_KEYS.PLAY_RECORDS);
-        apiRecords = data ? JSON.parse(data) : {};
-      } catch (error) {
-        logger.info("Failed to get all local play records:", error);
-        return {};
+    
+    // 始终从本地存储获取播放记录，确保能够显示
+    try {
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.PLAY_RECORDS);
+      apiRecords = data ? JSON.parse(data) : {};
+      logger.info(`[DEBUG] PlayRecordManager.getAll - local storage records: ${Object.keys(apiRecords).length}`);
+      if (Object.keys(apiRecords).length > 0) {
+        logger.info(`[DEBUG] PlayRecordManager.getAll - local storage keys: ${Object.keys(apiRecords).join(', ')}`);
       }
-    } else {
+    } catch (error) {
+      logger.info("Failed to get all local play records:", error);
+      apiRecords = {};
+    }
+
+    // 如果存储类型不是本地存储，也尝试从 API 获取播放记录
+    if (storageType && storageType !== "localstorage") {
       const apiStart = performance.now();
       logger.info(`[PERF] API getPlayRecords START`);
 
-      apiRecords = await api.getPlayRecords();
+      try {
+        const apiData = await api.getPlayRecords();
+        // 合并 API 数据和本地数据，优先使用 API 数据
+        // 只有当 API 数据不为空时才合并，避免覆盖本地数据
+        logger.info(`[DEBUG] PlayRecordManager.getAll - API records: ${Object.keys(apiData).length}`);
+        if (Object.keys(apiData).length > 0) {
+          apiRecords = { ...apiRecords, ...apiData };
+          logger.info(`[DEBUG] PlayRecordManager.getAll - merged records: ${Object.keys(apiRecords).length}`);
+        }
+      } catch (error) {
+        logger.info("Failed to get play records from API:", error);
+        // 继续使用本地数据
+      }
 
       const apiEnd = performance.now();
       logger.info(
@@ -288,18 +354,37 @@ export class PlayRecordManager {
   static async save(source: string, id: string, record: Omit<PlayRecord, "save_time">): Promise<void> {
     const key = generateKey(source, id);
     const { introEndTime, outroStartTime, ...apiRecord } = record;
+    
+    logger.info(`[DEBUG] PlayRecordManager.save START - key: ${key}, record: ${JSON.stringify(apiRecord)}`);
 
     // Player settings are always saved locally
     await PlayerSettingsManager.save(source, id, { introEndTime, outroStartTime });
 
-    if (this.getStorageType() === "localstorage") {
-      const allRecords = await this.getAll();
+    // 始终保存到本地存储，确保播放记录能够显示
+    try {
+      // 直接从本地存储获取播放记录，避免 API 数据覆盖本地数据
+      const data = await AsyncStorage.getItem(STORAGE_KEYS.PLAY_RECORDS);
+      const allRecords = data ? JSON.parse(data) : {};
       const fullRecord = { ...apiRecord, save_time: Date.now() };
       allRecords[key] = { ...allRecords[key], ...fullRecord };
       await AsyncStorage.setItem(STORAGE_KEYS.PLAY_RECORDS, JSON.stringify(allRecords));
-    } else {
-      await api.savePlayRecord(key, apiRecord);
+      logger.info(`[DEBUG] PlayRecordManager.save SUCCESS - saved to local storage, total records: ${Object.keys(allRecords).length}`);
+    } catch (error) {
+      logger.info("Failed to save play record to local storage:", error);
     }
+
+    // 如果存储类型不是本地存储，也尝试保存到 API
+    const storageType = this.getStorageType();
+    if (storageType && storageType !== "localstorage") {
+      try {
+        await api.savePlayRecord(key, apiRecord);
+        logger.info(`[DEBUG] PlayRecordManager.save SUCCESS - saved to API`);
+      } catch (error) {
+        logger.info("Failed to save play record to API:", error);
+      }
+    }
+    
+    logger.info(`[DEBUG] PlayRecordManager.save END`);
   }
 
   static async get(source: string, id: string): Promise<PlayRecord | null> {
@@ -321,22 +406,34 @@ export class PlayRecordManager {
     const key = generateKey(source, id);
     await PlayerSettingsManager.remove(source, id); // Always remove local settings
 
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
+    if (!storageType || storageType === "localstorage") {
       const allRecords = await this.getAll();
       delete allRecords[key];
       await AsyncStorage.setItem(STORAGE_KEYS.PLAY_RECORDS, JSON.stringify(allRecords));
     } else {
-      await api.deletePlayRecord(key);
+      try {
+        await api.deletePlayRecord(key);
+      } catch (error) {
+        logger.info("Failed to delete play record from API:", error);
+      }
     }
   }
 
   static async clearAll(): Promise<void> {
     await PlayerSettingsManager.clearAll(); // Always clear local settings
 
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
+    if (!storageType || storageType === "localstorage") {
       await AsyncStorage.removeItem(STORAGE_KEYS.PLAY_RECORDS);
     } else {
-      await api.deletePlayRecord();
+      try {
+        await api.deletePlayRecord();
+      } catch (error) {
+        logger.info("Failed to clear all play records from API:", error);
+      }
     }
   }
 }
@@ -348,7 +445,9 @@ export class SearchHistoryManager {
   }
 
   static async get(): Promise<string[]> {
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
+    if (!storageType || storageType === "localstorage") {
       try {
         const data = await AsyncStorage.getItem(STORAGE_KEYS.SEARCH_HISTORY);
         return data ? JSON.parse(data) : [];
@@ -364,7 +463,9 @@ export class SearchHistoryManager {
     const trimmed = keyword.trim();
     if (!trimmed) return;
 
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
+    if (!storageType || storageType === "localstorage") {
       let history = await this.get();
       history = [trimmed, ...history.filter((k) => k !== trimmed)].slice(0, 20); // Keep latest 20
       await AsyncStorage.setItem(STORAGE_KEYS.SEARCH_HISTORY, JSON.stringify(history));
@@ -374,7 +475,9 @@ export class SearchHistoryManager {
   }
 
   static async clear(): Promise<void> {
-    if (this.getStorageType() === "localstorage") {
+    const storageType = this.getStorageType();
+    // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
+    if (!storageType || storageType === "localstorage") {
       await AsyncStorage.removeItem(STORAGE_KEYS.SEARCH_HISTORY);
       return;
     }
