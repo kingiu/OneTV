@@ -127,11 +127,12 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   // 测试线路速度的函数
   testLineSpeed: async (url: string): Promise<number> => {
     try {
+      const { proxyService } = await import('@/services/proxyService');
       const startTime = performance.now();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
 
-      const response = await fetch(url, {
+      const response = await proxyService.fetch(url, {
         signal: controller.signal,
         method: 'HEAD', // 使用HEAD请求，只获取头信息，不下载内容
         redirect: 'follow',
@@ -297,29 +298,68 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       logger.info(`[PERF] Skipping DetailStore.init - using cached data`);
 
       // Even with cached data, ensure episodes are loaded from the right source.
-    if (detail && detail.source && detail.source !== source) {
-      logger.info(
-        `[INFO] Cached detail source "${detail.source}" differs from provided source "${source}", updating episodes`
-      );
-      // 从 searchResults 中找到对应的 source 的 detail 对象
-      const detailStoreState = useDetailStore.getState();
-      const sourceDetail = detailStoreState.searchResults.find(r => r.source === source);
-      if (sourceDetail) {
+      if (detail && detail.source && detail.source !== source) {
         logger.info(
-          `[INFO] Found detail for source "${source}", updating DetailStore`
+          `[INFO] Cached detail source "${detail.source}" differs from provided source "${source}", updating episodes`
         );
-        useDetailStore.getState().setDetail(sourceDetail);
-        detail = sourceDetail;
-      }
-      episodes = episodesSelectorBySource(source)(useDetailStore.getState());
+        // 从 searchResults 中找到对应的 source 的 detail 对象
+        const detailStoreState = useDetailStore.getState();
+        const sourceDetail = detailStoreState.searchResults.find(r => r.source === source);
+        if (sourceDetail) {
+          logger.info(
+            `[INFO] Found detail for source "${source}", updating DetailStore`
+          );
+          useDetailStore.getState().setDetail(sourceDetail);
+          detail = sourceDetail;
+        }
+        episodes = episodesSelectorBySource(source)(useDetailStore.getState());
 
-      if (!episodes || episodes.length === 0) {
-        logger.warn(
-          `[WARN] Provided source "${source}" has no episodes, trying cached source "${detail.source}"`
-        );
+        if (!episodes || episodes.length === 0) {
+          logger.warn(
+            `[WARN] Provided source "${source}" has no episodes, trying cached source "${detail.source}"`
+          );
+          episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+          
+          // If cached source also has no episodes, try to find any source with episodes
+          if (!episodes || episodes.length === 0) {
+            const detailStoreState = useDetailStore.getState();
+            const sourceWithEpisodes = detailStoreState.searchResults.find((r) => r.episodes && r.episodes.length > 0);
+            if (sourceWithEpisodes) {
+              logger.info(
+                `[FALLBACK] Using alternative source "${sourceWithEpisodes.source}" with ${sourceWithEpisodes.episodes.length} episodes`
+              );
+              episodes = sourceWithEpisodes.episodes;
+              detail = sourceWithEpisodes;
+            } else {
+              logger.error(`[ERROR] No source with episodes found in searchResults`);
+              set({ isLoading: false });
+              return;
+            }
+          }
+        }
+      } else if (detail) {
+        // Ensure episodes are loaded for the current source
         episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+        
+        if (!episodes || episodes.length === 0) {
+          logger.error(`[ERROR] No episodes found for "${title}" from source "${detail.source}" (${detail.source_name})`);
+          
+          // Try to find any source with episodes
+          const detailStoreState = useDetailStore.getState();
+          const sourceWithEpisodes = detailStoreState.searchResults.find((r) => r.episodes && r.episodes.length > 0);
+          if (sourceWithEpisodes) {
+            logger.info(
+              `[FALLBACK] Using alternative source "${sourceWithEpisodes.source}" with ${sourceWithEpisodes.episodes.length} episodes`
+            );
+            episodes = sourceWithEpisodes.episodes;
+            detail = sourceWithEpisodes;
+          } else {
+            logger.error(`[ERROR] No source with episodes found in searchResults`);
+            set({ isLoading: false });
+            return;
+          }
+        }
       }
-    }
     }
 
     // Final validation.

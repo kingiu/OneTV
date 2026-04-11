@@ -1,5 +1,6 @@
 import * as FileSystem from "expo-file-system";
 import Logger from "@/utils/Logger";
+import { proxyService } from "@/services/proxyService";
 
 const logger = Logger.withTag("M3U");
 
@@ -184,7 +185,7 @@ const fetchM3u8WithTimeout = async (url: string, timeoutMs = 12000) => {
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(url, {
+    const response = await proxyService.fetch(url, {
       signal: controller.signal,
       redirect: "follow",
       cache: "no-store",
@@ -205,29 +206,34 @@ const fetchM3u8WithTimeout = async (url: string, timeoutMs = 12000) => {
 };
 
 const resolveToMediaPlaylist = async (playlistUrl: string) => {
-  const primary = await fetchM3u8WithTimeout(playlistUrl);
+  try {
+    const primary = await fetchM3u8WithTimeout(playlistUrl);
 
-  if (!primary.text.includes("#EXT-X-STREAM-INF")) {
-    return primary;
-  }
-
-  const variants = parseVariantPlaylistUrls(primary.text, primary.finalUrl);
-  if (!variants.length) {
-    return primary;
-  }
-
-  for (const variant of variants) {
-    try {
-      const variantPlaylist = await fetchM3u8WithTimeout(variant.url);
-      if (variantPlaylist.text.includes("#EXTINF")) {
-        return variantPlaylist;
-      }
-    } catch (error) {
-      logger.warn(`[ADBLOCK] Failed to fetch variant playlist: ${variant.url}`);
+    if (!primary.text.includes("#EXT-X-STREAM-INF")) {
+      return primary;
     }
-  }
 
-  return primary;
+    const variants = parseVariantPlaylistUrls(primary.text, primary.finalUrl);
+    if (!variants.length) {
+      return primary;
+    }
+
+    for (const variant of variants) {
+      try {
+        const variantPlaylist = await fetchM3u8WithTimeout(variant.url);
+        if (variantPlaylist.text.includes("#EXTINF")) {
+          return variantPlaylist;
+        }
+      } catch (error) {
+        logger.warn(`[ADBLOCK] Failed to fetch variant playlist: ${variant.url}`);
+      }
+    }
+
+    return primary;
+  } catch (error) {
+    logger.warn(`[ADBLOCK] Failed to fetch primary playlist: ${playlistUrl}`);
+    throw error;
+  }
 };
 
 const hashString = (value: string) => {
@@ -251,11 +257,16 @@ export const createDiscontinuityFilteredM3u8Url = async (originalUrl: string): P
 
   const cachedUrl = filteredPlaylistCache.get(originalUrl);
   if (cachedUrl) {
-    const fileInfo = await FileSystem.getInfoAsync(cachedUrl);
-    if (fileInfo.exists) {
-      return cachedUrl;
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(cachedUrl);
+      if (fileInfo.exists) {
+        return cachedUrl;
+      }
+      filteredPlaylistCache.delete(originalUrl);
+    } catch (error) {
+      logger.warn(`[ADBLOCK] Failed to check cached playlist: ${cachedUrl}`);
+      filteredPlaylistCache.delete(originalUrl);
     }
-    filteredPlaylistCache.delete(originalUrl);
   }
 
   try {
@@ -269,18 +280,23 @@ export const createDiscontinuityFilteredM3u8Url = async (originalUrl: string): P
       return null;
     }
 
-    await FileSystem.makeDirectoryAsync(FILTER_CACHE_DIR, { intermediates: true });
-    const fileName = `${hashString(originalUrl)}.m3u8`;
-    const fileUri = `${FILTER_CACHE_DIR}${fileName}`;
+    try {
+      await FileSystem.makeDirectoryAsync(FILTER_CACHE_DIR, { intermediates: true });
+      const fileName = `${hashString(originalUrl)}.m3u8`;
+      const fileUri = `${FILTER_CACHE_DIR}${fileName}`;
 
-    await FileSystem.writeAsStringAsync(fileUri, filteredPlaylist, {
-      encoding: FileSystem.EncodingType.UTF8,
-    });
+      await FileSystem.writeAsStringAsync(fileUri, filteredPlaylist, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
 
-    filteredPlaylistCache.set(originalUrl, fileUri);
-    return fileUri;
+      filteredPlaylistCache.set(originalUrl, fileUri);
+      return fileUri;
+    } catch (fsError) {
+      logger.warn(`[ADBLOCK] Failed to write filtered playlist: ${originalUrl}`, fsError);
+      return null;
+    }
   } catch (error) {
-    logger.warn(`[ADBLOCK] Failed to build filtered playlist for ${originalUrl}`);
+    logger.warn(`[ADBLOCK] Failed to build filtered playlist for ${originalUrl}`, error);
     return null;
   }
 };

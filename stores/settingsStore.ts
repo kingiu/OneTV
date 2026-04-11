@@ -67,7 +67,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     sources: {},
   },
   proxyConfig: {
-    enabled: false,
+    enabled: true,
     useBackendProxy: true,
     cacheEnabled: true,
     cacheTTL: 3600,
@@ -76,6 +76,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       // 根据环境区分API地址
       const defaultUrl = __DEV__ ? "http://192.168.100.101:3000" : "https://onetv.aisxuexi.com";
       api.setBaseUrl(defaultUrl);
+      proxyService.setBaseUrl(defaultUrl);
       
       const settings = await SettingsManager.get();
       console.log('Loaded settings:', settings);
@@ -124,6 +125,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setApiBaseUrl: (url) => {
     set({ apiBaseUrl: url });
     api.setBaseUrl(url);
+    proxyService.setBaseUrl(url);
   },
   setCronPassword: (password) => set({ cronPassword: password }),
   setM3uUrl: (url) => set({ m3uUrl: url }),
@@ -196,6 +198,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       await AsyncStorage.setItem("authCookies", "");
     }
     api.setBaseUrl(processedApiBaseUrl);
+    proxyService.setBaseUrl(processedApiBaseUrl);
     // Also update the URL in the state so the input field shows the processed URL
     set({ isModalVisible: false, apiBaseUrl: processedApiBaseUrl });
     // 尝试获取服务器配置，但即使失败也不影响设置保存

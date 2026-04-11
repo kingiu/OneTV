@@ -168,7 +168,7 @@ class ProxyService {
   }
 
   // 代理请求
-  public async fetch(url: string, options: RequestInit = {}): Promise<Response> {
+  public async fetch(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
     const targetUrl = this.buildProxyUrl(url);
     const cacheKey = this.generateCacheKey(targetUrl, options.method || 'GET', options.body as string);
 
@@ -185,26 +185,59 @@ class ProxyService {
       });
     }
 
-    logger.debug('Fetching through proxy:', targetUrl);
-
-    try {
-      const response = await fetch(targetUrl, options);
-
-      // 缓存成功的 GET 请求
-      if (response.ok && options.method === 'GET') {
-        try {
-          const data = await response.clone().json();
-          this.saveToCache(cacheKey, data);
-        } catch {
-          // 非 JSON 响应不缓存
+    // 定义请求函数
+    const makeRequest = async (requestUrl: string, isProxy: boolean): Promise<Response> => {
+      logger.debug(isProxy ? 'Fetching through proxy:' : 'Fetching directly:', requestUrl);
+      try {
+        const response = await fetch(requestUrl, options);
+        
+        // 缓存成功的 GET 请求
+        if (response.ok && options.method === 'GET') {
+          try {
+            const data = await response.clone().json();
+            this.saveToCache(cacheKey, data);
+          } catch {
+            // 非 JSON 响应不缓存
+          }
         }
+        
+        return response;
+      } catch (error) {
+        logger.error(isProxy ? 'Proxy fetch error:' : 'Direct fetch error:', error);
+        throw error;
       }
+    };
 
-      return response;
-    } catch (error) {
-      logger.error('Proxy fetch error:', error);
-      throw error;
+    // 尝试使用代理请求
+    if (targetUrl !== url) {
+      try {
+        return await makeRequest(targetUrl, true);
+      } catch (error) {
+        logger.warn('Falling back to direct request for:', url);
+        // 代理请求失败，回退到直接请求
+      }
     }
+
+    // 尝试直接请求，支持重试
+    for (let i = 0; i <= retries; i++) {
+      try {
+        if (i > 0) {
+          logger.warn(`Retrying direct request (${i}/${retries}) for:`, url);
+          // 重试前添加延迟
+          await new Promise(resolve => setTimeout(resolve, 1000 * i));
+        }
+        return await makeRequest(url, false);
+      } catch (error) {
+        if (i === retries) {
+          logger.error('All direct requests failed:', error);
+          throw error;
+        }
+        logger.warn(`Direct request failed (${i}/${retries}), retrying...`);
+      }
+    }
+
+    // 理论上不会到达这里，但为了类型安全添加
+    throw new Error('All requests failed');
   }
 
   // 获取图片代理 URL

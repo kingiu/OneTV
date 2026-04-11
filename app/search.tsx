@@ -69,7 +69,9 @@ export default function SearchScreen() {
     try {
       const response = await api.searchVideos(term);
       if (response.results.length > 0) {
-        setResults(response.results);
+        // 聚合相同标题的结果，计算源数量
+        const aggregatedResults = aggregateSearchResults(response.results);
+        setResults(aggregatedResults);
       } else {
         setError("没有找到相关内容");
       }
@@ -79,6 +81,30 @@ export default function SearchScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 聚合搜索结果，将相同标题的结果合并并计算源数量
+  const aggregateSearchResults = (results: SearchResult[]): SearchResult[] => {
+    const titleMap = new Map<string, SearchResult & { sourceCount: number; sources: string[] }>();
+
+    results.forEach(item => {
+      if (titleMap.has(item.title)) {
+        // 如果标题已存在，增加源数量
+        const existingItem = titleMap.get(item.title)!;
+        existingItem.sourceCount += 1;
+        existingItem.sources.push(item.source);
+      } else {
+        // 如果标题不存在，创建新条目
+        titleMap.set(item.title, {
+          ...item,
+          sourceCount: 1,
+          sources: [item.source]
+        });
+      }
+    });
+
+    // 转换回数组并返回
+    return Array.from(titleMap.values());
   };
 
   const onSearchPress = () => handleSearch();
@@ -94,7 +120,7 @@ export default function SearchScreen() {
     showRemoteModal('search');
   };
 
-  const renderItem = ({ item }: { item: SearchResult; index: number }) => (
+  const renderItem = ({ item }: { item: SearchResult & { sourceCount?: number }; index: number }) => (
     <VideoCard
       id={item.id.toString()}
       source={item.source}
@@ -102,6 +128,7 @@ export default function SearchScreen() {
       poster={item.poster}
       year={item.year}
       sourceName={item.source_name}
+      sourceCount={item.sourceCount}
       api={api}
     />
   );

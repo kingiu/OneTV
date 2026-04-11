@@ -103,9 +103,26 @@ const useDetailStore = create<DetailState>((set, get) => ({
       if (signal.aborted) return;
 
       set((state) => {
-        const existingSources = new Set(state.searchResults.map((r) => r.source));
-        const newResults = resultsWithResolution.filter((r) => !existingSources.has(r.source));
-        const finalResults = merge ? [...state.searchResults, ...newResults] : resultsWithResolution;
+        // 同时根据 source 和 source_name 去重，避免相同名称的播放源重复显示
+        let finalResults;
+        if (merge) {
+          const existingSources = new Set(state.searchResults.map((r) => r.source));
+          const existingSourceNames = new Set(state.searchResults.map((r) => r.source_name));
+          const newResults = resultsWithResolution.filter((r) => 
+            !existingSources.has(r.source) && !existingSourceNames.has(r.source_name)
+          );
+          finalResults = [...state.searchResults, ...newResults];
+        } else {
+          // 初始加载时也要去重相同名称的播放源
+          const seenSourceNames = new Set();
+          finalResults = resultsWithResolution.filter((r) => {
+            if (seenSourceNames.has(r.source_name)) {
+              return false;
+            }
+            seenSourceNames.add(r.source_name);
+            return true;
+          });
+        }
 
         return {
           searchResults: finalResults,

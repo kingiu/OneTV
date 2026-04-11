@@ -19,6 +19,7 @@ interface VideoCardProps extends React.ComponentProps<typeof TouchableOpacity> {
   year?: string;
   rate?: string;
   sourceName?: string;
+  sourceCount?: number;
   progress?: number; // 播放进度，0-1之间的小数
   playTime?: number; // 播放时间 in ms
   episodeIndex?: number; // 剧集索引
@@ -38,6 +39,7 @@ const VideoCard = forwardRef<View, VideoCardProps>(
       year,
       rate,
       sourceName,
+      sourceCount,
       progress,
       episodeIndex,
       onFocus,
@@ -201,6 +203,11 @@ const VideoCard = forwardRef<View, VideoCardProps>(
                 <Text style={styles.badgeText}>{sourceName}</Text>
               </View>
             )}
+            {sourceCount && sourceCount > 1 && (
+              <View style={styles.sourceCountBadge}>
+                <Text style={styles.badgeText}>{sourceCount} 源</Text>
+              </View>
+            )}
           </View>
           <View style={styles.infoContainer}>
             <ThemedText numberOfLines={1}>{title}</ThemedText>
@@ -321,6 +328,15 @@ const styles = StyleSheet.create({
     top: 8,
     left: 8,
     backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  sourceCountBadge: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    backgroundColor: "rgba(52, 199, 89, 0.9)",
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,
