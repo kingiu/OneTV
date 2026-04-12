@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet, Image, ScrollView, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Image, ScrollView, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -23,12 +23,10 @@ export default function DetailScreen() {
 
   const {
     detail,
-    searchResults,
     loading,
     error,
     allSourcesLoaded,
     init,
-    setDetail,
     abort,
     isFavorited,
     toggleFavorite,
@@ -56,15 +54,6 @@ export default function DetailScreen() {
         episodeIndex: episodeIndex.toString(),
       },
     });
-  };
-
-  const handleSourcePress = async (item: (typeof searchResults)[number]) => {
-    const isCurrentSource = detail?.source === item.source;
-    await setDetail(item);
-
-    if (isCurrentSource && item.episodes.length > 0) {
-      handlePlay(0);
-    }
   };
 
   if (loading) {
@@ -147,41 +136,16 @@ export default function DetailScreen() {
             <ThemedText style={dynamicStyles.description}>{detail.desc}</ThemedText>
           </View>
 
-          {/* 播放源 */}
-          <View style={dynamicStyles.sourcesContainer}>
-            <View style={dynamicStyles.sourcesTitleContainer}>
-              <ThemedText style={dynamicStyles.sourcesTitle}>播放源 ({searchResults.length})</ThemedText>
-              {!allSourcesLoaded && <ActivityIndicator style={{ marginLeft: 10 }} />}
-              <StyledButton
-                text="播放第1集"
-                onPress={() => handlePlay(0)}
-                disabled={detail.episodes.length === 0}
-                style={dynamicStyles.quickPlayButton}
-                textStyle={dynamicStyles.quickPlayButtonText}
-              />
-            </View>
-            <View style={dynamicStyles.sourceList}>
-              {searchResults.map((item, index) => {
-                const isSelected = detail?.source === item.source;
-                return (
-                  <StyledButton
-                    key={index}
-                    onPress={() => handleSourcePress(item)}
-                    isSelected={isSelected}
-                    style={dynamicStyles.sourceButton}
-                  >
-                    <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
-                    {item.episodes.length > 1 && (
-                      <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
-                        <Text style={dynamicStyles.badgeText}>
-                          {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
-                        </Text>
-                      </View>
-                    )}
-                  </StyledButton>
-                );
-              })}
-            </View>
+          {/* 快速播放按钮 */}
+          <View style={dynamicStyles.quickPlayContainer}>
+            {!allSourcesLoaded && <ActivityIndicator style={{ marginRight: 10 }} />}
+            <StyledButton
+              text="开始播放"
+              onPress={() => handlePlay(0)}
+              disabled={detail.episodes.length === 0}
+              style={dynamicStyles.quickPlayButton}
+              textStyle={dynamicStyles.quickPlayButtonText}
+            />
           </View>
 
           {/* 剧集列表 */}
@@ -232,41 +196,16 @@ export default function DetailScreen() {
           </View>
 
           <View style={dynamicStyles.bottomContainer}>
-            <View style={dynamicStyles.sourcesContainer}>
-              <View style={dynamicStyles.sourcesTitleContainer}>
-                <ThemedText style={dynamicStyles.sourcesTitle}>选择播放源 共 {searchResults.length} 个</ThemedText>
-                {!allSourcesLoaded && <ActivityIndicator style={{ marginLeft: 10 }} />}
-                <StyledButton
-                  text="播放第1集"
-                  onPress={() => handlePlay(0)}
-                  disabled={detail.episodes.length === 0}
-                  style={dynamicStyles.quickPlayButton}
-                  textStyle={dynamicStyles.quickPlayButtonText}
-                />
-              </View>
-              <View style={dynamicStyles.sourceList}>
-                {searchResults.map((item, index) => {
-                  const isSelected = detail?.source === item.source;
-                  return (
-                    <StyledButton
-                      key={index}
-                      onPress={() => handleSourcePress(item)}
-                      hasTVPreferredFocus={index === 0}
-                      isSelected={isSelected}
-                      style={dynamicStyles.sourceButton}
-                    >
-                      <ThemedText style={dynamicStyles.sourceButtonText}>{item.source_name}</ThemedText>
-                      {item.episodes.length > 1 && (
-                        <View style={[dynamicStyles.badge, isSelected && dynamicStyles.selectedBadge]}>
-                          <Text style={dynamicStyles.badgeText}>
-                            {item.episodes.length > 99 ? "99+" : `${item.episodes.length}`} 集
-                          </Text>
-                        </View>
-                      )}
-                    </StyledButton>
-                  );
-                })}
-              </View>
+            {/* 快速播放按钮 */}
+            <View style={dynamicStyles.quickPlayContainer}>
+              {!allSourcesLoaded && <ActivityIndicator style={{ marginRight: 10 }} />}
+              <StyledButton
+                text="开始播放"
+                onPress={() => handlePlay(0)}
+                disabled={detail.episodes.length === 0}
+                style={dynamicStyles.quickPlayButton}
+                textStyle={dynamicStyles.quickPlayButtonText}
+              />
             </View>
             <View style={dynamicStyles.episodesContainer}>
               <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
@@ -394,57 +333,24 @@ const createResponsiveStyles = (deviceType: string, spacing: number) => {
     bottomContainer: {
       paddingHorizontal: spacing,
     },
-    sourcesContainer: {
-      marginTop: spacing,
-    },
-    sourcesTitleContainer: {
+    quickPlayContainer: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
+      justifyContent: "center",
+      marginTop: spacing,
       marginBottom: spacing / 2,
     },
-    sourcesTitle: {
-      fontSize: isMobile ? 16 : isTablet ? 18 : 20,
-      fontWeight: "bold",
-      color: "white",
-    },
-    sourceList: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-    },
-    sourceButton: {
-      margin: isMobile ? 4 : 8,
-      minHeight: isMobile ? 36 : 44,
-    },
-    sourceButtonText: {
-      color: "white",
-      fontSize: isMobile ? 14 : 16,
-    },
     quickPlayButton: {
-      marginLeft: spacing / 2,
-      minHeight: isMobile ? 34 : 40,
-      paddingHorizontal: isMobile ? 10 : 12,
-      paddingVertical: isMobile ? 6 : 8,
+      minHeight: isMobile ? 40 : 48,
+      paddingHorizontal: isMobile ? 20 : 24,
+      paddingVertical: isMobile ? 10 : 12,
+      backgroundColor: "#34C759",
+      borderRadius: 8,
     },
     quickPlayButtonText: {
-      fontSize: isMobile ? 12 : 14,
+      fontSize: isMobile ? 14 : 16,
       color: "white",
-    },
-    badge: {
-      backgroundColor: "#666",
-      borderRadius: 10,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      marginLeft: 8,
-    },
-    badgeText: {
-      color: "#fff",
-      fontSize: isMobile ? 10 : 12,
       fontWeight: "bold",
-      paddingBottom: 2.5,
-    },
-    selectedBadge: {
-      backgroundColor: "#4c4c4c",
     },
 
     episodesContainer: {

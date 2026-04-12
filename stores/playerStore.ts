@@ -71,6 +71,7 @@ interface PlayerState {
     title: string;
     episodeIndex: number;
     position?: number;
+    skipAutoSourceSelection?: boolean;
   }) => Promise<void>;
   playEpisode: (index: number) => void;
   togglePlayPause: () => void;
@@ -206,9 +207,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     return bestLineIndex;
   },
 
-  loadVideo: async ({ source, id, episodeIndex, position, title }) => {
+  loadVideo: async ({ source, id, episodeIndex, position, title, skipAutoSourceSelection }) => {
     const perfStart = performance.now();
-    logger.info(`[PERF] PlayerStore.loadVideo START - source: ${source}, id: ${id}, title: ${title}`);
+    logger.info(`[PERF] PlayerStore.loadVideo START - source: ${source}, id: ${id}, title: ${title}, skipAutoSourceSelection: ${skipAutoSourceSelection}`);
 
     let detail = useDetailStore.getState().detail;
     let episodes: string[] = [];
@@ -378,6 +379,23 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     }
 
     logger.info(`[SUCCESS] Final validation passed - detail: ${detail.source_name}, episodes: ${episodes.length}`);
+
+    // 自动选择最佳播放源（除非用户手动选择了源）
+    if (!skipAutoSourceSelection) {
+      const bestSource = await useDetailStore.getState().selectBestSource(episodeIndex);
+      if (bestSource && bestSource.source !== detail.source) {
+        logger.info(`[AUTO_SOURCE] Switching to best source: ${bestSource.source_name} (from ${detail.source_name})`);
+        detail = bestSource;
+        episodes = bestSource.episodes || [];
+        await useDetailStore.getState().setDetail(bestSource);
+      } else if (bestSource) {
+        logger.info(`[AUTO_SOURCE] Current source is already the best: ${detail.source_name}`);
+      } else {
+        logger.warn(`[AUTO_SOURCE] No best source found, using current: ${detail.source_name}`);
+      }
+    } else {
+      logger.info(`[AUTO_SOURCE] Skipped auto source selection (user manually selected source)`);
+    }
 
     try {
       const storageStart = performance.now();

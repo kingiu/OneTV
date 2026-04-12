@@ -17,6 +17,10 @@ interface ProxyConfig {
   cacheTTL: number;
 }
 
+interface SourceWeight {
+  [sourceKey: string]: number;
+}
+
 interface SettingsState {
   apiBaseUrl: string;
   cronPassword: string;
@@ -31,6 +35,7 @@ interface SettingsState {
       [key: string]: boolean;
     };
   };
+  sourceWeights: SourceWeight;
   proxyConfig: ProxyConfig;
   isModalVisible: boolean;
   serverConfig: ServerConfig | null;
@@ -47,6 +52,7 @@ interface SettingsState {
   setProxyConfig: (config: Partial<ProxyConfig>) => void;
   saveSettings: () => Promise<void>;
   setVideoSource: (config: { enabledAll: boolean; sources: { [key: string]: boolean } }) => void;
+  setSourceWeight: (sourceKey: string, weight: number) => void;
   showModal: () => void;
   hideModal: () => void;
 }
@@ -66,6 +72,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     enabledAll: true,
     sources: {},
   },
+  sourceWeights: {},
   proxyConfig: {
     enabled: true,
     useBackendProxy: true,
@@ -96,6 +103,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           enabledAll: true,
           sources: {},
         },
+        sourceWeights: settings.sourceWeights || {},
         proxyConfig,
       });
       
@@ -134,6 +142,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setLiveAdBlockEnabled: (enabled) => set({ liveAdBlockEnabled: enabled }),
   setVodAdBlockEnabled: (enabled) => set({ vodAdBlockEnabled: enabled, vodProxyEnabled: enabled }),
   setVideoSource: (config) => set({ videoSource: config }),
+  setSourceWeight: (sourceKey: string, weight: number) => {
+    set((state) => ({
+      sourceWeights: { ...state.sourceWeights, [sourceKey]: weight },
+    }));
+  },
   setProxyConfig: (config) => {
     set((state) => ({
       proxyConfig: { ...state.proxyConfig, ...config },
@@ -149,6 +162,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       liveAdBlockEnabled,
       vodAdBlockEnabled,
       videoSource,
+      sourceWeights,
       proxyConfig,
     } = get();
     const currentSettings = await SettingsManager.get();
@@ -183,6 +197,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       liveAdBlockEnabled,
       vodAdBlockEnabled,
       videoSource,
+      sourceWeights,
     });
     
     // 保存代理配置

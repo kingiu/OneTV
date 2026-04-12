@@ -19,6 +19,7 @@ interface DetailState {
   q: string | null;
   searchResults: SearchResultWithResolution[];
   sources: { source: string; source_name: string; resolution: string | null | undefined }[];
+  resourceWeights: { [key: string]: number }; // 后端返回的资源权重
   detail: SearchResultWithResolution | null;
   loading: boolean;
   error: string | null;
@@ -33,12 +34,15 @@ interface DetailState {
   toggleFavorite: () => Promise<void>;
   markSourceAsFailed: (source: string, reason: string) => void;
   getNextAvailableSource: (currentSource: string, episodeIndex: number) => SearchResultWithResolution | null;
+  selectBestSource: (episodeIndex?: number) => Promise<SearchResultWithResolution | null>;
+  testSourceSpeed: (url: string) => Promise<number>;
 }
 
 const useDetailStore = create<DetailState>((set, get) => ({
   q: null,
   searchResults: [],
   sources: [],
+  resourceWeights: {},
   detail: null,
   loading: true,
   error: null,
@@ -247,6 +251,14 @@ const useDetailStore = create<DetailState>((set, get) => ({
           const resourcesEnd = performance.now();
           logger.info(`[PERF] API getResources END - took ${(resourcesEnd - resourcesStart).toFixed(2)}ms, resources: ${allResources.length}`);
           
+          // 保存后端返回的资源权重
+          const weights: { [key: string]: number } = {};
+          allResources.forEach(r => {
+            weights[r.key] = r.weight;
+          });
+          set({ resourceWeights: weights });
+          logger.info(`[INFO] Resource weights from backend: ${JSON.stringify(weights)}`);
+          
           const enabledResources = videoSource.enabledAll
             ? allResources
             : allResources.filter((r) => videoSource.sources[r.key]);
@@ -443,6 +455,122 @@ const useDetailStore = create<DetailState>((set, get) => ({
     logger.info(`[SOURCE_SELECTION] Selected fallback source: ${selectedSource.source} (${selectedSource.source_name}) with resolution: ${selectedSource.resolution || 'unknown'}`);
     
     return selectedSource;
+  },
+
+  testSourceSpeed: async (url: string): Promise<number> => {
+    try {
+      const { proxyService } = await import('@/services/proxyService');
+      const startTime = performance.now();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await proxyService.fetch(url, {
+        signal: controller.signal,
+        method: 'HEAD',
+        redirect: 'follow',
+      });
+
+      clearTimeout(timeoutId);
+      const endTime = performance.now();
+      return endTime - startTime;
+    } catch (error) {
+      logger.warn(`[SPEED_TEST] Failed to test speed for ${url}:`, error);
+      return Infinity;
+    }
+  },
+
+  selectBestSource: async (episodeIndex = 0): Promise<SearchResultWithResolution | null> => {
+    const { searchResults, failedSources, resourceWeights } = get();
+    const { sourceWeights } = useSettingsStore.getState();
+
+    logger.info(`[BEST_SOURCE] Selecting best source for episode ${episodeIndex + 1}`);
+    logger.info(`[BEST_SOURCE] Available sources: ${searchResults.length}`);
+    logger.info(`[BEST_SOURCE] Failed sources: [${Array.from(failedSources).join(', ')}]`);
+    logger.info(`[BEST_SOURCE] Backend resource weights: ${JSON.stringify(resourceWeights)}`);
+    logger.info(`[BEST_SOURCE] Local source weights: ${JSON.stringify(sourceWeights)}`);
+
+    // 过滤掉已失败的sources和没有对应剧集的sources
+    const availableSources = searchResults.filter(result =>
+      !failedSources.has(result.source) &&
+      result.episodes &&
+      result.episodes.length > episodeIndex
+    );
+
+    if (availableSources.length === 0) {
+      logger.error(`[BEST_SOURCE] No available sources for episode ${episodeIndex + 1}`);
+      return null;
+    }
+
+    if (availableSources.length === 1) {
+      logger.info(`[BEST_SOURCE] Only one source available: ${availableSources[0].source_name}`);
+      return availableSources[0];
+    }
+
+    // 对每个源进行评分
+    const sourceScores = await Promise.all(
+      availableSources.map(async (source) => {
+        // 1. 权重分数 (0-100) - 优先使用后端权重，其次使用本地配置
+        const backendWeight = resourceWeights[source.source];
+        const localWeight = sourceWeights[source.source];
+        const weight = backendWeight ?? localWeight ?? 50;
+        const weightScore = weight;
+        
+        logger.info(`[BEST_SOURCE] ${source.source_name} weight: backend=${backendWeight}, local=${localWeight}, using=${weight}`);
+
+        // 2. 清晰度分数 (0-40)
+        let resolutionScore = 0;
+        const resolution = source.resolution || '';
+        if (resolution.includes('4K') || resolution.includes('2160')) resolutionScore = 40;
+        else if (resolution.includes('1080')) resolutionScore = 35;
+        else if (resolution.includes('720')) resolutionScore = 25;
+        else if (resolution.includes('480')) resolutionScore = 15;
+        else if (resolution.includes('360')) resolutionScore = 10;
+        else resolutionScore = 20; // 未知分辨率给中等分数
+
+        // 3. 速度分数 (0-30) - 测试第一个剧集URL
+        let speedScore = 15; // 默认中等分数
+        if (source.episodes && source.episodes.length > 0) {
+          try {
+            const latency = await get().testSourceSpeed(source.episodes[0]);
+            if (latency < 500) speedScore = 30;
+            else if (latency < 1000) speedScore = 25;
+            else if (latency < 2000) speedScore = 20;
+            else if (latency < 3000) speedScore = 15;
+            else if (latency < 5000) speedScore = 10;
+            else speedScore = 5;
+
+            logger.info(`[BEST_SOURCE] Speed test for ${source.source_name}: ${latency.toFixed(0)}ms (score: ${speedScore})`);
+          } catch (e) {
+            logger.warn(`[BEST_SOURCE] Speed test failed for ${source.source_name}`);
+          }
+        }
+
+        // 总分 = 权重分数 + 清晰度分数 + 速度分数
+        const totalScore = weightScore + resolutionScore + speedScore;
+
+        logger.info(
+          `[BEST_SOURCE] ${source.source_name}: weight=${weightScore}, resolution=${resolutionScore}, speed=${speedScore}, total=${totalScore}`
+        );
+
+        return {
+          source,
+          totalScore,
+          weightScore,
+          resolutionScore,
+          speedScore,
+        };
+      })
+    );
+
+    // 按总分排序
+    sourceScores.sort((a, b) => b.totalScore - a.totalScore);
+
+    const bestSource = sourceScores[0].source;
+    logger.info(
+      `[BEST_SOURCE] Selected best source: ${bestSource.source_name} (total score: ${sourceScores[0].totalScore})`
+    );
+
+    return bestSource;
   },
 }));
 

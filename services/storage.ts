@@ -35,6 +35,9 @@ export interface AppSettings {
       [key: string]: boolean;
     };
   };
+  sourceWeights?: {
+    [key: string]: number;
+  };
   m3uUrl: string;
 }
 
