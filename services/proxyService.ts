@@ -167,6 +167,39 @@ class ProxyService {
     }
   }
 
+  // 分析网络错误原因
+  private analyzeNetworkError(error: any): string {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    if (errorMsg.includes('Network request failed')) {
+      return 'Possible causes:\n' +
+             '  1. Device is offline or network unstable\n' +
+             '  2. DNS resolution failed\n' +
+             '  3. Target server unreachable\n' +
+             '  4. SSL/TLS certificate invalid\n' +
+             '  5. Firewall or VPN blocking the request\n' +
+             '  6. Request timeout (server not responding)';
+    }
+    
+    if (errorMsg.includes('abort') || errorMsg.includes('AbortError')) {
+      return 'Request was aborted (timeout or manual cancellation)';
+    }
+    
+    if (errorMsg.includes('timeout')) {
+      return 'Request timed out - server took too long to respond';
+    }
+    
+    if (errorMsg.includes('SSL') || errorMsg.includes('certificate')) {
+      return 'SSL certificate error - server certificate invalid or expired';
+    }
+    
+    if (errorMsg.includes('CORS') || errorMsg.includes('cross-origin')) {
+      return 'CORS policy blocked the request';
+    }
+    
+    return `Unknown error type: ${errorMsg}`;
+  }
+
   // 代理请求
   public async fetch(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
     const targetUrl = this.buildProxyUrl(url);
@@ -189,7 +222,28 @@ class ProxyService {
     const makeRequest = async (requestUrl: string, isProxy: boolean): Promise<Response> => {
       logger.debug(isProxy ? 'Fetching through proxy:' : 'Fetching directly:', requestUrl);
       try {
-        const response = await fetch(requestUrl, options);
+        // 添加默认超时（如果未设置）
+        const fetchOptions = {
+          ...options,
+          signal: options.signal,
+        };
+        
+        // 如果没有设置超时，添加默认 30 秒超时
+        if (!fetchOptions.signal) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
+          fetchOptions.signal = controller.signal;
+          
+          // 存储 timeoutId 以便后续清理
+          (fetchOptions as any)._timeoutId = timeoutId;
+        }
+        
+        const response = await fetch(requestUrl, fetchOptions);
+        
+        // 清理超时
+        if ((fetchOptions as any)._timeoutId) {
+          clearTimeout((fetchOptions as any)._timeoutId);
+        }
         
         // 缓存成功的 GET 请求
         if (response.ok && options.method === 'GET') {
@@ -203,7 +257,17 @@ class ProxyService {
         
         return response;
       } catch (error) {
-        logger.error(isProxy ? 'Proxy fetch error:' : 'Direct fetch error:', error);
+        // 增强错误日志
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorDetails = this.analyzeNetworkError(error);
+        
+        logger.error(
+          isProxy ? 'Proxy fetch error:' : 'Direct fetch error:', 
+          `\n  URL: ${requestUrl.substring(0, 100)}...`,
+          `\n  Error: ${errorMsg}`,
+          `\n  Analysis: ${errorDetails}`
+        );
+        
         throw error;
       }
     };
