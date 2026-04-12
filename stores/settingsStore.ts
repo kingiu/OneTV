@@ -204,13 +204,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     await proxyService.saveConfig(proxyConfig);
     
     if (currentApiBaseUrl !== processedApiBaseUrl) {
-      // 清除登录凭证和 authCookies
+      // 清除登录凭证，但不清除 authCookies，因为服务端可能已经返回了有效的 cookie
       try {
         await AsyncStorage.removeItem("mytv_login_credentials");
       } catch (storageError) {
         logger.error("Failed to clear login credentials:", storageError);
       }
-      await AsyncStorage.setItem("authCookies", "");
+      // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
     }
     api.setBaseUrl(processedApiBaseUrl);
     proxyService.setBaseUrl(processedApiBaseUrl);

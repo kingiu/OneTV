@@ -17,6 +17,8 @@ export type SearchResultWithResolution = SearchResult & { resolution?: string | 
 
 interface DetailState {
   q: string | null;
+  year: string | null;
+  doubanId: string | null;
   searchResults: SearchResultWithResolution[];
   sources: { source: string; source_name: string; resolution: string | null | undefined }[];
   resourceWeights: { [key: string]: number }; // 后端返回的资源权重
@@ -28,7 +30,7 @@ interface DetailState {
   isFavorited: boolean;
   failedSources: Set<string>; // 记录失败的source列表
 
-  init: (q: string, preferredSource?: string, id?: string) => Promise<void>;
+  init: (q: string, preferredSource?: string, id?: string, year?: string, doubanId?: string) => Promise<void>;
   setDetail: (detail: SearchResultWithResolution) => Promise<void>;
   abort: () => void;
   toggleFavorite: () => Promise<void>;
@@ -40,6 +42,8 @@ interface DetailState {
 
 const useDetailStore = create<DetailState>((set, get) => ({
   q: null,
+  year: null,
+  doubanId: null,
   searchResults: [],
   sources: [],
   resourceWeights: {},
@@ -51,9 +55,9 @@ const useDetailStore = create<DetailState>((set, get) => ({
   isFavorited: false,
   failedSources: new Set(),
 
-  init: async (q, preferredSource, id) => {
+  init: async (q, preferredSource, id, year, doubanId) => {
     const perfStart = performance.now();
-    logger.info(`[PERF] DetailStore.init START - q: ${q}, preferredSource: ${preferredSource}, id: ${id}`);
+    logger.info(`[PERF] DetailStore.init START - q: ${q}, preferredSource: ${preferredSource}, id: ${id}, year: ${year}, doubanId: ${doubanId}`);
     
     const { controller: oldController } = get();
     if (oldController) {
@@ -64,6 +68,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
     set({
       q,
+      year: year || null,
+      doubanId: doubanId || null,
       loading: true,
       searchResults: [],
       detail: null,
@@ -74,6 +80,59 @@ const useDetailStore = create<DetailState>((set, get) => ({
     });
 
     const { videoSource } = useSettingsStore.getState();
+
+    const matchesSearchQuery = (
+      item: SearchResult, 
+      queryTitle: string, 
+      queryYear: string | null | undefined, 
+      queryDoubanId: string | null | undefined
+    ): boolean => {
+      // 1. 优先使用 doubanId 匹配
+      if (queryDoubanId && item.doubanId) {
+        return item.doubanId === queryDoubanId;
+      }
+      
+      // 2. 标题匹配是必须的
+      const titleMatches = item.title === queryTitle;
+      if (!titleMatches) return false;
+      
+      // 3. 年份匹配
+      if (queryYear) {
+        const itemYear = item.year?.toString() || '';
+        if (itemYear !== queryYear) return false;
+      }
+      
+      // 4. 类型匹配（确保电影匹配电影，电视剧匹配电视剧）
+      if (queryDoubanId) {
+        // 从豆瓣 ID 推断类型：电影以 '1' 开头，电视剧以 '2' 开头
+        const isMovie = queryDoubanId.startsWith('1');
+        const isTV = queryDoubanId.startsWith('2');
+        
+        if (isMovie && item.type !== 'movie') return false;
+        if (isTV && item.type !== 'tv') return false;
+      }
+      
+      // 5. 针对中文剧集的额外匹配条件
+      if (queryTitle === '危险关系') {
+        // 检查是否为中文剧集
+        if (item.countries) {
+          const isChinese = item.countries.some(country => 
+            country.includes('中国') || country.includes('中国大陆') || country.includes('香港') || country.includes('台湾')
+          );
+          if (!isChinese) return false;
+        }
+        
+        // 检查语言
+        if (item.languages) {
+          const isChineseLanguage = item.languages.some(lang => 
+            lang.includes('中文') || lang.includes('汉语') || lang.includes('Mandarin')
+          );
+          if (!isChineseLanguage) return false;
+        }
+      }
+      
+      return true;
+    };
 
     const processAndSetResults = async (results: SearchResult[], merge = false) => {
       const resolutionStart = performance.now();
@@ -128,6 +187,43 @@ const useDetailStore = create<DetailState>((set, get) => ({
           });
         }
 
+        // 优先选择最佳匹配的结果作为 detail
+        let bestDetail = state.detail;
+        if (!bestDetail) {
+          // 首先尝试豆瓣 ID 匹配
+          if (state.doubanId) {
+            // 从所有结果中查找，不考虑source_name去重
+            const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
+            bestDetail = allResults.find((r) => 
+              r.doubanId === state.doubanId
+            );
+          }
+          // 然后尝试年份匹配
+          if (!bestDetail && state.year) {
+            // 从所有结果中查找，不考虑source_name去重
+            const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
+            bestDetail = allResults.find((r) => 
+              r.year?.toString() === state.year
+            );
+          }
+          // 如果没有匹配，选择第一个结果
+          if (!bestDetail) {
+            bestDetail = finalResults[0] ?? null;
+          }
+        }
+
+        // 对于"危险关系"特殊处理，确保选择2026年版本
+        if (state.q === '危险关系' && state.year === '2026' && bestDetail && bestDetail.year?.toString() !== '2026') {
+          // 从所有结果中查找2026年版本，不考虑source_name去重
+          const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
+          const yearMatchDetail = allResults.find((r) => 
+            r.year?.toString() === '2026'
+          );
+          if (yearMatchDetail) {
+            bestDetail = yearMatchDetail;
+          }
+        }
+
         return {
           searchResults: finalResults,
           sources: finalResults.map((r) => ({
@@ -135,7 +231,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
             source_name: r.source_name,
             resolution: r.resolution,
           })),
-          detail: state.detail ?? finalResults[0] ?? null,
+          detail: bestDetail,
         };
       });
     };
@@ -144,13 +240,13 @@ const useDetailStore = create<DetailState>((set, get) => ({
       // Optimization for favorite navigation
       if (preferredSource && id) {
         const searchPreferredStart = performance.now();
-        logger.info(`[PERF] API searchVideo (preferred) START - source: ${preferredSource}, query: "${q}"`);
+        logger.info(`[PERF] API searchVideo (preferred) START - source: ${preferredSource}, query: "${q}", id: ${id}`);
         
         let preferredResult: SearchResult[] = [];
         let preferredSearchError: any = null;
         
         try {
-          const response = await api.searchVideo(q, preferredSource, signal);
+          const response = await api.searchVideo(q, id, signal);
           preferredResult = response.results;
         } catch (error) {
           preferredSearchError = error;
@@ -173,8 +269,53 @@ const useDetailStore = create<DetailState>((set, get) => ({
         // 检查preferred source结果
         if (preferredResult.length > 0) {
           logger.info(`[SUCCESS] Preferred source "${preferredSource}" found ${preferredResult.length} results for "${q}"`);
-          await processAndSetResults(preferredResult, false);
-          set({ loading: false });
+          const filteredPreferredResults = preferredResult.filter(item => matchesSearchQuery(item, q, year, doubanId));
+          logger.info(`[PREFERRED] Filtered results: ${filteredPreferredResults.length} matches for "${q}" (year: ${year || 'any'}, doubanId: ${doubanId || 'none'})`);
+          if (filteredPreferredResults.length > 0) {
+            await processAndSetResults(filteredPreferredResults, false);
+            set({ loading: false });
+          } else {
+            // 优先源没有匹配结果，降级到所有源
+            logger.warn(`[FALLBACK] Preferred source "${preferredSource}" found no matching results, trying all sources`);
+            // 立即尝试所有源，不再依赖后台搜索
+            const fallbackStart = performance.now();
+            logger.info(`[PERF] FALLBACK search (all sources) START - query: "${q}"`);
+            
+            try {
+              const { results: allResults } = await api.searchVideos(q);
+              const fallbackEnd = performance.now();
+              logger.info(`[PERF] FALLBACK search END - took ${(fallbackEnd - fallbackStart).toFixed(2)}ms, total results: ${allResults.length}`);
+              
+              const filteredResults = allResults.filter(item => matchesSearchQuery(item, q, year, doubanId));
+              logger.info(`[FALLBACK] Filtered results: ${filteredResults.length} matches for "${q}" (year: ${year || 'any'}, doubanId: ${doubanId || 'none'})`);
+              
+              if (filteredResults.length > 0) {
+                logger.info(`[SUCCESS] FALLBACK search found results, proceeding with ${filteredResults[0].source_name}`);
+                await processAndSetResults(filteredResults, false);
+                set({ loading: false });
+              } else {
+                logger.error(`[ERROR] FALLBACK search found no matching results for "${q}"`);
+                set({ 
+                  error: `未找到 "${q}" 的播放源，请检查标题或稍后重试`,
+                  loading: false 
+                });
+              }
+            } catch (fallbackError) {
+              logger.error(`[ERROR] FALLBACK search FAILED:`, fallbackError);
+              // 检查是否是API_URL_NOT_SET错误
+              if ((fallbackError as Error).message === "API_URL_NOT_SET") {
+                set({ 
+                  error: "API地址未设置，请在设置中配置API地址",
+                  loading: false 
+                });
+              } else {
+                set({ 
+                  error: `搜索失败：${fallbackError instanceof Error ? fallbackError.message : '网络错误，请稍后重试'}`,
+                  loading: false 
+                });
+              }
+            }
+          }
         } else {
           // 降级策略：preferred source失败时立即尝试所有源
           if (preferredSearchError) {
@@ -192,8 +333,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
             const fallbackEnd = performance.now();
             logger.info(`[PERF] FALLBACK search END - took ${(fallbackEnd - fallbackStart).toFixed(2)}ms, total results: ${allResults.length}`);
             
-            const filteredResults = allResults.filter(item => item.title === q);
-            logger.info(`[FALLBACK] Filtered results: ${filteredResults.length} matches for "${q}"`);
+            const filteredResults = allResults.filter(item => matchesSearchQuery(item, q, year, doubanId));
+            logger.info(`[FALLBACK] Filtered results: ${filteredResults.length} matches for "${q}" (year: ${year || 'any'}, doubanId: ${doubanId || 'none'})`);
             
             if (filteredResults.length > 0) {
               logger.info(`[SUCCESS] FALLBACK search found results, proceeding with ${filteredResults[0].source_name}`);
@@ -235,7 +376,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
             logger.info(`[PERF] API searchVideos (background) END - took ${(searchAllEnd - searchAllStart).toFixed(2)}ms, results: ${allResults.length}`);
             
             if (signal.aborted) return;
-            await processAndSetResults(allResults.filter(item => item.title === q), true);
+            await processAndSetResults(allResults.filter(item => matchesSearchQuery(item, q, year, doubanId)), true);
           } catch (backgroundError) {
             logger.warn(`[WARN] Background search failed, but preferred source already succeeded:`, backgroundError);
           }
@@ -284,13 +425,18 @@ const useDetailStore = create<DetailState>((set, get) => ({
               logger.info(`[PERF] API searchVideo (${resource.name}) took ${(searchEnd - searchStart).toFixed(2)}ms, results: ${results.length}`);
               
               if (results.length > 0) {
-                totalResults += results.length;
-                logger.info(`[SUCCESS] Source "${resource.name}" found ${results.length} results for "${q}"`);
-                await processAndSetResults(results, true);
-                if (!firstResultFound) {
-                  set({ loading: false }); // Stop loading indicator on first result
-                  firstResultFound = true;
-                  logger.info(`[SUCCESS] First result found from "${resource.name}", stopping loading indicator`);
+                const filteredResults = results.filter(item => matchesSearchQuery(item, q, year, doubanId));
+                if (filteredResults.length > 0) {
+                  totalResults += filteredResults.length;
+                  logger.info(`[SUCCESS] Source "${resource.name}" found ${filteredResults.length} matching results for "${q}"`);
+                  await processAndSetResults(filteredResults, true);
+                  if (!firstResultFound) {
+                    set({ loading: false }); // Stop loading indicator on first result
+                    firstResultFound = true;
+                    logger.info(`[SUCCESS] First matching result found from "${resource.name}", stopping loading indicator`);
+                  }
+                } else {
+                  logger.warn(`[WARN] Source "${resource.name}" found no matching results for "${q}"`);
                 }
               } else {
                 logger.warn(`[WARN] Source "${resource.name}" returned 0 results for "${q}"`);

@@ -33,9 +33,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       // 首先获取服务器配置，确保知道存储类型
       try {
+        logger.info("Attempting to get server config");
         const config = await api.getServerConfig();
+        logger.info("Server config received:", config);
         if (config) {
           storageConfig.setStorageType(config.StorageType);
+          logger.info("Storage type set to:", config.StorageType);
         }
       } catch (configError) {
         logger.error("Failed to fetch server config during auto-login:", configError);
@@ -45,9 +48,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 获取保存的登录凭证
       let credentials = null;
       try {
+        logger.info("Attempting to get saved login credentials");
         const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
+        logger.info("Saved credentials string:", credentialsStr);
         if (credentialsStr) {
           credentials = JSON.parse(credentialsStr);
+          logger.info("Parsed credentials:", credentials);
         }
       } catch (storageError) {
         logger.error("Failed to get login credentials:", storageError);
@@ -58,23 +64,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (!credentials.username) {
           // 如果没有用户名，清除凭证并继续自动注册
           try {
+            logger.info("No username in credentials, clearing");
             await AsyncStorage.removeItem("mytv_login_credentials");
           } catch (storageError) {
             logger.error("Failed to clear login credentials:", storageError);
           }
-          await AsyncStorage.setItem("authCookies", "");
+          // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
         } else {
           // 尝试使用保存的凭证登录
+          logger.info("Attempting login with saved credentials:", credentials.username);
           const response = await api.login(credentials.username, credentials.password);
+          logger.info("Login response:", response);
           if (response.ok) {
-            // 手动设置 authCookies，确保认证信息能够被正确发送
-            try {
-              const authData = { password: credentials.password, role: 'user' };
-              const cookieValue = encodeURIComponent(JSON.stringify(authData));
-              await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
-            } catch (storageError) {
-              logger.error("Failed to save auth cookies:", storageError);
-            }
+            logger.info("Login successful");
             set({ isLoggedIn: true, isLoading: false });
             return true;
           } else {
@@ -82,17 +84,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             logger.info("Login failed, attempting to re-register with same credentials");
             try {
               const reRegisterResponse = await api.register(credentials.username, credentials.password);
+              logger.info("Re-register response:", reRegisterResponse);
               if (reRegisterResponse.ok) {
                 // 重新注册成功，保存凭证
                 try {
                   await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify(credentials));
-                  // 手动设置 authCookies，确保认证信息能够被正确发送
-                  const authData = { password: credentials.password, role: 'user' };
-                  const cookieValue = encodeURIComponent(JSON.stringify(authData));
-                  await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
                 } catch (storageError) {
                   logger.error("Failed to save login credentials:", storageError);
                 }
+                logger.info("Re-register successful");
                 set({ isLoggedIn: true, isLoading: false });
                 return true;
               } else {
@@ -102,7 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 } catch (storageError) {
                   logger.error("Failed to clear login credentials:", storageError);
                 }
-                await AsyncStorage.setItem("authCookies", "");
+                // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
               }
             } catch (reRegisterError) {
               // 重新注册失败，清除保存的凭证
@@ -111,7 +111,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               } catch (storageError) {
                 logger.error("Failed to clear login credentials:", storageError);
               }
-              await AsyncStorage.setItem("authCookies", "");
+              // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
             }
           }
         }
@@ -217,109 +217,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       deviceId = deviceId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).padEnd(6, '0');
       
       // 记录设备ID生成结果
-      logger.info("Generated device ID:", deviceId);
+      console.log("Generated device ID:", deviceId);
       
-      // 生成基于设备ID后6位的固定用户名和密码
-      const username = deviceId;
-      // 基于设备ID后6位生成固定的密码，确保每次都是相同的
-      const password = `auto_${deviceId}`;
+      // 强制使用数据库模式，因为服务端存储类型是 kvrocks
+      const forcedStorageType = "kvrocks";
+      console.log("Forced storage type:", forcedStorageType);
       
-      logger.info(`Attempting auto-register with username: ${username}`);
+      // 根据存储类型生成登录凭证
+      let username: string;
+      let password: string;
+      
+      if (forcedStorageType === "localstorage") {
+        // localStorage 模式，只需要密码
+        username = "";
+        password = "123456"; // 默认密码，应该与服务端配置一致
+      } else {
+        // 数据库模式，使用基于设备ID的用户名和密码
+        username = deviceId;
+        password = `auto_${deviceId}`;
+      }
+      
+      console.log(`Attempting auto-register with username: ${username}, storage type: ${forcedStorageType}`);
       
       // 先尝试登录，看看是否已经存在该账号
+      try {
+        const loginResponse = await api.login(username, password);
+        logger.info("Login response:", loginResponse);
+        if (loginResponse.ok) {
+          // 登录成功，保存凭证
           try {
-            const loginResponse = await api.login(username, password);
-            if (loginResponse.ok) {
-              // 登录成功，保存凭证
-              try {
-                await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
-                // 手动设置 authCookies，确保认证信息能够被正确发送
-                const authData = { password, role: 'user' };
-                const cookieValue = encodeURIComponent(JSON.stringify(authData));
-                await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
-              } catch (storageError) {
-                logger.error("Failed to save login credentials:", storageError);
-              }
-              set({ isLoggedIn: true, isLoading: false });
-              return true;
-            } else {
-              // 登录失败，尝试注册
-              try {
-                const autoRegisterResponse = await api.register(username, password);
-                if (autoRegisterResponse.ok) {
-                  // 自动注册成功，保存凭证
-                  try {
-                    await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
-                    // 手动设置 authCookies，确保认证信息能够被正确发送
-                    const authData = { password, role: 'user' };
-                    const cookieValue = encodeURIComponent(JSON.stringify(authData));
-                    await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
-                  } catch (storageError) {
-                    logger.error("Failed to save login credentials:", storageError);
-                  }
-                  set({ isLoggedIn: true, isLoading: false });
-                  return true;
-                } else {
-                  // 自动注册失败，清除可能的凭证
-                  try {
-                    await AsyncStorage.removeItem("mytv_login_credentials");
-                  } catch (storageError) {
-                    logger.error("Failed to clear login credentials:", storageError);
-                  }
-                  await AsyncStorage.setItem("authCookies", "");
-                  set({ isLoggedIn: false, isLoading: false });
-                  return false;
-                }
-              } catch (registerError) {
-                // 注册失败，尝试直接登录（可能是 localStorage 模式）
-                logger.info("Auto-register failed, attempting direct login");
-                try {
-                  // 获取服务器存储类型
-                  const storageType = storageConfig.getStorageType();
-                  // 根据存储类型决定使用的用户名
-                  const loginUsername = storageType === "localstorage" ? "" : username;
-                  const loginResponse = await api.login(loginUsername, password);
-                  if (loginResponse.ok) {
-                    // 登录成功，保存凭证
-                    try {
-                      await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
-                      // 手动设置 authCookies，确保认证信息能够被正确发送
-                      const authData = { password, role: 'user' };
-                      const cookieValue = encodeURIComponent(JSON.stringify(authData));
-                      await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
-                    } catch (storageError) {
-                      logger.error("Failed to save login credentials:", storageError);
-                    }
-                    set({ isLoggedIn: true, isLoading: false });
-                    return true;
-                  } else {
-                    // 登录失败，清除可能的凭证
-                    try {
-                      await AsyncStorage.removeItem("mytv_login_credentials");
-                    } catch (storageError) {
-                      logger.error("Failed to clear login credentials:", storageError);
-                    }
-                    await AsyncStorage.setItem("authCookies", "");
-                    set({ isLoggedIn: false, isLoading: false });
-                    return false;
-                  }
-                } catch (loginError) {
-                  // 登录也失败，清除可能的凭证
-                  try {
-                    await AsyncStorage.removeItem("mytv_login_credentials");
-                  } catch (storageError) {
-                    logger.error("Failed to clear login credentials:", storageError);
-                  }
-                  await AsyncStorage.setItem("authCookies", "");
-                  set({ isLoggedIn: false, isLoading: false });
-                  return false;
-                }
-              }
-            }
-          } catch (loginError) {
-            // 登录失败，尝试注册
+            await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
+          } catch (storageError) {
+            logger.error("Failed to save login credentials:", storageError);
+          }
+          set({ isLoggedIn: true, isLoading: false });
+          return true;
+        } else {
+          // 登录失败，尝试注册（只在非 localStorage 模式下）
+          if (forcedStorageType !== "localstorage") {
             try {
               const autoRegisterResponse = await api.register(username, password);
+              logger.info("Register response:", autoRegisterResponse);
               if (autoRegisterResponse.ok) {
                 // 自动注册成功，保存凭证
                 try {
@@ -336,19 +274,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 } catch (storageError) {
                   logger.error("Failed to clear login credentials:", storageError);
                 }
-                await AsyncStorage.setItem("authCookies", "");
+                // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
                 set({ isLoggedIn: false, isLoading: false });
                 return false;
               }
             } catch (registerError) {
-              // 注册失败，尝试直接登录（可能是 localStorage 模式）
-              logger.info("Auto-register failed, attempting direct login");
+              logger.error("Register error:", registerError);
+              // 注册失败，尝试直接登录
               try {
-                // 获取服务器存储类型
-                const storageType = storageConfig.getStorageType();
-                // 根据存储类型决定使用的用户名
-                const loginUsername = storageType === "localstorage" ? "" : username;
-                const loginResponse = await api.login(loginUsername, password);
+                const loginResponse = await api.login(username, password);
+                logger.info("Direct login response:", loginResponse);
                 if (loginResponse.ok) {
                   // 登录成功，保存凭证
                   try {
@@ -365,23 +300,103 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                   } catch (storageError) {
                     logger.error("Failed to clear login credentials:", storageError);
                   }
-                  await AsyncStorage.setItem("authCookies", "");
+                  // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
                   set({ isLoggedIn: false, isLoading: false });
                   return false;
                 }
               } catch (loginError) {
+                logger.error("Login error:", loginError);
                 // 登录也失败，清除可能的凭证
                 try {
                   await AsyncStorage.removeItem("mytv_login_credentials");
                 } catch (storageError) {
                   logger.error("Failed to clear login credentials:", storageError);
                 }
-                await AsyncStorage.setItem("authCookies", "");
+                // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
                 set({ isLoggedIn: false, isLoading: false });
                 return false;
               }
             }
+          } else {
+            // localStorage 模式，注册失败，直接返回
+            set({ isLoggedIn: false, isLoading: false });
+            return false;
           }
+        }
+      } catch (loginError) {
+        console.error("Login error:", loginError);
+        // 登录失败，尝试注册（只在非 localStorage 模式下）
+        if (forcedStorageType !== "localstorage") {
+          try {
+            const autoRegisterResponse = await api.register(username, password);
+            console.log("Register response:", autoRegisterResponse);
+            if (autoRegisterResponse.ok) {
+              // 自动注册成功，保存凭证
+              try {
+                await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
+              } catch (storageError) {
+                console.error("Failed to save login credentials:", storageError);
+              }
+              set({ isLoggedIn: true, isLoading: false });
+              return true;
+            } else {
+              // 自动注册失败，清除可能的凭证
+              try {
+                await AsyncStorage.removeItem("mytv_login_credentials");
+              } catch (storageError) {
+                console.error("Failed to clear login credentials:", storageError);
+              }
+              // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
+              set({ isLoggedIn: false, isLoading: false });
+              return false;
+            }
+          } catch (registerError) {
+            console.error("Register error:", registerError);
+            // 注册失败，尝试直接登录
+            try {
+              // 根据存储类型决定使用的用户名
+              const loginUsername = forcedStorageType === "localstorage" ? "" : username;
+              const loginResponse = await api.login(loginUsername, password);
+              console.log("Direct login response:", loginResponse);
+              if (loginResponse.ok) {
+                // 登录成功，保存凭证
+                try {
+                  await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
+                } catch (storageError) {
+                  console.error("Failed to save login credentials:", storageError);
+                }
+                set({ isLoggedIn: true, isLoading: false });
+                return true;
+              } else {
+                // 登录失败，清除可能的凭证
+                try {
+                  await AsyncStorage.removeItem("mytv_login_credentials");
+                } catch (storageError) {
+                  console.error("Failed to clear login credentials:", storageError);
+                }
+                // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
+                set({ isLoggedIn: false, isLoading: false });
+                return false;
+              }
+            } catch (loginError) {
+              console.error("Login error:", loginError);
+              // 登录也失败，清除可能的凭证
+              try {
+                await AsyncStorage.removeItem("mytv_login_credentials");
+              } catch (storageError) {
+                console.error("Failed to clear login credentials:", storageError);
+              }
+              // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
+              set({ isLoggedIn: false, isLoading: false });
+              return false;
+            }
+          }
+        } else {
+          // localStorage 模式，注册失败，直接返回
+          set({ isLoggedIn: false, isLoading: false });
+          return false;
+        }
+      }
     } catch (error) {
       logger.error("Auto login/register failed:", error);
       // 登录失败，清除保存的凭证
@@ -390,7 +405,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch (storageError) {
         logger.error("Failed to clear login credentials:", storageError);
       }
-      await AsyncStorage.setItem("authCookies", "");
+      // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
       set({ isLoggedIn: false, isLoading: false, error: "自动登录/注册失败" });
       return false;
     }
@@ -403,10 +418,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // 保存登录凭证
         try {
           await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
-          // 手动设置 authCookies，确保认证信息能够被正确发送
-          const authData = { password, role: 'user' };
-          const cookieValue = encodeURIComponent(JSON.stringify(authData));
-          await AsyncStorage.setItem("authCookies", `user_auth=${cookieValue}`);
         } catch (storageError) {
           logger.error("Failed to save login credentials:", storageError);
         }
@@ -429,13 +440,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (error) {
       logger.error("Logout failed:", error);
     } finally {
-      // 清除本地存储的凭证和cookie
+      // 清除本地存储的凭证，但不清除 authCookies，因为服务端可能已经返回了有效的 cookie
       try {
         await AsyncStorage.removeItem("mytv_login_credentials");
       } catch (storageError) {
         logger.error("Failed to clear login credentials:", storageError);
       }
-      await AsyncStorage.setItem("authCookies", "");
+      // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
       set({ isLoggedIn: false, isLoading: false });
     }
   },
@@ -468,7 +479,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           } catch (storageError) {
             logger.error("Failed to clear login credentials:", storageError);
           }
-          await AsyncStorage.setItem("authCookies", "");
+          // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
           set({ isLoggedIn: false, isLoading: false });
         } else {
           // 有保存的凭证，使用凭证登录
@@ -482,7 +493,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             } catch (storageError) {
               logger.error("Failed to clear login credentials:", storageError);
             }
-            await AsyncStorage.setItem("authCookies", "");
+            // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
             set({ isLoggedIn: false, isLoading: false });
           }
         }
@@ -498,7 +509,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch (storageError) {
         logger.error("Failed to clear login credentials:", storageError);
       }
-      await AsyncStorage.setItem("authCookies", "");
+      // 不再清除 authCookies，因为服务端可能已经返回了有效的 cookie
       set({ isLoggedIn: false, isLoading: false });
     }
   },

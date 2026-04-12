@@ -17,6 +17,7 @@ export type RowItem = (SearchResult | PlayRecord) & {
   totalEpisodes?: number;
   year?: string;
   rate?: string;
+  doubanId?: string;
 };
 
 export interface Category {
@@ -178,8 +179,12 @@ const useHomeStore = create<HomeState>((set, get) => ({
 
         const newItems = result.list.map((item) => ({
           ...item,
-          id: item.title,
+          id: item.id,  // 使用豆瓣 ID 作为唯一标识
           source: "douban",
+          poster: item.poster || item.cover,
+          year: item.year?.toString(),
+          rate: item.rate || item.rating?.toString(),
+          doubanId: item.id,
         })) as RowItem[];
 
         const cacheKey = getCacheKey(selectedCategory);

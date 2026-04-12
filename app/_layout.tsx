@@ -47,18 +47,19 @@ export default function RootLayout() {
 
   useEffect(() => {
     const initializeApp = async () => {
+      console.log('Starting initializeApp');
       await loadSettings();
+      console.log('loadSettings completed');
       setIsSettingsReady(true);
+      console.log('isSettingsReady set to true');
+      // 直接调用 autoLogin，不等待状态更新
+      console.log('Calling autoLogin directly');
+      await autoLogin();
+      console.log('autoLogin completed');
     };
     initializeApp();
     initUpdateStore(); // 初始化更新存储
   }, [loadSettings]);
-
-  useEffect(() => {
-    if (isSettingsReady) {
-      autoLogin();
-    }
-  }, [autoLogin, isSettingsReady]);
 
   useEffect(() => {
     if (!isSettingsReady || !apiBaseUrl || !cronPassword || hasTriggeredCronRef.current) {

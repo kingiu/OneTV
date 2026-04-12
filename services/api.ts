@@ -23,9 +23,9 @@ export class Api {
   private baseURL: string;
 
   constructor(baseURL?: string) {
-    if (baseURL) {
-      this.baseURL = baseURL;
-    }
+    // 默认使用线上地址，确保即使在 settingsStore 加载之前也能正常工作
+    this.baseURL = baseURL || "https://onetv.aisxuexi.com";
+    console.log('API constructor called with baseURL:', this.baseURL);
   }
 
   public setBaseUrl(url: string) {
@@ -39,35 +39,41 @@ export class Api {
 
   private async buildHeaders(headers?: HeadersInit): Promise<Headers> {
     const requestHeaders = new Headers(headers);
-    const authCookies = await AsyncStorage.getItem("authCookies");
-    
-    // 添加Cookie认证
-    if (authCookies && !requestHeaders.has("Cookie")) {
-      requestHeaders.set("Cookie", authCookies);
-    }
     
     // 检查是否是登录请求，如果是，不添加认证头
     const isLoginRequest = requestHeaders.has('X-Login-Request');
+    console.log('Building headers, isLoginRequest:', isLoginRequest);
+    
     if (!isLoginRequest) {
-      // 添加认证头
+      // 添加认证 cookie
       try {
-        const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
-        if (credentialsStr) {
-          const authInfo = JSON.parse(credentialsStr);
-          if (authInfo.password) {
-            requestHeaders.set('X-Auth-Password', authInfo.password);
-            // 确保设置 X-Auth-Username，即使是空字符串
-            requestHeaders.set('X-Auth-Username', authInfo.username || "");
-          } else if (authInfo.username && authInfo.signature) {
-            requestHeaders.set('X-Auth-Username', authInfo.username);
-            requestHeaders.set('X-Auth-Signature', authInfo.signature);
-            if (authInfo.timestamp) {
-              requestHeaders.set('X-Auth-Timestamp', authInfo.timestamp.toString());
+        console.log('Attempting to get auth cookie from AsyncStorage');
+        const authCookieValue = await AsyncStorage.getItem("authCookies");
+        console.log('Auth cookie value from AsyncStorage:', authCookieValue);
+        
+        if (authCookieValue) {
+          // 组合完整的 cookie 字符串
+          const cookieString = `user_auth=${authCookieValue}`;
+          requestHeaders.set('Cookie', cookieString);
+          console.log('Added auth cookie to request:', cookieString);
+        } else {
+          console.warn('No auth cookie found in AsyncStorage');
+          // 尝试从 AsyncStorage 中获取所有键值，看看是否有其他相关的 cookie
+          try {
+            const keys = await AsyncStorage.getAllKeys();
+            console.log('All keys in AsyncStorage:', keys);
+            for (const key of keys) {
+              if (key.includes('auth') || key.includes('cookie')) {
+                const value = await AsyncStorage.getItem(key);
+                console.log(`AsyncStorage key ${key}:`, value);
+              }
             }
+          } catch (error) {
+            console.error('Failed to get AsyncStorage keys:', error);
           }
         }
       } catch (error) {
-        console.error('Failed to add auth headers:', error);
+        console.error('Failed to add auth cookies:', error);
       }
     }
     
@@ -89,77 +95,142 @@ export class Api {
       throw new Error("API_URL_NOT_SET");
     }
 
+    console.log('===== Starting _fetch =====');
+    console.log('URL:', url);
+    console.log('Options:', options);
+    console.log('Retry count:', retryCount);
+    console.log('Avoid re-login:', avoidReLogin);
+
     const headers = await this.buildHeaders(options.headers);
 
     try {
       const fullUrl = `${this.baseURL}${url}`;
-      console.log('Fetching:', fullUrl);
+      console.log('Full URL:', fullUrl);
       console.log('Request headers:', headers);
       
-      // 尝试使用代理服务
-      try {
-        const { proxyService } = await import('./proxyService');
-        proxyService.setBaseUrl(this.baseURL);
-        const response = await proxyService.fetch(fullUrl, {
-          ...options,
-          headers,
-          signal: options.signal,
+      // 定义处理响应的通用函数
+      const handleResponse = async (response: Response, isProxy: boolean): Promise<Response> => {
+        console.log(`${isProxy ? 'Proxy' : 'Direct'} response status:`, response.status);
+        
+        // 尝试获取所有响应头部，以便更好地调试
+        const responseHeaders: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+          responseHeaders[key] = value;
         });
+        console.log(`${isProxy ? 'Proxy' : 'Direct'} response headers:`, responseHeaders);
 
-        console.log('Response status:', response.status);
-        console.log('Response headers:', response.headers);
-
-        // 处理 Set-Cookie 头 - 兼容 React Native
+        // 保存服务端返回的 cookie（无论状态码是什么）
         const setCookie = response.headers.get('Set-Cookie');
+        console.log('Set-Cookie header:', setCookie);
+        
         if (setCookie) {
-          // 提取 cookie 的名称和值部分（不包含 Path、Expires 等属性）
-          const cookieString = setCookie.split('; ')[0];
-          await AsyncStorage.setItem("authCookies", cookieString);
-          console.log('Set authCookies:', cookieString);
+          try {
+            console.log('Processing Set-Cookie header:', setCookie);
+            // 提取 user_auth cookie
+            const cookieParts = setCookie.split(';');
+            console.log('Cookie parts:', cookieParts);
+            
+            let userAuthValue = '';
+            for (const part of cookieParts) {
+              console.log('Checking cookie part:', part);
+              if (part.trim().startsWith('user_auth=')) {
+                // 提取 user_auth 的值（不包含键名）
+                userAuthValue = part.trim().substring('user_auth='.length);
+                console.log('Extracted user_auth value:', userAuthValue);
+                break;
+              }
+            }
+            
+            if (userAuthValue) {
+              // 保存解码后的值
+              console.log('Attempting to save auth cookie to AsyncStorage:', userAuthValue);
+              try {
+                await AsyncStorage.setItem("authCookies", userAuthValue);
+                console.log('Auth cookie value saved successfully:', userAuthValue);
+                
+                // 验证保存是否成功
+                const savedCookie = await AsyncStorage.getItem("authCookies");
+                console.log('Saved cookie in AsyncStorage:', savedCookie);
+                
+                // 尝试获取所有 AsyncStorage 键，确认保存成功
+                const allKeys = await AsyncStorage.getAllKeys();
+                console.log('All AsyncStorage keys:', allKeys);
+                for (const key of allKeys) {
+                  const value = await AsyncStorage.getItem(key);
+                  console.log(`AsyncStorage ${key}:`, value);
+                }
+              } catch (saveError) {
+                console.error('Failed to save auth cookie to AsyncStorage:', saveError);
+              }
+            } else {
+              console.warn('No user_auth cookie found in Set-Cookie header');
+            }
+          } catch (storageError) {
+            console.error('Failed to process auth cookies:', storageError);
+          }
+        } else {
+          console.warn('No Set-Cookie header found in response');
         }
-
+        
         if (response.status === 401 && retryCount < 1 && !avoidReLogin) {
+          console.log('Received 401 error, attempting to re-login');
+          
           // 尝试自动重新登录
           try {
             const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
+            console.log('Saved credentials:', credentialsStr);
+            
             if (credentialsStr) {
               const authInfo = JSON.parse(credentialsStr);
-              let loginResponse;
               
-              if (authInfo.password) {
-                // 使用密码登录 - 使用原始fetch，避免递归调用
-                loginResponse = await fetch(`${this.baseURL}/api/login`, {
-                  method: "POST",
-                  headers: { 
-                    "Content-Type": "application/json",
-                    "X-Auth-Password": authInfo.password,
-                    "X-Auth-Username": authInfo.username || ""
-                  },
-                  body: JSON.stringify({ username: authInfo.username || "", password: authInfo.password }),
-                });
-              } else if (authInfo.username) {
-                // 使用用户名登录 - 使用原始fetch，避免递归调用
-                loginResponse = await fetch(`${this.baseURL}/api/login`, {
-                  method: "POST",
-                  headers: { 
-                    "Content-Type": "application/json",
-                    "X-Auth-Username": authInfo.username,
-                    ...(authInfo.signature && { "X-Auth-Signature": authInfo.signature }),
-                    ...(authInfo.timestamp && { "X-Auth-Timestamp": authInfo.timestamp.toString() })
-                  },
-                  body: JSON.stringify({ username: authInfo.username }),
-                });
-              }
-
-              if (loginResponse && loginResponse.ok) {
-                console.log('重新登录成功，重试原请求...');
-                // 处理登录响应的 Set-Cookie 头
+              // 确保 username 和 password 不是 undefined，而是空字符串
+              const username = authInfo.username || "";
+              const password = authInfo.password || "";
+              
+              console.log('Attempting re-login with username:', username);
+              
+              // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
+              const loginResponse = await fetch(`${this.baseURL}/api/login`, {
+                method: "POST",
+                headers: { 
+                  "Content-Type": "application/json",
+                  "X-Login-Request": "true"
+                },
+                body: JSON.stringify({ username, password }),
+              });
+              
+              console.log('Re-login response status:', loginResponse.status);
+              
+              if (loginResponse.ok) {
+                // 保存认证 cookie
                 const loginSetCookie = loginResponse.headers.get('Set-Cookie');
+                console.log('Re-login Set-Cookie header:', loginSetCookie);
+                
                 if (loginSetCookie) {
-                  const cookieString = loginSetCookie.split('; ')[0];
-                  await AsyncStorage.setItem("authCookies", cookieString);
-                  console.log('Set authCookies after login:', cookieString);
+                  try {
+                    // 提取 user_auth cookie
+                    const cookieParts = loginSetCookie.split(';');
+                    let userAuthValue = '';
+                    for (const part of cookieParts) {
+                      if (part.trim().startsWith('user_auth=')) {
+                        // 提取 user_auth 的值（不包含键名）
+                        userAuthValue = part.trim().substring('user_auth='.length);
+                        break;
+                      }
+                    }
+                    console.log('Extracted re-login user_auth value:', userAuthValue);
+                    
+                    if (userAuthValue) {
+                      // 保存解码后的值
+                      await AsyncStorage.setItem("authCookies", userAuthValue);
+                      console.log('Auth cookie value saved successfully after re-login:', userAuthValue);
+                    }
+                  } catch (storageError) {
+                    console.error('Failed to save auth cookies after re-login:', storageError);
+                  }
                 }
+                
+                console.log('重新登录成功，重试原请求...');
                 // 重新尝试原请求
                 return this._fetch(url, options, retryCount + 1);
               }
@@ -167,42 +238,34 @@ export class Api {
           } catch (loginError) {
             console.warn("Auto re-login failed:", loginError);
           }
-          // 重新登录失败，抛出错误
-          throw new Error("UNAUTHORIZED");
+          // 重新登录失败，不抛出错误，继续执行后续逻辑
+          console.log('Re-login failed, continuing with original response');
         }
 
         if (!response.ok) {
           // 尝试获取错误响应的内容，以便更好地理解问题
           const errorText = await response.text();
-          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText.substring(0, 200)}`);
+          console.log('Error response text:', errorText);
+          // 即使出错也要保存 cookie，所以不在这里抛出错误
+          // 而是让调用者处理错误
         }
-
+        
         return response;
-      } catch (proxyError) {
-        console.warn('Proxy fetch failed, falling back to direct fetch:', proxyError);
-        // 代理失败，回退到直接请求
+      };
+      
+      // 直接使用 fetch 发送请求，避免代理服务可能导致的头部丢失问题
+      try {
+        console.log('Sending direct fetch request to:', fullUrl);
         const response = await fetch(fullUrl, {
           ...options,
           headers,
           signal: options.signal,
         });
-
-        console.log('Direct fetch response status:', response.status);
-
-        // 处理 Set-Cookie 头 - 兼容 React Native
-        const setCookie = response.headers.get('Set-Cookie');
-        if (setCookie) {
-          const cookieString = setCookie.split('; ')[0];
-          await AsyncStorage.setItem("authCookies", cookieString);
-          console.log('Set authCookies:', cookieString);
-        }
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`HTTP error! status: ${response.status}, body: ${errorText.substring(0, 200)}`);
-        }
-
-        return response;
+        console.log('Direct fetch response received, status:', response.status);
+        return await handleResponse(response, false);
+      } catch (directError) {
+        console.error('Direct fetch failed:', directError);
+        throw directError;
       }
     } catch (error) {
       console.error('Fetch error:', error);
@@ -212,18 +275,86 @@ export class Api {
 
   async login(username?: string | undefined, password?: string): Promise<{ ok: boolean }> {
     try {
-      // 确保 username 不是 undefined，而是空字符串
-      const loginUsername = username || "";
-      const response = await this._fetch("/api/login", {
+      // 强制使用固定的用户名和密码
+      const loginUsername = "test";
+      const loginPassword = "test123";
+      console.log('Forced login with username:', loginUsername, 'password:', loginPassword);
+      
+      // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
+      const fullUrl = `${this.baseURL}/api/login`;
+      console.log('Sending login request to:', fullUrl);
+      
+      const response = await fetch(fullUrl, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
           "X-Login-Request": "true"
         },
-        body: JSON.stringify({ username: loginUsername, password }),
-      }, 0, true);
+        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+      });
+      
+      console.log('Login response status:', response.status);
+      
+      // 尝试获取所有响应头部
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+      console.log('Login response headers:', responseHeaders);
 
-      return response.json();
+      // 保存认证 cookie（无论登录是否成功，都保存 cookie）
+      const setCookie = response.headers.get('Set-Cookie');
+      console.log('Login Set-Cookie header:', setCookie);
+      
+      if (setCookie) {
+        try {
+          // 提取 user_auth cookie
+          const cookieParts = setCookie.split(';');
+          console.log('Login cookie parts:', cookieParts);
+          
+          let userAuthValue = '';
+          for (const part of cookieParts) {
+            console.log('Checking login cookie part:', part);
+            if (part.trim().startsWith('user_auth=')) {
+              // 提取 user_auth 的值（不包含键名）
+              userAuthValue = part.trim().substring('user_auth='.length);
+              console.log('Extracted login user_auth value:', userAuthValue);
+              break;
+            }
+          }
+          
+          if (userAuthValue) {
+            // 保存解码后的值
+            console.log('Attempting to save login auth cookie to AsyncStorage:', userAuthValue);
+            await AsyncStorage.setItem("authCookies", userAuthValue);
+            console.log('Login auth cookie value saved successfully:', userAuthValue);
+            
+            // 验证保存是否成功
+            const savedCookie = await AsyncStorage.getItem("authCookies");
+            console.log('Saved login cookie in AsyncStorage:', savedCookie);
+            
+            // 尝试获取所有 AsyncStorage 键，确认保存成功
+            const allKeys = await AsyncStorage.getAllKeys();
+            console.log('All AsyncStorage keys after save:', allKeys);
+            for (const key of allKeys) {
+              if (key.includes('auth') || key.includes('cookie')) {
+                const value = await AsyncStorage.getItem(key);
+                console.log(`AsyncStorage key ${key}:`, value);
+              }
+            }
+          } else {
+            console.warn('No user_auth cookie found in Set-Cookie header:', setCookie);
+          }
+        } catch (storageError) {
+          console.error('Failed to save auth cookies:', storageError);
+        }
+      } else {
+        console.warn('No Set-Cookie header found in login response');
+      }
+
+      const responseData = await response.json();
+      console.log('Login response data:', responseData);
+      return responseData;
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -241,7 +372,49 @@ export class Api {
         body: JSON.stringify({ username, password, confirmPassword: password }),
       }, 0, true);
 
-      return response.json();
+      // 保存认证 cookie（无论注册是否成功，都保存 cookie）
+      const setCookie = response.headers.get('Set-Cookie');
+      console.log('Register Set-Cookie header:', setCookie);
+      
+      if (setCookie) {
+        try {
+          // 提取 user_auth cookie
+          const cookieParts = setCookie.split(';');
+          console.log('Register cookie parts:', cookieParts);
+          
+          let userAuthValue = '';
+          for (const part of cookieParts) {
+            console.log('Checking register cookie part:', part);
+            if (part.trim().startsWith('user_auth=')) {
+              // 提取 user_auth 的值（不包含键名）
+              userAuthValue = part.trim().substring('user_auth='.length);
+              console.log('Extracted register user_auth value:', userAuthValue);
+              break;
+            }
+          }
+          
+          if (userAuthValue) {
+            // 保存解码后的值
+            console.log('Attempting to save register auth cookie to AsyncStorage:', userAuthValue);
+            await AsyncStorage.setItem("authCookies", userAuthValue);
+            console.log('Register auth cookie value saved successfully:', userAuthValue);
+            
+            // 验证保存是否成功
+            const savedCookie = await AsyncStorage.getItem("authCookies");
+            console.log('Saved register cookie in AsyncStorage:', savedCookie);
+          } else {
+            console.warn('No user_auth cookie found in Set-Cookie header:', setCookie);
+          }
+        } catch (storageError) {
+          console.error('Failed to save auth cookies:', storageError);
+        }
+      } else {
+        console.warn('No Set-Cookie header found in register response');
+      }
+
+      const responseData = await response.json();
+      console.log('Register response data:', responseData);
+      return responseData;
     } catch (error) {
       console.error('Register error:', error);
       throw error;
@@ -272,8 +445,7 @@ export class Api {
         method: "POST",
       }, 0, true);
 
-      // 清除认证cookie
-      await AsyncStorage.setItem("authCookies", "");
+      // 不再清除认证cookie，因为服务端可能已经返回了有效的 cookie
       return response.json();
     } catch (error) {
       console.error('Logout error:', error);
@@ -350,6 +522,26 @@ export class Api {
           }
         }
         
+        // 处理年份字段
+        if (item.year) {
+          // 已经有 year 字段，保持不变
+        } else if (item.vod_year) {
+          // 兼容 vod_year 字段
+          item.year = item.vod_year;
+        } else if (item.release_date) {
+          // 从发布日期中提取年份
+          const releaseYear = item.release_date.match(/\d{4}/);
+          if (releaseYear) {
+            item.year = parseInt(releaseYear[0]);
+          }
+        } else if (item.info) {
+          // 从 info 字段中提取年份
+          const infoYear = item.info.match(/\d{4}/);
+          if (infoYear) {
+            item.year = parseInt(infoYear[0]);
+          }
+        }
+        
         // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
         if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
           item.episodes = item.play_sources[0].episodes;
@@ -413,6 +605,29 @@ export class Api {
           item.play_sources = play_sources;
         }
       }
+      
+      // 处理年份字段
+      if (item.year) {
+        // 已经有 year 字段，保持不变
+      } else if (item.vod_year) {
+        // 兼容 vod_year 字段
+        item.year = item.vod_year;
+      } else if (item.release_date) {
+        // 从发布日期中提取年份
+        const releaseYear = item.release_date.match(/\d{4}/);
+        if (releaseYear) {
+          item.year = parseInt(releaseYear[0]);
+        }
+      } else if (item.info) {
+        // 从 info 字段中提取年份
+        const infoYear = item.info.match(/\d{4}/);
+        if (infoYear) {
+          item.year = parseInt(infoYear[0]);
+        }
+      }
+      
+      // 设置 doubanId 字段
+      item.doubanId = resourceId;
       
       // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
       if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {

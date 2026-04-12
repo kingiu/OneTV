@@ -83,19 +83,21 @@ export default function SearchScreen() {
     }
   };
 
-  // 聚合搜索结果，将相同标题的结果合并并计算源数量
+  // 聚合搜索结果，将相同标题和年份的结果合并并计算源数量
   const aggregateSearchResults = (results: SearchResult[]): SearchResult[] => {
     const titleMap = new Map<string, SearchResult & { sourceCount: number; sources: string[] }>();
 
     results.forEach(item => {
-      if (titleMap.has(item.title)) {
-        // 如果标题已存在，增加源数量
-        const existingItem = titleMap.get(item.title)!;
+      const uniqueKey = `${item.title}_${item.year || ''}`;
+      
+      if (titleMap.has(uniqueKey)) {
+        // 如果标题+年份已存在，增加源数量
+        const existingItem = titleMap.get(uniqueKey)!;
         existingItem.sourceCount += 1;
         existingItem.sources.push(item.source);
       } else {
-        // 如果标题不存在，创建新条目
-        titleMap.set(item.title, {
+        // 如果标题+年份不存在，创建新条目
+        titleMap.set(uniqueKey, {
           ...item,
           sourceCount: 1,
           sources: [item.source]

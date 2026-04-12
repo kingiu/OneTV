@@ -24,6 +24,7 @@ interface VideoCardTabletProps extends React.ComponentProps<typeof TouchableOpac
   playTime?: number;
   episodeIndex?: number;
   totalEpisodes?: number;
+  doubanId?: string;
   onFocus?: () => void;
   onRecordDeleted?: () => void;
   api: API;
@@ -41,6 +42,7 @@ const VideoCardTablet = forwardRef<View, VideoCardTabletProps>(
       sourceName,
       progress,
       episodeIndex,
+      doubanId,
       onFocus,
       onRecordDeleted,
       api,
@@ -70,7 +72,7 @@ const VideoCardTablet = forwardRef<View, VideoCardTabletProps>(
       } else {
         router.push({
           pathname: "/detail",
-          params: { source, q: title },
+          params: { source, q: title, id, year: year || undefined, doubanId: doubanId || undefined },
         });
       }
     };

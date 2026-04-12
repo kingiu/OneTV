@@ -13,7 +13,7 @@ import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
 import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
 
 export default function DetailScreen() {
-  const { q, source, id } = useLocalSearchParams<{ q: string; source?: string; id?: string }>();
+  const { q, source, id, year, doubanId } = useLocalSearchParams<{ q: string; source?: string; id?: string; year?: string; doubanId?: string }>();
   const router = useRouter();
 
   // 响应式布局配置
@@ -34,12 +34,12 @@ export default function DetailScreen() {
 
   useEffect(() => {
     if (q) {
-      init(q, source, id);
+      init(q, source, id, year, doubanId);
     }
     return () => {
       abort();
     };
-  }, [abort, init, q, source, id]);
+  }, [abort, init, q, source, id, year, doubanId]);
 
   const handlePlay = (episodeIndex: number) => {
     if (!detail) return;

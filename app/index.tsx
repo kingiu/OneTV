@@ -185,6 +185,7 @@ export default function HomeScreen() {
       episodeIndex={item.episodeIndex}
       sourceName={item.sourceName}
       totalEpisodes={item.totalEpisodes}
+      doubanId={item.doubanId}
       api={api}
       onRecordDeleted={fetchInitialData}
     />

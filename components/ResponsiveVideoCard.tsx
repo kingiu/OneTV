@@ -24,6 +24,7 @@ interface VideoCardProps extends React.ComponentProps<typeof TouchableOpacity> {
   playTime?: number; // 播放时间 in ms
   episodeIndex?: number; // 剧集索引
   totalEpisodes?: number; // 总集数
+  doubanId?: string;
   onFocus?: () => void;
   onRecordDeleted?: () => void; // 添加回调属性
   api: API;
@@ -74,7 +75,7 @@ const ResponsiveVideoCard = forwardRef<View, VideoCardProps>(
       } else {
         router.push({
           pathname: "/detail",
-          params: { source, q: title },
+          params: { source, q: title, year: year || undefined },
         });
       }
     };
