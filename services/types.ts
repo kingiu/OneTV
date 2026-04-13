@@ -1,1 +1,341 @@
-// --- Type Definitions ---\n\n// 登录凭证相关类型\nexport interface LoginCredentials {\n  username: string;\n  password: string;\n}\n\n// 播放记录相关类型\nexport interface PlayRecord {\n  key: string;\n  title: string;\n  cover: string;\n  currentTime: number;\n  totalTime: number;\n  lastPlayed: number;\n  save_time: number;\n  introEndTime?: number;\n  outroStartTime?: number;\n  playbackRate?: number;\n}\n\n// 收藏相关类型\nexport interface Favorite {\n  key: string;\n  title: string;\n  cover: string;\n  type: string;\n  save_time: number;\n}\n\n// 服务器配置相关类型\nexport interface ServerConfig {\n  Version: string;\n  StorageType: string;\n  SiteName: string;\n  DownloadEnabled: boolean;\n  requireInviteCode: boolean;\n  TelegramAuthConfig?: {\n    enabled: boolean;\n    botUsername: string;\n    buttonSize: string;\n    showAvatar: boolean;\n    requestWriteAccess: boolean;\n  };\n  OIDCProviders?: Array<{\n    id: string;\n    name: string;\n    buttonText: string;\n    issuer: string;\n  }>;\n  OIDCConfig?: {\n    enabled: boolean;\n    buttonText: string;\n    issuer: string;\n  };\n  // 保持向后兼容的字段\n  AuthConfig?: {\n    Enable: boolean;\n    Password: string;\n  };\n  SiteConfig?: {\n    Name: string;\n    Logo: string;\n    Favicon: string;\n  };\n  UserConfig?: {\n    Enable: boolean;\n    Users: Array<{\n      username: string;\n      password: string;\n      role: 'admin' | 'user';\n      group: string;\n      expiredAt: number;\n      createdAt: number;\n      updatedAt: number;\n      banned: boolean;\n    }>;\n  };\n  ApiConfig?: {\n    EnableSearch: boolean;\n    EnableLive: boolean;\n    EnableDouban: boolean;\n    EnableMembership: boolean;\n    EnableCoupon: boolean;\n    EnablePlayRecord: boolean;\n    EnableFavorite: boolean;\n    EnableSearchHistory: boolean;\n  };\n  MembershipConfig?: {\n    Enable: boolean;\n    Tiers: Array<{\n      id: string;\n      name: string;\n      displayName: string;\n      price: number;\n      description: string;\n      features: string[];\n      durationDays: number;\n      priority: number;\n      permissions: string[];\n    }>;\n  };\n}\n\n// 会员相关类型\nexport interface MembershipTier {\n  id?: string;\n  name: string;\n  displayName: string;\n  price: number;\n  description?: string;\n  features: string[];\n  durationDays?: number;\n  priority?: number;\n  permissions?: string[];\n  isDefault?: boolean;\n  userGroup?: string;\n}\n\nexport interface UserMembership {\n  tierId: string;\n  startDate: number;\n  endDate: number;\n  status: 'active' | 'expired' | 'pending';\n  autoRenew: boolean;\n  source?: 'manual' | 'coupon' | 'system';\n  renewInfo?: {\n    enabled: boolean;\n    renewalTierId: string;\n    nextRenewalDate: number;\n  } | null;\n  lastUpdated?: number;\n  activationHistory?: Array<{\n    tierId: string;\n    startDate: number;\n    durationDays: number;\n    source: 'manual' | 'coupon' | 'system';\n    transactionId: string;\n  }>;\n}\n\nexport interface MembershipConfig {\n  tiers: MembershipTier[];\n  defaultTierId?: string;\n  enableMembershipSystem?: boolean;\n  lastUpdated?: number;\n  defaultDurationDays?: number;\n}\n\nexport interface MembershipResponse {\n  membership: UserMembership;\n  config: MembershipConfig;\n}\n\n// 卡券相关类型\nexport interface Coupon {\n  code: string;\n  batchId: string;\n  type: string;\n  tier: string;\n  durationDays: number;\n  status: 'active' | 'used' | 'expired' | 'invalid';\n  createdAt: number;\n  redeemedAt?: number;\n  redeemedBy?: string;\n  expireTime: number;\n  expireDate?: number;\n  expireTimeStr?: string;\n  usedAt?: number;\n  usedBy?: string;\n  createDate?: number;\n  isExpired?: boolean;\n}\n\nexport interface CouponBatch {\n  id: string;\n  name: string;\n  type: string;\n  tier: string;\n  durationDays: number;\n  quantity: number;\n  prefix: string;\n  status: 'active' | 'inactive';\n  createdAt: number;\n  expiredAt?: number;\n  startAt?: number;\n  endAt?: number;\n  totalRedeemed: number;\n  totalCreated: number;\n  createdBy?: string;\n  description?: string;\n}\n\nexport interface RedeemResult {\n  success: boolean;\n  message: string;\n  data?: {\n    membership: UserMembership;\n    config: MembershipConfig;\n  };\n  error?: string;\n}\n\n// 直播源相关类型\nexport interface LiveApiResponse<T> {\n  code: number;\n  data: T;\n  message: string;\n  total?: number;\n}\n\nexport interface LiveSource {\n  id: string;\n  name: string;\n  url: string;\n  logo: string;\n  group: string;\n  delay?: number;\n  filter?: string;\n  sort?: number;\n  isOk?: boolean;\n  lastCheck?: number;\n}\n\n// 搜索相关类型\nexport interface SearchResult {\n  id: string;\n  title: string;\n  type: string;\n  cover: string;\n  rating?: number;\n  year?: number;\n  doubanId?: string;\n  imdbId?: string;\n  tmdbId?: string;\n  overview?: string;\n  genres?: string[];\n  tags?: string[];\n  actors?: string[];\n  directors?: string[];\n  countries?: string[];\n  languages?: string[];\n  releaseDate?: string;\n  runtime?: number;\n  status?: string;\n  network?: string;\n  seasons?: number;\n  episodes?: string[];\n  episodes_titles?: string[];\n  play_sources?: Array<{\n    name: string;\n    episodes: string[];\n    episodes_titles: string[];\n  }>;\n  vod_play_from?: string;\n  vod_play_url?: string;\n}\n\n// 视频详情相关类型\nexport interface VideoDetail {\n  id: string;\n  title: string;\n  type: string;\n  cover: string;\n  rating?: number;\n  year?: number;\n  doubanId?: string;\n  imdbId?: string;\n  tmdbId?: string;\n  overview?: string;\n  genres?: string[];\n  tags?: string[];\n  actors?: string[];\n  directors?: string[];\n  countries?: string[];\n  languages?: string[];\n  releaseDate?: string;\n  runtime?: number;\n  status?: string;\n  network?: string;\n  seasons?: number;\n  episodes?: string[];\n  episodes_titles?: string[];\n  play_sources?: Array<{\n    name: string;\n    episodes: string[];\n    episodes_titles: string[];\n  }>;\n  vod_play_from?: string;\n  vod_play_url?: string;\n}\n\n// 搜索资源相关类型\nexport interface ApiSite {\n  id: string;\n  name: string;\n  key: string;\n  type: string;\n  api: string;\n  search: string;\n  quickSearch?: string;\n  categories?: Array<{\n    key: string;\n    name: string;\n  }>;\n  filters?: Array<{\n    key: string;\n    name: string;\n    values: Array<{\n      key: string;\n      name: string;\n    }>;\n  }>;\n  weight: number;\n  enabled: boolean;\n  searchable: boolean;\n  quickSearchable: boolean;\n  lang: string;\n}\n\n// 豆瓣相关类型\nexport interface DoubanResponse {\n  items: Array<{\n    id: string;\n    title: string;\n    cover: string;\n    rating: number;\n    year: number;\n    type: string;\n  }>;\n  total: number;\n  page: number;\n  pageSize: number;\n  hasMore: boolean;\n}
+// --- Type Definitions ---
+
+// 登录凭证相关类型
+export interface LoginCredentials {
+  username: string;
+  password: string;
+}
+
+// 播放记录相关类型
+export interface PlayRecord {
+  key: string;
+  title: string;
+  cover: string;
+  currentTime: number;
+  totalTime: number;
+  lastPlayed: number;
+  save_time: number;
+  introEndTime?: number;
+  outroStartTime?: number;
+  playbackRate?: number;
+}
+
+// 收藏相关类型
+export interface Favorite {
+  key: string;
+  title: string;
+  cover: string;
+  type: string;
+  save_time: number;
+}
+
+// 服务器配置相关类型
+export interface ServerConfig {
+  Version: string;
+  StorageType: string;
+  SiteName: string;
+  DownloadEnabled: boolean;
+  requireInviteCode: boolean;
+  TelegramAuthConfig?: {
+    enabled: boolean;
+    botUsername: string;
+    buttonSize: string;
+    showAvatar: boolean;
+    requestWriteAccess: boolean;
+  };
+  OIDCProviders?: Array<{
+    id: string;
+    name: string;
+    buttonText: string;
+    issuer: string;
+  }>;
+  OIDCConfig?: {
+    enabled: boolean;
+    buttonText: string;
+    issuer: string;
+  };
+  // 保持向后兼容的字段
+  AuthConfig?: {
+    Enable: boolean;
+    Password: string;
+  };
+  SiteConfig?: {
+    Name: string;
+    Logo: string;
+    Favicon: string;
+  };
+  UserConfig?: {
+    Enable: boolean;
+    Users: Array<{
+      username: string;
+      password: string;
+      role: 'admin' | 'user';
+      group: string;
+      expiredAt: number;
+      createdAt: number;
+      updatedAt: number;
+      banned: boolean;
+    }>;
+  };
+  ApiConfig?: {
+    EnableSearch: boolean;
+    EnableLive: boolean;
+    EnableDouban: boolean;
+    EnableMembership: boolean;
+    EnableCoupon: boolean;
+    EnablePlayRecord: boolean;
+    EnableFavorite: boolean;
+    EnableSearchHistory: boolean;
+  };
+  MembershipConfig?: {
+    Enable: boolean;
+    Tiers: Array<{
+      id: string;
+      name: string;
+      displayName: string;
+      price: number;
+      description: string;
+      features: string[];
+      durationDays: number;
+      priority: number;
+      permissions: string[];
+    }>;
+  };
+}
+
+// 会员相关类型
+export interface MembershipTier {
+  id?: string;
+  name: string;
+  displayName: string;
+  price: number;
+  description?: string;
+  features: string[];
+  durationDays?: number;
+  priority?: number;
+  permissions?: string[];
+  isDefault?: boolean;
+  userGroup?: string;
+}
+
+export interface UserMembership {
+  tierId: string;
+  tierName?: string;
+  startDate: number;
+  endDate: number;
+  status: 'active' | 'expired' | 'pending';
+  autoRenew: boolean;
+  source?: 'manual' | 'coupon' | 'system';
+  renewInfo?: {
+    enabled: boolean;
+    renewalTierId: string;
+    nextRenewalDate: number;
+  } | null;
+  lastUpdated?: number;
+  activationHistory?: Array<{
+    tierId: string;
+    startDate: number;
+    durationDays: number;
+    source: 'manual' | 'coupon' | 'system';
+    transactionId: string;
+  }>;
+}
+
+export interface MembershipConfig {
+  tiers: MembershipTier[];
+  levels?: MembershipTier[];
+  defaultTierId?: string;
+  enableMembershipSystem?: boolean;
+  lastUpdated?: number;
+  defaultDurationDays?: number;
+  enable?: boolean;
+}
+
+export interface MembershipResponse {
+  membership: UserMembership;
+  config: MembershipConfig;
+}
+
+// 卡券相关类型
+export interface Coupon {
+  code: string;
+  batchId: string;
+  type: string;
+  tier: string;
+  durationDays: number;
+  status: 'active' | 'used' | 'expired' | 'invalid';
+  createdAt: number;
+  redeemedAt?: number;
+  redeemedBy?: string;
+  expireTime: number;
+  expireDate?: number;
+  expireTimeStr?: string;
+  usedAt?: number;
+  usedBy?: string;
+  createDate?: number;
+  isExpired?: boolean;
+}
+
+export interface CouponBatch {
+  id: string;
+  name: string;
+  type: string;
+  tier: string;
+  durationDays: number;
+  quantity: number;
+  prefix: string;
+  status: 'active' | 'inactive';
+  createdAt: number;
+  expiredAt?: number;
+  startAt?: number;
+  endAt?: number;
+  totalRedeemed: number;
+  totalCreated: number;
+  createdBy?: string;
+  description?: string;
+}
+
+export interface RedeemResult {
+  success: boolean;
+  message: string;
+  data?: {
+    membership: UserMembership;
+    config: MembershipConfig;
+  };
+  error?: string;
+}
+
+// 直播源相关类型
+export interface LiveApiResponse<T> {
+  code: number;
+  data: T;
+  message: string;
+  total?: number;
+}
+
+export interface LiveSource {
+  id: string;
+  name: string;
+  url: string;
+  logo: string;
+  group: string;
+  delay?: number;
+  filter?: string;
+  sort?: number;
+  isOk?: boolean;
+  lastCheck?: number;
+}
+
+// 搜索相关类型
+export interface SearchResult {
+  id: string;
+  title: string;
+  type: string;
+  cover: string;
+  rating?: number;
+  year?: number | string;
+  doubanId?: string;
+  imdbId?: string;
+  tmdbId?: string;
+  overview?: string;
+  genres?: string[];
+  tags?: string[];
+  actors?: string[];
+  directors?: string[];
+  countries?: string[];
+  languages?: string[];
+  releaseDate?: string;
+  runtime?: number;
+  status?: string;
+  network?: string;
+  seasons?: number;
+  episodes?: string[];
+  episodes_titles?: string[];
+  play_sources?: Array<{
+    name: string;
+    episodes: string[];
+    episodes_titles: string[];
+  }>;
+  vod_play_from?: string;
+  vod_play_url?: string;
+  source?: string;
+}
+
+// 视频详情相关类型
+export interface VideoDetail {
+  id: string;
+  title: string;
+  type: string;
+  cover: string;
+  rating?: number;
+  year?: number | string;
+  doubanId?: string;
+  imdbId?: string;
+  tmdbId?: string;
+  overview?: string;
+  genres?: string[];
+  tags?: string[];
+  actors?: string[];
+  directors?: string[];
+  countries?: string[];
+  languages?: string[];
+  releaseDate?: string;
+  runtime?: number;
+  status?: string;
+  network?: string;
+  seasons?: number;
+  episodes?: string[];
+  episodes_titles?: string[];
+  play_sources?: Array<{
+    name: string;
+    episodes: string[];
+    episodes_titles: string[];
+  }>;
+  vod_play_from?: string;
+  vod_play_url?: string;
+  source?: string;
+}
+
+// 搜索资源相关类型
+export interface ApiSite {
+  id: string;
+  name: string;
+  key: string;
+  type: string;
+  api: string;
+  search: string;
+  quickSearch?: string;
+  categories?: Array<{
+    key: string;
+    name: string;
+  }>;
+  filters?: Array<{
+    key: string;
+    name: string;
+    values: Array<{
+      key: string;
+      name: string;
+    }>;
+  }>;
+  weight: number;
+  enabled: boolean;
+  searchable: boolean;
+  quickSearchable: boolean;
+  lang: string;
+}
+
+// 豆瓣相关类型
+export interface DoubanResponse {
+  items: Array<{
+    id: string;
+    title: string;
+    cover: string;
+    rating: number;
+    year: number;
+    type: string;
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}

@@ -72,6 +72,7 @@ interface PlayerState {
     episodeIndex: number;
     position?: number;
     skipAutoSourceSelection?: boolean;
+    preferredDetail?: any;
   }) => Promise<void>;
   playEpisode: (index: number) => void;
   togglePlayPause: () => void;
@@ -207,17 +208,18 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     return bestLineIndex;
   },
 
-  loadVideo: async ({ source, id, episodeIndex, position, title, skipAutoSourceSelection }) => {
+  loadVideo: async ({ source, id, episodeIndex, position, title, skipAutoSourceSelection, preferredDetail }) => {
     const perfStart = performance.now();
-    logger.info(`[PERF] PlayerStore.loadVideo START - source: ${source}, id: ${id}, title: ${title}, skipAutoSourceSelection: ${skipAutoSourceSelection}`);
+    logger.info(`[PERF] PlayerStore.loadVideo START - source: ${source}, id: ${id}, title: ${title}, skipAutoSourceSelection: ${skipAutoSourceSelection}, hasPreferredDetail: ${!!preferredDetail}`);
 
-    let detail = useDetailStore.getState().detail;
+    let detail = preferredDetail || useDetailStore.getState().detail;
     let episodes: string[] = [];
 
-    // If detail exists, use detail.source; otherwise use provided source.
     if (detail && detail.source) {
-      logger.info(`[INFO] Using existing detail source "${detail.source}" to get episodes`);
-      episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+      logger.info(`[INFO] Using detail source "${detail.source}" to get episodes (preferred: ${!!preferredDetail})`);
+      episodes = detail.episodes && detail.episodes.length > 0 
+        ? detail.episodes 
+        : episodesSelectorBySource(detail.source)(useDetailStore.getState());
     } else {
       logger.info(`[INFO] No existing detail, using provided source "${source}" to get episodes`);
       episodes = episodesSelectorBySource(source)(useDetailStore.getState());
@@ -227,9 +229,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       isLoading: true,
     });
 
-    const needsDetailInit = !detail || !episodes || episodes.length === 0 || detail.title !== title;
+    const needsDetailInit = !preferredDetail && (!detail || !episodes || episodes.length === 0 || detail.title !== title);
     logger.info(
-      `[PERF] Detail check - needsInit: ${needsDetailInit}, hasDetail: ${!!detail}, episodesCount: ${
+      `[PERF] Detail check - needsInit: ${needsDetailInit}, hasDetail: ${!!detail}, hasPreferredDetail: ${!!preferredDetail}, episodesCount: ${
         episodes?.length || 0
       }`
     );
@@ -265,7 +267,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
       // Use actual source selected by DetailStore.
       logger.info(`[INFO] Using actual source "${detail.source}" instead of preferred source "${source}"`);
-      episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+      episodes = detail.episodes && detail.episodes.length > 0
+        ? detail.episodes
+        : episodesSelectorBySource(detail.source)(useDetailStore.getState());
 
       if (!episodes || episodes.length === 0) {
         logger.error(`[ERROR] No episodes found for "${title}" from source "${detail.source}" (${detail.source_name})`);
@@ -299,7 +303,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       logger.info(`[PERF] Skipping DetailStore.init - using cached data`);
 
       // Even with cached data, ensure episodes are loaded from the right source.
-      if (detail && detail.source && detail.source !== source) {
+      if (detail && detail.source && detail.source !== source && !preferredDetail) {
         logger.info(
           `[INFO] Cached detail source "${detail.source}" differs from provided source "${source}", updating episodes`
         );
@@ -313,13 +317,17 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
           useDetailStore.getState().setDetail(sourceDetail);
           detail = sourceDetail;
         }
-        episodes = episodesSelectorBySource(source)(useDetailStore.getState());
+        episodes = detail.episodes && detail.episodes.length > 0
+          ? detail.episodes
+          : episodesSelectorBySource(source)(useDetailStore.getState());
 
         if (!episodes || episodes.length === 0) {
           logger.warn(
             `[WARN] Provided source "${source}" has no episodes, trying cached source "${detail.source}"`
           );
-          episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+          episodes = detail.episodes && detail.episodes.length > 0
+            ? detail.episodes
+            : episodesSelectorBySource(detail.source)(useDetailStore.getState());
           
           // If cached source also has no episodes, try to find any source with episodes
           if (!episodes || episodes.length === 0) {
@@ -340,9 +348,23 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         }
       } else if (detail) {
         // Ensure episodes are loaded for the current source
-        episodes = episodesSelectorBySource(detail.source)(useDetailStore.getState());
+        episodes = detail.episodes && detail.episodes.length > 0
+          ? detail.episodes
+          : episodesSelectorBySource(detail.source)(useDetailStore.getState());
         
         if (!episodes || episodes.length === 0) {
+          // 如果是用户手动选择的源，不要自动切换到其他源
+          if (preferredDetail) {
+            logger.error(`[ERROR] User selected source "${detail.source}" has no episodes`);
+            Toast.show({
+              type: "error",
+              text1: "播放失败",
+              text2: `播放源 "${detail.source_name}" 没有可用的剧集`,
+            });
+            set({ isLoading: false });
+            return;
+          }
+          
           logger.error(`[ERROR] No episodes found for "${title}" from source "${detail.source}" (${detail.source_name})`);
           
           // Try to find any source with episodes

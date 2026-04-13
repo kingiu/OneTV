@@ -17,8 +17,6 @@ export const SourceSelectionModal: React.FC = () => {
       const newDetail = searchResults[index];
       setDetail(newDetail);
       
-      // Reload the video with the new source, preserving current position
-      // skipAutoSourceSelection: true 表示用户手动选择源，跳过自动选择
       const currentPosition = status?.isLoaded ? status.positionMillis : undefined;
       loadVideo({
         source: newDetail.source,
@@ -26,7 +24,8 @@ export const SourceSelectionModal: React.FC = () => {
         episodeIndex: currentEpisodeIndex,
         title: newDetail.title,
         position: currentPosition,
-        skipAutoSourceSelection: true
+        skipAutoSourceSelection: true,
+        preferredDetail: newDetail
       });
     }
     setShowSourceModal(false);

@@ -41,6 +41,7 @@ interface SettingsState {
   serverConfig: ServerConfig | null;
   isLoadingServerConfig: boolean;
   loadSettings: () => Promise<void>;
+  checkBackendAndSyncProxyConfig: () => Promise<void>;
   fetchServerConfig: () => Promise<void>;
   setApiBaseUrl: (url: string) => void;
   setCronPassword: (password: string) => void;
@@ -80,7 +81,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     cacheTTL: 3600,
   },
   loadSettings: async () => {
-      // 根据环境区分API地址
       const defaultUrl = __DEV__ ? "http://192.168.100.101:3000" : "https://onetv.aisxuexi.com";
       api.setBaseUrl(defaultUrl);
       proxyService.setBaseUrl(defaultUrl);
@@ -88,7 +88,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const settings = await SettingsManager.get();
       console.log('Loaded settings:', settings);
       
-      // 加载代理配置
       const proxyConfig = await proxyService.getConfig();
       
       set({
@@ -107,11 +106,45 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         proxyConfig,
       });
       
-      // 尝试获取服务器配置（异步执行，不阻塞主流程）
+      get().checkBackendAndSyncProxyConfig();
+      
       get().fetchServerConfig().catch((error) => {
         logger.error("Failed to fetch server config:", error);
       });
     },
+  checkBackendAndSyncProxyConfig: async () => {
+    const state = get();
+    const { apiBaseUrl } = state;
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${apiBaseUrl}/api/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      const isBackendAvailable = response.ok;
+      console.log(`Backend health check: ${isBackendAvailable ? 'available' : 'unavailable'}`);
+      
+      if (!isBackendAvailable && state.proxyConfig.useBackendProxy) {
+        console.warn('Backend unavailable, auto-disabling proxy');
+        state.setProxyConfig({ enabled: false });
+      } else if (isBackendAvailable && !state.proxyConfig.enabled && state.vodProxyEnabled) {
+        console.log('Backend available, re-enabling proxy');
+        state.setProxyConfig({ enabled: true });
+      }
+    } catch (error) {
+      console.log('Backend health check failed:', error instanceof Error ? error.message : String(error));
+      if (state.proxyConfig.useBackendProxy && state.proxyConfig.enabled) {
+        console.warn('Auto-disabling proxy due to backend error');
+        state.setProxyConfig({ enabled: false });
+      }
+    }
+  },
   fetchServerConfig: async () => {
     set({ isLoadingServerConfig: true });
     try {
@@ -130,10 +163,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       set({ isLoadingServerConfig: false });
     }
   },
-  setApiBaseUrl: (url) => {
+  setApiBaseUrl: async (url) => {
     set({ apiBaseUrl: url });
     api.setBaseUrl(url);
     proxyService.setBaseUrl(url);
+    
+    get().checkBackendAndSyncProxyConfig();
   },
   setCronPassword: (password) => set({ cronPassword: password }),
   setM3uUrl: (url) => set({ m3uUrl: url }),

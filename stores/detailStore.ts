@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { SearchResult, api } from "@/services/api";
+import { resourceMatcher } from "@/services/resourceMatcher";
 import { getResolutionFromM3U8 } from "@/services/m3u8";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { FavoriteManager } from "@/services/storage";
@@ -66,6 +67,10 @@ const useDetailStore = create<DetailState>((set, get) => ({
     const newController = new AbortController();
     const signal = newController.signal;
 
+    // 构建带年份的查询字符串，用于搜索
+    const searchQuery = year ? `${q} ${year}` : q;
+    logger.info(`[MATCHING] Search query: "${searchQuery}" (original: "${q}", year: ${year})`);
+
     set({
       q,
       year: year || null,
@@ -81,58 +86,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
     const { videoSource } = useSettingsStore.getState();
 
-    const matchesSearchQuery = (
-      item: SearchResult, 
-      queryTitle: string, 
-      queryYear: string | null | undefined, 
-      queryDoubanId: string | null | undefined
-    ): boolean => {
-      // 1. 优先使用 doubanId 匹配
-      if (queryDoubanId && item.doubanId) {
-        return item.doubanId === queryDoubanId;
-      }
-      
-      // 2. 标题匹配是必须的
-      const titleMatches = item.title === queryTitle;
-      if (!titleMatches) return false;
-      
-      // 3. 年份匹配
-      if (queryYear) {
-        const itemYear = item.year?.toString() || '';
-        if (itemYear !== queryYear) return false;
-      }
-      
-      // 4. 类型匹配（确保电影匹配电影，电视剧匹配电视剧）
-      if (queryDoubanId) {
-        // 从豆瓣 ID 推断类型：电影以 '1' 开头，电视剧以 '2' 开头
-        const isMovie = queryDoubanId.startsWith('1');
-        const isTV = queryDoubanId.startsWith('2');
-        
-        if (isMovie && item.type !== 'movie') return false;
-        if (isTV && item.type !== 'tv') return false;
-      }
-      
-      // 5. 针对中文剧集的额外匹配条件
-      if (queryTitle === '危险关系') {
-        // 检查是否为中文剧集
-        if (item.countries) {
-          const isChinese = item.countries.some(country => 
-            country.includes('中国') || country.includes('中国大陆') || country.includes('香港') || country.includes('台湾')
-          );
-          if (!isChinese) return false;
-        }
-        
-        // 检查语言
-        if (item.languages) {
-          const isChineseLanguage = item.languages.some(lang => 
-            lang.includes('中文') || lang.includes('汉语') || lang.includes('Mandarin')
-          );
-          if (!isChineseLanguage) return false;
-        }
-      }
-      
-      return true;
-    };
+    // 使用 resourceMatcher 进行更灵活的匹配，不再需要严格的匹配函数
 
     const processAndSetResults = async (results: SearchResult[], merge = false) => {
       const resolutionStart = performance.now();
@@ -144,12 +98,12 @@ const useDetailStore = create<DetailState>((set, get) => ({
           const m3u8Start = performance.now();
           try {
             if (searchResult.episodes && searchResult.episodes.length > 0) {
-              resolution = await getResolutionFromM3U8(searchResult.episodes[0], signal);
+              // 不再传递 signal，避免被外部中止
+              resolution = await getResolutionFromM3U8(searchResult.episodes[0]);
             }
           } catch (e) {
-            if ((e as Error).name !== "AbortError") {
-              logger.info(`Failed to get resolution for ${searchResult.source_name}`, e);
-            }
+            // 捕获所有错误，不再区分 AbortError
+            logger.info(`Failed to get resolution for ${searchResult.source_name}`, e);
           }
           const m3u8End = performance.now();
           logger.info(`[PERF] M3U8 resolution for ${searchResult.source_name}: ${(m3u8End - m3u8Start).toFixed(2)}ms (${resolution || 'failed'})`);
@@ -166,25 +120,53 @@ const useDetailStore = create<DetailState>((set, get) => ({
       if (signal.aborted) return;
 
       set((state) => {
-        // 同时根据 source 和 source_name 去重，避免相同名称的播放源重复显示
-        let finalResults;
-        if (merge) {
-          const existingSources = new Set(state.searchResults.map((r) => r.source));
-          const existingSourceNames = new Set(state.searchResults.map((r) => r.source_name));
-          const newResults = resultsWithResolution.filter((r) => 
-            !existingSources.has(r.source) && !existingSourceNames.has(r.source_name)
-          );
-          finalResults = [...state.searchResults, ...newResults];
+        // 统一去重逻辑：使用 source_id 作为唯一键（参考 LunaTV）
+        const seenKeys = new Set<string>();
+        const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
+        
+        const deduplicatedResults = allResults.filter((r) => {
+          const uniqueKey = `${r.source}_${r.id}`;
+          if (seenKeys.has(uniqueKey)) {
+            return false;
+          }
+          seenKeys.add(uniqueKey);
+          return true;
+        });
+        
+        logger.info(`[MATCHING] Before dedup: ${allResults.length} results, After dedup: ${deduplicatedResults.length} results`);
+        
+        // 检测去重后的视频源数量是否超过后端限制（24个）
+        const MAX_SOURCES = 24;
+        if (deduplicatedResults.length > MAX_SOURCES) {
+          logger.warn(`[WARN] After initial dedup: ${deduplicatedResults.length} results exceeds limit of ${MAX_SOURCES}`);
+        }
+        
+        let processedResults = deduplicatedResults;
+        let finalDeduplicatedResults = deduplicatedResults;
+
+        // 不使用匹配引擎过滤，直接使用所有去重后的结果
+        // 这样可以确保获取到所有可用的视频源
+        logger.info(`[MATCHING] Using all deduplicated results: ${deduplicatedResults.length} results`);
+        processedResults = deduplicatedResults;
+
+        // 最终去重：使用 source_id 作为唯一键（参考 LunaTV）
+        const seenFinal = new Set<string>();
+        finalDeduplicatedResults = processedResults.filter((r) => {
+          const uniqueKey = `${r.source}_${r.id}`;
+          if (seenFinal.has(uniqueKey)) {
+            return false;
+          }
+          seenFinal.add(uniqueKey);
+          return true;
+        });
+
+        logger.info(`[MATCHING] After final deduplication: ${finalDeduplicatedResults.length} results`);
+        
+        // 检测最终视频源数量是否超过后端限制（24个）
+        if (finalDeduplicatedResults.length > MAX_SOURCES) {
+          logger.warn(`[WARN] Final results count (${finalDeduplicatedResults.length}) exceeds limit of ${MAX_SOURCES}`);
         } else {
-          // 初始加载时也要去重相同名称的播放源
-          const seenSourceNames = new Set();
-          finalResults = resultsWithResolution.filter((r) => {
-            if (seenSourceNames.has(r.source_name)) {
-              return false;
-            }
-            seenSourceNames.add(r.source_name);
-            return true;
-          });
+          logger.info(`[INFO] Final results count: ${finalDeduplicatedResults.length} (limit: ${MAX_SOURCES})`);
         }
 
         // 优先选择最佳匹配的结果作为 detail
@@ -198,35 +180,27 @@ const useDetailStore = create<DetailState>((set, get) => ({
               r.doubanId === state.doubanId
             );
           }
-          // 然后尝试年份匹配
-          if (!bestDetail && state.year) {
-            // 从所有结果中查找，不考虑source_name去重
-            const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
-            bestDetail = allResults.find((r) => 
-              r.year?.toString() === state.year
+          
+          // 然后尝试年份精确匹配
+          if (!bestDetail && state.year && finalDeduplicatedResults.length > 0) {
+            const yearMatch = finalDeduplicatedResults.find((r) => 
+              r.year === state.year || r.year === String(state.year)
             );
+            if (yearMatch) {
+              logger.info(`[MATCHING] Found year exact match: ${yearMatch.title} (${yearMatch.year})`);
+              bestDetail = yearMatch;
+            }
           }
-          // 如果没有匹配，选择第一个结果
-          if (!bestDetail) {
-            bestDetail = finalResults[0] ?? null;
-          }
-        }
-
-        // 对于"危险关系"特殊处理，确保选择2026年版本
-        if (state.q === '危险关系' && state.year === '2026' && bestDetail && bestDetail.year?.toString() !== '2026') {
-          // 从所有结果中查找2026年版本，不考虑source_name去重
-          const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
-          const yearMatchDetail = allResults.find((r) => 
-            r.year?.toString() === '2026'
-          );
-          if (yearMatchDetail) {
-            bestDetail = yearMatchDetail;
+          
+          // 最后使用匹配引擎的结果
+          if (!bestDetail && finalDeduplicatedResults.length > 0) {
+            bestDetail = finalDeduplicatedResults[0];
           }
         }
 
         return {
-          searchResults: finalResults,
-          sources: finalResults.map((r) => ({
+          searchResults: finalDeduplicatedResults,
+          sources: finalDeduplicatedResults.map((r) => ({
             source: r.source,
             source_name: r.source_name,
             resolution: r.resolution,
@@ -237,246 +211,67 @@ const useDetailStore = create<DetailState>((set, get) => ({
     };
 
     try {
-      // Optimization for favorite navigation
-      if (preferredSource && id) {
-        const searchPreferredStart = performance.now();
-        logger.info(`[PERF] API searchVideo (preferred) START - source: ${preferredSource}, query: "${q}", id: ${id}`);
-        
-        let preferredResult: SearchResult[] = [];
-        let preferredSearchError: any = null;
-        
-        try {
-          const response = await api.searchVideo(q, id, signal);
-          preferredResult = response.results;
-        } catch (error) {
-          preferredSearchError = error;
-          logger.error(`[ERROR] API searchVideo (preferred) FAILED - source: ${preferredSource}, error:`, error);
-          // 检查是否是API_URL_NOT_SET错误
-          if ((error as Error).message === "API_URL_NOT_SET") {
-            set({ 
-              error: "API地址未设置，请在设置中配置API地址",
-              loading: false 
-            });
-            return;
-          }
-        }
-        
-        const searchPreferredEnd = performance.now();
-        logger.info(`[PERF] API searchVideo (preferred) END - took ${(searchPreferredEnd - searchPreferredStart).toFixed(2)}ms, results: ${preferredResult.length}, error: ${!!preferredSearchError}`);
+      // 无论是否有 preferredSource，都使用 searchVideos 搜索所有源
+      // 这样可以确保获取到所有可用的视频源，而不仅仅是首选源
+      const searchStart = performance.now();
+      logger.info(`[PERF] API searchVideos (all sources) START - query: "${searchQuery}"`);
+      
+      try {
+        const { results: allResults } = await api.searchVideos(searchQuery, doubanId);
+        const searchEnd = performance.now();
+        logger.info(`[PERF] API searchVideos (all sources) END - took ${(searchEnd - searchStart).toFixed(2)}ms, results: ${allResults.length}`);
         
         if (signal.aborted) return;
         
-        // 检查preferred source结果
-        if (preferredResult.length > 0) {
-          logger.info(`[SUCCESS] Preferred source "${preferredSource}" found ${preferredResult.length} results for "${q}"`);
-          const filteredPreferredResults = preferredResult.filter(item => matchesSearchQuery(item, q, year, doubanId));
-          logger.info(`[PREFERRED] Filtered results: ${filteredPreferredResults.length} matches for "${q}" (year: ${year || 'any'}, doubanId: ${doubanId || 'none'})`);
-          if (filteredPreferredResults.length > 0) {
-            await processAndSetResults(filteredPreferredResults, false);
-            set({ loading: false });
-          } else {
-            // 优先源没有匹配结果，降级到所有源
-            logger.warn(`[FALLBACK] Preferred source "${preferredSource}" found no matching results, trying all sources`);
-            // 立即尝试所有源，不再依赖后台搜索
-            const fallbackStart = performance.now();
-            logger.info(`[PERF] FALLBACK search (all sources) START - query: "${q}"`);
-            
-            try {
-              const { results: allResults } = await api.searchVideos(q);
-              const fallbackEnd = performance.now();
-              logger.info(`[PERF] FALLBACK search END - took ${(fallbackEnd - fallbackStart).toFixed(2)}ms, total results: ${allResults.length}`);
-              
-              const filteredResults = allResults.filter(item => matchesSearchQuery(item, q, year, doubanId));
-              logger.info(`[FALLBACK] Filtered results: ${filteredResults.length} matches for "${q}" (year: ${year || 'any'}, doubanId: ${doubanId || 'none'})`);
-              
-              if (filteredResults.length > 0) {
-                logger.info(`[SUCCESS] FALLBACK search found results, proceeding with ${filteredResults[0].source_name}`);
-                await processAndSetResults(filteredResults, false);
-                set({ loading: false });
-              } else {
-                logger.error(`[ERROR] FALLBACK search found no matching results for "${q}"`);
-                set({ 
-                  error: `未找到 "${q}" 的播放源，请检查标题或稍后重试`,
-                  loading: false 
-                });
-              }
-            } catch (fallbackError) {
-              logger.error(`[ERROR] FALLBACK search FAILED:`, fallbackError);
-              // 检查是否是API_URL_NOT_SET错误
-              if ((fallbackError as Error).message === "API_URL_NOT_SET") {
-                set({ 
-                  error: "API地址未设置，请在设置中配置API地址",
-                  loading: false 
-                });
-              } else {
-                set({ 
-                  error: `搜索失败：${fallbackError instanceof Error ? fallbackError.message : '网络错误，请稍后重试'}`,
-                  loading: false 
-                });
-              }
-            }
-          }
+        if (allResults.length > 0) {
+          logger.info(`[SUCCESS] searchVideos found ${allResults.length} results for "${q}"`);
+          await processAndSetResults(allResults, false);
+          set({ loading: false }); // Stop loading indicator
         } else {
-          // 降级策略：preferred source失败时立即尝试所有源
-          if (preferredSearchError) {
-            logger.warn(`[FALLBACK] Preferred source "${preferredSource}" failed with error, trying all sources immediately`);
-          } else {
-            logger.warn(`[FALLBACK] Preferred source "${preferredSource}" returned 0 results for "${q}", trying all sources immediately`);
-          }
-          
-          // 立即尝试所有源，不再依赖后台搜索
-          const fallbackStart = performance.now();
-          logger.info(`[PERF] FALLBACK search (all sources) START - query: "${q}"`);
-          
-          try {
-            const { results: allResults } = await api.searchVideos(q);
-            const fallbackEnd = performance.now();
-            logger.info(`[PERF] FALLBACK search END - took ${(fallbackEnd - fallbackStart).toFixed(2)}ms, total results: ${allResults.length}`);
-            
-            const filteredResults = allResults.filter(item => matchesSearchQuery(item, q, year, doubanId));
-            logger.info(`[FALLBACK] Filtered results: ${filteredResults.length} matches for "${q}" (year: ${year || 'any'}, doubanId: ${doubanId || 'none'})`);
-            
-            if (filteredResults.length > 0) {
-              logger.info(`[SUCCESS] FALLBACK search found results, proceeding with ${filteredResults[0].source_name}`);
-              await processAndSetResults(filteredResults, false);
-              set({ loading: false });
-            } else {
-              logger.error(`[ERROR] FALLBACK search found no matching results for "${q}"`);
-              set({ 
-                error: `未找到 "${q}" 的播放源，请检查标题或稍后重试`,
-                loading: false 
-              });
-            }
-          } catch (fallbackError) {
-            logger.error(`[ERROR] FALLBACK search FAILED:`, fallbackError);
-            // 检查是否是API_URL_NOT_SET错误
-            if ((fallbackError as Error).message === "API_URL_NOT_SET") {
-              set({ 
-                error: "API地址未设置，请在设置中配置API地址",
-                loading: false 
-              });
-            } else {
-              set({ 
-                error: `搜索失败：${fallbackError instanceof Error ? fallbackError.message : '网络错误，请稍后重试'}`,
-                loading: false 
-              });
-            }
-          }
-        }
-        
-        // 后台搜索（如果preferred source成功的话）
-        if (preferredResult.length > 0) {
-          const searchAllStart = performance.now();
-          logger.info(`[PERF] API searchVideos (background) START`);
-          
-          try {
-            const { results: allResults } = await api.searchVideos(q);
-            
-            const searchAllEnd = performance.now();
-            logger.info(`[PERF] API searchVideos (background) END - took ${(searchAllEnd - searchAllStart).toFixed(2)}ms, results: ${allResults.length}`);
-            
-            if (signal.aborted) return;
-            await processAndSetResults(allResults.filter(item => matchesSearchQuery(item, q, year, doubanId)), true);
-          } catch (backgroundError) {
-            logger.warn(`[WARN] Background search failed, but preferred source already succeeded:`, backgroundError);
-          }
-        }
-      } else {
-        // Standard navigation: fetch resources, then fetch details one by one
-        const resourcesStart = performance.now();
-        logger.info(`[PERF] API getResources START - query: "${q}"`);
-        
-        try {
-          const allResources = await api.getResources(signal);
-          
-          const resourcesEnd = performance.now();
-          logger.info(`[PERF] API getResources END - took ${(resourcesEnd - resourcesStart).toFixed(2)}ms, resources: ${allResources.length}`);
-          
-          // 保存后端返回的资源权重
-          const weights: { [key: string]: number } = {};
-          allResources.forEach(r => {
-            weights[r.key] = r.weight;
-          });
-          set({ resourceWeights: weights });
-          logger.info(`[INFO] Resource weights from backend: ${JSON.stringify(weights)}`);
-          
-          const enabledResources = videoSource.enabledAll
-            ? allResources
-            : allResources.filter((r) => videoSource.sources[r.key]);
-
-          logger.info(`[PERF] Enabled resources: ${enabledResources.length}/${allResources.length}`);
-          
-          if (enabledResources.length === 0) {
-            logger.error(`[ERROR] No enabled resources available for search`);
-            set({ 
-              error: "没有可用的视频源，请检查设置或联系管理员",
-              loading: false 
-            });
-            return;
-          }
-
-          let firstResultFound = false;
-          let totalResults = 0;
-          const searchPromises = enabledResources.map(async (resource) => {
-            try {
-              const searchStart = performance.now();
-              const { results } = await api.searchVideo(q, resource.key, signal);
-              const searchEnd = performance.now();
-              logger.info(`[PERF] API searchVideo (${resource.name}) took ${(searchEnd - searchStart).toFixed(2)}ms, results: ${results.length}`);
-              
-              if (results.length > 0) {
-                const filteredResults = results.filter(item => matchesSearchQuery(item, q, year, doubanId));
-                if (filteredResults.length > 0) {
-                  totalResults += filteredResults.length;
-                  logger.info(`[SUCCESS] Source "${resource.name}" found ${filteredResults.length} matching results for "${q}"`);
-                  await processAndSetResults(filteredResults, true);
-                  if (!firstResultFound) {
-                    set({ loading: false }); // Stop loading indicator on first result
-                    firstResultFound = true;
-                    logger.info(`[SUCCESS] First matching result found from "${resource.name}", stopping loading indicator`);
-                  }
-                } else {
-                  logger.warn(`[WARN] Source "${resource.name}" found no matching results for "${q}"`);
-                }
-              } else {
-                logger.warn(`[WARN] Source "${resource.name}" returned 0 results for "${q}"`);
-              }
-            } catch (error) {
-              logger.error(`[ERROR] Failed to fetch from ${resource.name}:`, error);
-            }
-          });
-
-          await Promise.all(searchPromises);
-          
-          // 检查是否找到任何结果
-          if (totalResults === 0) {
-            logger.error(`[ERROR] All sources returned 0 results for "${q}"`);
-            set({ 
-              error: `未找到 "${q}" 的播放源，请尝试其他关键词或稍后重试`,
-              loading: false 
-            });
-          } else {
-            logger.info(`[SUCCESS] Standard search completed, total results: ${totalResults}`);
-          }
-        } catch (resourceError) {
-          logger.error(`[ERROR] Failed to get resources:`, resourceError);
+          logger.error(`[ERROR] searchVideos found no results for "${q}"`);
           set({ 
-            error: `获取视频源失败：${resourceError instanceof Error ? resourceError.message : '网络错误，请稍后重试'}`,
+            error: `未找到 "${q}" 的播放源，请尝试其他关键词或稍后重试`,
             loading: false 
           });
-          return;
         }
+      } catch (searchError) {
+        logger.error(`[ERROR] searchVideos failed:`, searchError);
+        set({ 
+          error: `搜索失败：${searchError instanceof Error ? searchError.message : '网络错误，请稍后重试'}`,
+          loading: false 
+        });
       }
+      
+      // 保存后端返回的资源权重
+      try {
+        const allResources = await api.getResources(signal);
+        const weights: { [key: string]: number } = {};
+        allResources.forEach(r => {
+          weights[r.key] = r.weight;
+        });
+        set({ resourceWeights: weights });
+        logger.info(`[INFO] Resource weights from backend: ${JSON.stringify(weights)}`);
+      } catch (resourceError) {
+        logger.warn(`[WARN] Failed to get resources (non-fatal):`, resourceError);
+      }
+      
+      // 旧的 preferredSource 逻辑已被替换，因为我们现在总是使用 searchVideos
 
       const favoriteCheckStart = performance.now();
       const finalState = get();
       
       // 最终检查：如果所有搜索都完成但仍然没有结果
+      const MAX_SOURCES = 24;
       if (finalState.searchResults.length === 0 && !finalState.error) {
         logger.error(`[ERROR] All search attempts completed but no results found for "${q}"`);
         set({ error: `未找到 "${q}" 的播放源，请检查标题拼写或稍后重试` });
       } else if (finalState.searchResults.length > 0) {
         logger.info(`[SUCCESS] DetailStore.init completed successfully with ${finalState.searchResults.length} sources`);
+        if (finalState.searchResults.length > MAX_SOURCES) {
+          logger.warn(`[WARN] Total sources (${finalState.searchResults.length}) exceeds backend limit of ${MAX_SOURCES}`);
+        } else {
+          logger.info(`[INFO] Total sources: ${finalState.searchResults.length} (limit: ${MAX_SOURCES})`);
+        }
       }
 
       if (finalState.detail) {
@@ -607,16 +402,13 @@ const useDetailStore = create<DetailState>((set, get) => ({
     try {
       const { proxyService } = await import('@/services/proxyService');
       const startTime = performance.now();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
+      // 移除 AbortController，使用 proxyService 内部的超时机制
       const response = await proxyService.fetch(url, {
-        signal: controller.signal,
         method: 'HEAD',
         redirect: 'follow',
       });
 
-      clearTimeout(timeoutId);
       const endTime = performance.now();
       return endTime - startTime;
     } catch (error) {
