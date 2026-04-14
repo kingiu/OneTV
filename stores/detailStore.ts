@@ -99,6 +99,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
         logger.info(`[DEBUG] Play sources for ${searchResult.source_name}: ${searchResult.play_sources?.length || 0}`);
         logger.info(`[DEBUG] vod_play_from: ${searchResult.vod_play_from}`);
         logger.info(`[DEBUG] vod_play_url: ${searchResult.vod_play_url}`);
+        logger.info(`[DEBUG] episodes: ${searchResult.episodes?.length || 0}`);
+        logger.info(`[DEBUG] Raw searchResult keys:`, Object.keys(searchResult));
         return { ...searchResult, resolution: undefined };
       });
 
@@ -189,15 +191,16 @@ const useDetailStore = create<DetailState>((set, get) => ({
           // 最后使用匹配引擎的结果，但按权重排序选择最高权重的源
           if (!bestDetail && finalDeduplicatedResults.length > 0) {
             const { sourceWeights } = useSettingsStore.getState();
-            
+            const { resourceWeights: currentResourceWeights } = get(); // 获取当前状态中的 resourceWeights
+
             // 按权重排序，选择最高权重的源
             // 优先使用后端权重，其次使用前端配置权重，最后使用默认值 50
             const sortedResults = [...finalDeduplicatedResults].sort((a, b) => {
-              const aWeight = resourceWeights[a.source] ?? sourceWeights[a.source] ?? 50;
-              const bWeight = resourceWeights[b.source] ?? sourceWeights[b.source] ?? 50;
+              const aWeight = currentResourceWeights?.[a.source] ?? sourceWeights[a.source] ?? 50;
+              const bWeight = currentResourceWeights?.[b.source] ?? sourceWeights[b.source] ?? 50;
               return bWeight - aWeight;
             });
-            
+
             bestDetail = sortedResults[0];
             logger.info(`[MATCHING] Selected best source by weight: ${bestDetail.source} (${bestDetail.source_name})`);
           }
@@ -250,14 +253,14 @@ const useDetailStore = create<DetailState>((set, get) => ({
       // 保存后端返回的资源权重
       try {
         logger.info(`[WEIGHT] Fetching resource weights from backend...`);
-        
+
         // 使用 LunaTV API 端点获取权重
         const backendWeights = await api.getSourceWeights(signal);
         logger.info(`[WEIGHT] Got weights from /api/source-weights: ${JSON.stringify(backendWeights)}`);
-        
+
         const weights: { [key: string]: number } = {};
-        let hasBackendWeights = Object.keys(backendWeights).length > 0;
-        
+        const hasBackendWeights = Object.keys(backendWeights).length > 0;
+
         // 如果后端返回了权重，直接使用
         if (hasBackendWeights) {
           Object.assign(weights, backendWeights);
@@ -266,25 +269,25 @@ const useDetailStore = create<DetailState>((set, get) => ({
             logger.info(`[WEIGHT]   ${key}: ${weight}`);
           });
         }
-        
+
         // 如果后端没有返回权重，使用前端默认权重
         if (!hasBackendWeights) {
           logger.info(`[WEIGHT] Backend did not return weights, using frontend default weights`);
-          
+
           // 前端默认权重配置（可按需修改）
           const defaultWeights: { [key: string]: number } = {
             'aixuexi.com': 100,        // 官方高清站 - 最高优先级
             'jszyapi.com': 50,         // 极速资源 - 中等优先级
           };
-          
+
           // 为每个资源分配默认权重
           const allResources = await api.getResources(signal);
           logger.info(`[WEIGHT] Got ${allResources.length} resources from /api/search/resources`);
-          
+
           allResources.forEach(r => {
             const resourceKey = r.key || r.source || 'unknown';
             const defaultWeight = defaultWeights[resourceKey];
-            
+
             if (defaultWeight !== undefined) {
               weights[resourceKey] = defaultWeight;
               logger.info(`[WEIGHT] ⚙️ ${resourceKey}: assigned default weight=${defaultWeight}`);
@@ -294,7 +297,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
             }
           });
         }
-        
+
         set({ resourceWeights: weights });
         logger.info(`[WEIGHT] ✓ Final resource weights: ${JSON.stringify(weights)}`);
         logger.info(`[WEIGHT] Total resources with weights: ${Object.keys(weights).length}`);
@@ -326,9 +329,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
         } catch (favoriteError) {
           logger.warn(`[WARN] Failed to check favorite status:`, favoriteError);
         }
-      } else {
-        logger.warn(`[WARN] No detail found after all search attempts for "${q}"`);
       }
+      // 移除重复警告：如果 searchResults.length === 0，上面已经记录了错误
 
       const favoriteCheckEnd = performance.now();
       logger.info(`[PERF] Favorite check took ${(favoriteCheckEnd - favoriteCheckStart).toFixed(2)}ms`);
@@ -469,7 +471,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
     logger.info(`[BEST_SOURCE] Failed sources: [${Array.from(failedSources).join(', ')}]`);
     logger.info(`[BEST_SOURCE] Backend resource weights: ${JSON.stringify(resourceWeights)}`);
     logger.info(`[BEST_SOURCE] Local source weights: ${JSON.stringify(sourceWeights)}`);
-    
+
     // 调试：详细输出每个源的权重来源
     logger.info(`[BEST_SOURCE] === SOURCE WEIGHT DETAILS ===`);
     searchResults.forEach(source => {
@@ -503,7 +505,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
         // 1. 权重分数 (0-100) - 后端权重优先，本地权重作为备份
         const backendWeight = resourceWeights[source.source];
         const localWeight = sourceWeights[source.source];
-        
+
         // 修复：后端权重不存在（undefined）时才使用本地权重
         // 注意：backendWeight 可能为 0，此时应该使用 0 而不是 fallback
         const weight = backendWeight !== undefined ? backendWeight : (localWeight ?? 50);

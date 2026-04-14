@@ -49,12 +49,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   const playSources = detail?.play_sources || [];
   const currentLineName = playSources.length > 0 && currentPlaySourceIndex < playSources.length ? playSources[currentPlaySourceIndex].name : "";
 
-  // 调试日志
-  console.log('Detail:', detail);
-  console.log('Play sources:', playSources);
-  console.log('Play sources length:', playSources.length);
-  console.log('Current line name:', currentLineName);
-  console.log('Detail has play_sources:', !!detail?.play_sources);
+  // 调试日志（仅在 play_sources 变化时输出）
+  React.useEffect(() => {
+    console.log('[DEBUG] PlayerControls - detail.play_sources changed:', playSources.length);
+    console.log('[DEBUG] PlayerControls - play_sources:', playSources);
+  }, [playSources.length]);
 
   const formatTime = (milliseconds: number) => {
     if (!milliseconds) return "00:00";

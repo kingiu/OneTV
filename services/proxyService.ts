@@ -1,5 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag("ProxyService");
@@ -14,7 +12,7 @@ class ProxyService {
   private baseURL: string;
   private cache: Map<string, CacheItem> = new Map();
   private readonly DEFAULT_CACHE_TTL = 3600;
-  private readonly VIDEO_REQUEST_TIMEOUT = 12000;   // 视频请求 12s
+  private readonly VIDEO_REQUEST_TIMEOUT = 8000;    // 视频请求 8s（优化：从 12s 降至 8s）
   private readonly API_REQUEST_TIMEOUT = 8000;       // API 请求 8s
   private readonly HEALTH_CHECK_TIMEOUT = 5000;     // 健康检查 5s
 
@@ -131,7 +129,7 @@ class ProxyService {
   }
 
   // 直接请求
-  public async fetch(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
+  public async fetch(url: string, options: RequestInit = {}, retries = 1): Promise<Response> {
     const cacheKey = this.generateCacheKey(url, options.method || "GET", options.body as string);
 
     logger.debug("Fetching directly:", url);
@@ -202,12 +200,12 @@ class ProxyService {
       }
     };
 
-    // 尝试直接请求，支持重试
+    // 尝试直接请求，支持重试（优化：减少重试次数，从 2 次降至 1 次）
     for (let i = 0; i <= retries; i++) {
       try {
         if (i > 0) {
           logger.warn(`Retrying direct request (${i}/${retries}) for:`, url);
-          await new Promise(resolve => setTimeout(resolve, 1000 * i));
+          await new Promise(resolve => setTimeout(resolve, 500 * i)); // 优化：重试间隔从 1s 降至 500ms
         }
         return await makeRequest(url);
       } catch (error) {

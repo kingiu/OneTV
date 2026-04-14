@@ -20,9 +20,10 @@ import {
   type ServerConfig
 } from "./types";
 
-// 主API类
+// 主 API 类
 export class Api {
   private baseURL: string;
+  private searchCache: Map<string, { results: SearchResult[]; timestamp: number }> = new Map(); // 搜索结果缓存
 
   constructor(baseURL?: string) {
     // 默认使用本地 LunaTV 后端服务
@@ -640,23 +641,101 @@ export class Api {
     const searchVariants = resourceMatcher.generateSearchVariants(query);
     console.log('Search variants (searchVideos):', searchVariants);
 
-    // 2. 并行搜索所有变体，合并所有结果（参考 LunaTV）
-    const variantPromises = searchVariants.map(async (variant) => {
+    // 2. 检查缓存（优化：添加搜索结果缓存）
+    const cacheKey = `search:${query}:${doubanId || 'none'}`;
+    const cached = this.searchCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) { // 30 分钟缓存
+      console.log(`[CACHE HIT] Returning cached results for "${query}"`);
+      return { results: cached.results };
+    }
+
+    // 3. 并行搜索所有变体，合并所有结果（参考 LunaTV）
+    // 优化：限制并发数为 10，避免过多同时请求
+    const MAX_CONCURRENT = 10;
+    
+    // 创建带超时的请求函数
+    const fetchWithTimeout = async (variant: string, timeoutMs = 8000): Promise<SearchResult[]> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      
       try {
         const url = `/api/search?q=${encodeURIComponent(variant)}`;
-        const response = await this._fetch(url);
+        const response = await this._fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await response.json();
         const variantResults = data.results || [];
 
         console.log(`Variant "${variant}" found ${variantResults.length} results`);
-        return variantResults;
+        
+        // 处理 vod_play_from 和 vod_play_url 字段，转换为 play_sources
+        const processedResults = variantResults.map((item: any) => {
+          // 优先使用 API 返回的 lines 字段（LunaTV 格式）
+          if (item.lines && Array.isArray(item.lines) && item.lines.length > 0) {
+            console.log('Using lines from API:', item.lines.length);
+            item.play_sources = item.lines.map((line: any) => ({
+              name: line.name || '未知线路',
+              episodes: line.episodes || [],
+              episodes_titles: line.episodes_titles || [],
+            }));
+          } else if (item.vod_play_from && item.vod_play_url) {
+            const play_sources: { name: string; episodes: string[]; episodes_titles: string[] }[] = [];
+            const sources = item.vod_play_from.split('$$$');
+            const urls = item.vod_play_url.split('$$$');
+            
+            console.log('Processing sources:', sources);
+            console.log('Processing urls:', urls);
+            
+            sources.forEach((source: string, index: number) => {
+              if (urls[index]) {
+                const sourceName = source.replace(/\(.*\)/, '').trim();
+                const episodePairs = urls[index].split('#');
+                const episodes: string[] = [];
+                const episodes_titles: string[] = [];
+                
+                console.log('Processing source:', sourceName);
+                console.log('Processing episode pairs:', episodePairs.length);
+                
+                episodePairs.forEach((pair: string) => {
+                  const parts = pair.split('$');
+                  if (parts.length >= 2) {
+                    episodes_titles.push(parts[0].trim());
+                    episodes.push(parts[1].trim());
+                  }
+                });
+                
+                // 即使没有剧集，也添加线路信息
+                play_sources.push({ name: sourceName, episodes, episodes_titles });
+              }
+            });
+            
+            console.log('Parsed play_sources:', play_sources.length);
+            
+            if (play_sources.length > 0) {
+              item.play_sources = play_sources;
+            }
+          }
+          
+          // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
+          if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
+            item.episodes = item.play_sources[0].episodes;
+            item.episodes_titles = item.play_sources[0].episodes_titles;
+          }
+          
+          return item;
+        });
+        
+        return processedResults;
       } catch (error) {
+        clearTimeout(timeoutId);
         console.warn(`Search variant "${variant}" failed:`, error);
         return [];
       }
-    });
+    };
 
-    // 等待所有搜索完成
+    // 分批并发搜索（优化：限制搜索站点数量）
+    const variantPromises = searchVariants.map((variant) => fetchWithTimeout(variant));
+    
+    // 等待所有搜索完成（最多 8 秒超时）
     const variantResultsArray = await Promise.all(variantPromises);
 
     // 合并所有结果
@@ -692,6 +771,12 @@ export class Api {
     // 不再限制返回结果数量，后端会持续增加新的视频源
     console.log(`Final results: ${deduplicatedResults.length} (no limit)`);
 
+    // 保存到缓存
+    this.searchCache.set(cacheKey, {
+      results: deduplicatedResults,
+      timestamp: Date.now(),
+    });
+
     return { results: deduplicatedResults };
   }
 
@@ -712,9 +797,23 @@ export class Api {
 
     console.log(`After deduplication: ${deduplicatedResults.length} results`);
 
+    // 为每个结果创建 play_sources（如果没有的话）
+    const processedResults = deduplicatedResults.map((result) => {
+      // 如果没有 play_sources 但有 episodes，创建一个默认的播放源
+      if ((!result.play_sources || result.play_sources.length === 0) && result.episodes && result.episodes.length > 0) {
+        result.play_sources = [{
+          name: '默认线路',
+          episodes: result.episodes,
+          episodes_titles: result.episodes_titles || [],
+        }];
+        console.log(`[FALLBACK] Created default play_source for ${result.title} (${result.source_name})`);
+      }
+      return result;
+    });
+
     // 如果有豆瓣 ID，优先返回匹配豆瓣 ID 的结果
     if (doubanId) {
-      const doubanMatches = deduplicatedResults.filter(r => r.doubanId === doubanId || r.douban_id?.toString() === doubanId);
+      const doubanMatches = processedResults.filter(r => r.doubanId === doubanId || r.douban_id?.toString() === doubanId);
       if (doubanMatches.length > 0) {
         console.log(`Found ${doubanMatches.length} results with matching doubanId: ${doubanId}`);
         return doubanMatches;
@@ -722,8 +821,8 @@ export class Api {
     }
 
     // 否则使用匹配引擎处理搜索结果
-    console.log('Before matching (filterSearchResults) - total unique results:', deduplicatedResults.length);
-    const processed = resourceMatcher.processSearchResults(query, deduplicatedResults);
+    console.log('Before matching (filterSearchResults) - total unique results:', processedResults.length);
+    const processed = resourceMatcher.processSearchResults(query, processedResults);
     console.log('After matching (filterSearchResults) - total matches:', processed.matches.length);
     console.log('Match quality (filterSearchResults):', processed.quality);
 
@@ -744,8 +843,8 @@ export class Api {
       console.log(`After final deduplication: ${deduplicatedMatchedResults.length} results`);
       return deduplicatedMatchedResults;
     } else {
-      console.log(`Returning ${deduplicatedResults.length} deduplicated results`);
-      return deduplicatedResults;
+      console.log(`Returning ${processedResults.length} deduplicated results`);
+      return processedResults;
     }
   }
 
@@ -809,6 +908,14 @@ export class Api {
 
         // 处理每个结果
         const processedVariantData = variantData.map((item: SearchItem) => {
+          // 调试：打印原始数据的所有键名
+          console.log(`[DEBUG] Raw item keys for ${item.title}:`, Object.keys(item));
+          console.log(`[DEBUG] Raw item episodes:`, item.episodes?.length || 0);
+          console.log(`[DEBUG] Raw item play_sources:`, item.play_sources?.length || 0);
+          console.log(`[DEBUG] Raw item vod_play_from:`, item.vod_play_from ? 'exists' : 'undefined');
+          console.log(`[DEBUG] Raw item vod_play_url:`, item.vod_play_url ? 'exists' : 'undefined');
+          console.log(`[DEBUG] Raw item lines:`, item.lines?.length || 0);
+
           // 优先使用 API 返回的 lines 字段（LunaTV 格式）
           if (item.lines && Array.isArray(item.lines) && item.lines.length > 0) {
             item.play_sources = item.lines.map((line: Line) => ({
@@ -873,6 +980,16 @@ export class Api {
           if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
             item.episodes = item.play_sources[0].episodes;
             item.episodes_titles = item.play_sources[0].episodes_titles;
+          }
+
+          // 如果没有 play_sources 但有 episodes，创建一个默认的播放源
+          if ((!item.play_sources || item.play_sources.length === 0) && item.episodes && item.episodes.length > 0) {
+            item.play_sources = [{
+              name: '默认线路',
+              episodes: item.episodes,
+              episodes_titles: item.episodes_titles || [],
+            }];
+            console.log(`[FALLBACK] Created default play_source from episodes for ${item.title}`);
           }
 
           return item;

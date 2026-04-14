@@ -9,7 +9,7 @@ interface LivePlayerProps {
   onPlaybackStatusUpdate: (status: AVPlaybackStatus) => void;
 }
 
-const PLAYBACK_TIMEOUT = 15000; // 15 seconds
+const PLAYBACK_TIMEOUT = 10000; // 优化：直播超时从 15s 降至 10s
 
 export default function LivePlayer({ streamUrl, channelTitle, onPlaybackStatusUpdate }: LivePlayerProps) {
   const video = useRef<Video>(null);
@@ -92,7 +92,7 @@ export default function LivePlayer({ streamUrl, channelTitle, onPlaybackStatusUp
         resizeMode={ResizeMode.CONTAIN}
         shouldPlay
         onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
-        onError={(e) => {
+        onError={() => {
           setIsTimeout(true);
           setIsLoading(false);
         }}

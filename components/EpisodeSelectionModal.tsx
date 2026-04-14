@@ -16,6 +16,17 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
   const playSources: Array<{ name: string; episodes: string[]; episodes_titles: string[] }> = detail?.play_sources || [];
   const episodes = playerEpisodes;
 
+  // 调试信息
+  if (showEpisodeModal) {
+    console.log('[DEBUG] === EpisodeSelectionModal OPENED ===');
+    console.log('[DEBUG] - detail exists:', !!detail);
+    console.log('[DEBUG] - detail.source:', detail?.source);
+    console.log('[DEBUG] - detail.play_sources:', detail?.play_sources);
+    console.log('[DEBUG] - playSources.length:', playSources.length);
+    console.log('[DEBUG] - currentPlaySourceIndex:', currentPlaySourceIndex);
+    console.log('[DEBUG] - activeTab:', activeTab);
+  }
+
   const [episodeGroupSize] = useState(30);
   const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(Math.floor(currentEpisodeIndex / episodeGroupSize));
   const [activeTab, setActiveTab] = useState<'episodes' | 'lines'>(episodeModalInitialTab);

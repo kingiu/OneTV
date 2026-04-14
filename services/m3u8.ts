@@ -9,8 +9,8 @@ interface CacheEntry {
 }
 
 const resolutionCache: { [url: string]: CacheEntry } = {};
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const FETCH_TIMEOUT = 15000; // 15秒超时
+const CACHE_DURATION = 30 * 60 * 1000; // 优化：延长缓存时间到 30 分钟（从 5 分钟增加）
+const FETCH_TIMEOUT = 8000; // 优化：缩短超时到 8 秒（从 15 秒减少）
 
 export const getResolutionFromM3U8 = async (
   url: string
@@ -31,8 +31,8 @@ export const getResolutionFromM3U8 = async (
     return null;
   }
 
-  // 尝试最多3次
-  const maxRetries = 3;
+  // 尝试最多 2 次（优化：减少重试次数）
+  const maxRetries = 2;
   for (let i = 0; i < maxRetries; i++) {
     // 创建超时控制器
     const controller = new AbortController();
@@ -104,8 +104,8 @@ export const getResolutionFromM3U8 = async (
         logger.warn(`[PERF] M3U8 resolution detection FAILED - took ${(perfEnd - perfStart).toFixed(2)}ms, error: ${error instanceof Error ? error.message : String(error)}, attempt ${i + 1}/${maxRetries}`);
         // 如果不是最后一次尝试，继续重试
         if (i < maxRetries - 1) {
-          // 重试前添加延迟
-          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+          // 重试前添加延迟（优化：减少重试间隔）
+          await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
           continue;
         }
       }

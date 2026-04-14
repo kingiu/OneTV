@@ -47,6 +47,14 @@ interface Episode {
   currentCandidateIndex: number;
 }
 
+interface LineTestResult {
+  index: number;
+  latency: number;
+  bandwidth: number;
+  quality: number;
+  compositeScore?: number;
+}
+
 interface PlayerState {
   videoRef: RefObject<Video> | null;
   currentEpisodeIndex: number;
@@ -129,32 +137,57 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setVideoRef: (ref) => set({ videoRef: ref }),
 
-  // 测试线路速度的函数
-  testLineSpeed: async (url: string): Promise<number> => {
+  // 测试线路速度的函数（优化：增加带宽测试）
+  testLineSpeed: async (url: string): Promise<{ latency: number; bandwidth: number }> => {
     try {
       const { proxyService } = await import('@/services/proxyService');
       const startTime = performance.now();
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 秒超时
 
-      const response = await proxyService.fetch(url, {
+      // 第一步：HEAD 请求测试延迟
+      await proxyService.fetch(url, {
         signal: controller.signal,
-        method: 'HEAD', // 使用HEAD请求，只获取头信息，不下载内容
+        method: 'HEAD',
         redirect: 'follow',
       });
 
-      clearTimeout(timeoutId);
-      const endTime = performance.now();
-      const latency = endTime - startTime;
+      const latency = performance.now() - startTime;
 
-      return latency;
+      // 第二步：GET 请求前 50KB 测试带宽
+      clearTimeout(timeoutId);
+      const bandwidthController = new AbortController();
+      const bandwidthTimeoutId = setTimeout(() => bandwidthController.abort(), 5000);
+
+      const bandwidthStart = performance.now();
+      const getResponse = await proxyService.fetch(url, {
+        signal: bandwidthController.signal,
+        method: 'GET',
+        redirect: 'follow',
+        headers: {
+          'Range': 'bytes=0-51199', // 只请求前 50KB
+        },
+      });
+
+      const bandwidthEnd = performance.now();
+      clearTimeout(bandwidthTimeoutId);
+
+      // 计算带宽（KB/s）
+      const contentLength = getResponse.headers.get('content-length');
+      const bytesDownloaded = contentLength ? parseInt(contentLength, 10) : 51200;
+      const durationSeconds = (bandwidthEnd - bandwidthStart) / 1000;
+      const bandwidth = bytesDownloaded / 1024 / durationSeconds; // KB/s
+
+      logger.info(`[SPEED_TEST] ${url.substring(0, 50)}... - latency: ${latency.toFixed(2)}ms, bandwidth: ${bandwidth.toFixed(2)}KB/s`);
+
+      return { latency, bandwidth };
     } catch (error) {
       logger.warn(`[SPEED_TEST] Failed to test speed for ${url}:`, error);
-      return Infinity; // 失败的线路设为无限大延迟
+      return { latency: Infinity, bandwidth: 0 }; // 失败的线路设为无限大延迟，0 带宽
     }
   },
 
-  // 选择最佳线路的函数
+  // 选择最佳线路的函数（优化：使用带宽和延迟综合评分）
   selectBestLine: async (playSources: Array<{ episodes: string[]; name?: string }>): Promise<number> => {
     if (!playSources || playSources.length === 0) {
       return 0;
@@ -166,15 +199,15 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
     logger.info(`[LINE_SELECTION] Testing ${playSources.length} lines for speed and quality`);
 
-    // 对每个线路进行速度测试
-    const lineTests = await Promise.all(
+    // 对每个线路进行速度测试（并行执行）
+    const lineTests = await Promise.all<LineTestResult>(
       playSources.map(async (source, index) => {
         if (!source.episodes || source.episodes.length === 0) {
-          return { index, latency: Infinity, quality: 0 };
+          return { index, latency: Infinity, bandwidth: 0, quality: 0 };
         }
 
         const testUrl = source.episodes[0];
-        const latency = await get().testLineSpeed(testUrl);
+        const speedResult = await get().testLineSpeed(testUrl);
 
         // 简单的质量评分：基于线路名称中的清晰度标识
         let quality = 0;
@@ -184,30 +217,40 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         else if (sourceName.includes('480') || sourceName.includes('sd')) quality = 2;
         else if (sourceName.includes('360')) quality = 1;
 
-        logger.info(`[LINE_SELECTION] Line ${index + 1} (${source.name}): latency = ${latency.toFixed(2)}ms, quality = ${quality}`);
-        return { index, latency, quality };
+        logger.info(`[LINE_SELECTION] Line ${index + 1} (${source.name}): latency = ${speedResult.latency.toFixed(2)}ms, bandwidth = ${speedResult.bandwidth.toFixed(2)}KB/s, quality = ${quality}`);
+        return {
+          index,
+          latency: speedResult.latency,
+          bandwidth: speedResult.bandwidth,
+          quality
+        };
       })
     );
 
     // 过滤掉失败的线路
-    const validLines = lineTests.filter(line => line.latency < Infinity);
+    const validLines = lineTests.filter(line => line.latency < Infinity && line.bandwidth > 0);
     if (validLines.length === 0) {
       logger.warn(`[LINE_SELECTION] All lines failed speed test, using first line`);
       return 0;
     }
 
-    // 排序：优先考虑质量，然后考虑速度
-    validLines.sort((a, b) => {
-      // 质量优先
-      if (b.quality !== a.quality) {
-        return b.quality - a.quality;
-      }
-      // 质量相同时，速度优先
-      return a.latency - b.latency;
+    // 综合评分：延迟 40% + 带宽 40% + 质量 20%
+    validLines.forEach(line => {
+      // 归一化延迟（越低越好，转为 0-100 分）
+      const latencyScore = Math.max(0, 100 - line.latency / 10);
+      // 归一化带宽（越高越好，转为 0-100 分）
+      const bandwidthScore = Math.min(100, line.bandwidth / 10);
+      // 质量分（0-4 转为 0-100 分）
+      const qualityScore = line.quality * 25;
+      // 综合评分
+      line.compositeScore = latencyScore * 0.4 + bandwidthScore * 0.4 + qualityScore * 0.2;
     });
 
+    // 按综合评分排序
+    validLines.sort((a, b) => b.compositeScore - a.compositeScore);
+
     const bestLineIndex = validLines[0].index;
-    logger.info(`[LINE_SELECTION] Selected best line: ${bestLineIndex + 1} (${playSources[bestLineIndex].name})`);
+    logger.info(`[LINE_SELECTION] Selected best line: ${bestLineIndex + 1} (${playSources[bestLineIndex].name}), score: ${validLines[0].compositeScore.toFixed(2)}`);
     return bestLineIndex;
   },
 
@@ -442,7 +485,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       let currentPlaySourceIndex = 0;
       if (detail.play_sources && detail.play_sources.length > 1) {
         currentPlaySourceIndex = await get().selectBestLine(detail.play_sources);
-        // 如果选择了非默认线路，更新episodes
+        // 如果选择了非默认线路，更新 episodes
         if (currentPlaySourceIndex > 0 && detail.play_sources[currentPlaySourceIndex].episodes) {
           episodes = detail.play_sources[currentPlaySourceIndex].episodes;
           logger.info(`[LINE_SELECTION] Updated episodes to best line: ${detail.play_sources[currentPlaySourceIndex].name}`);

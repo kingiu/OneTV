@@ -182,7 +182,7 @@ const parseVariantPlaylistUrls = (playlistText: string, baseUrl: string) => {
   return variants.sort((a, b) => b.bandwidth - a.bandwidth);
 };
 
-const fetchM3u8WithTimeout = async (url: string, timeoutMs = 12000) => {
+const fetchM3u8WithTimeout = async (url: string, timeoutMs = 6000) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 

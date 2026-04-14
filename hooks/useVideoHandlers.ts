@@ -186,9 +186,9 @@ export const useVideoHandlers = ({
       resizeMode: ResizeMode.CONTAIN,
       rate: playbackRate,
       bufferConfig: {
-        minBufferMs: 15000,    // 至少缓冲 15s
-        maxBufferMs: 50000,   // 最多缓冲 50s
-        bufferSizeMs: 5000,   // 缓冲区大小 5s
+        minBufferMs: 5000,    // 至少缓冲 5s（降低阈值，快速起播）
+        maxBufferMs: 30000,   // 最多缓冲 30s
+        bufferSizeMs: 10000,  // 缓冲区大小 10s
       },
       onPlaybackStatusUpdate: handlePlaybackStatusUpdate,
       onLoad,
