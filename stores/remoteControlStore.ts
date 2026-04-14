@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+
 import { remoteControlService } from '@/services/remoteControlService';
 import Logger from '@/utils/Logger';
 
@@ -40,7 +41,7 @@ export const useRemoteControlStore = create<RemoteControlState>((set, get) => ({
       },
       onHandshake: () => {
         logger.debug('Handshake successful');
-        set({ isModalVisible: false })
+        set({ isModalVisible: false });
       },
     });
     try {

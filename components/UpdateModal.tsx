@@ -1,7 +1,9 @@
 import React from "react";
 import { Modal, View, StyleSheet, ActivityIndicator, Platform } from "react-native";
-import { useUpdateStore } from "../stores/updateStore";
+
 import { Colors } from "../constants/Colors";
+import { useUpdateStore } from "../stores/updateStore";
+
 import { StyledButton } from "./StyledButton";
 import { ThemedText } from "./ThemedText";
 

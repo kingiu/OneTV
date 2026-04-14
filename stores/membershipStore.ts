@@ -1,7 +1,9 @@
-import { create } from "zustand";
-import { api, MembershipResponse, Coupon, RedeemResult } from "@/services/api";
-import Logger from "@/utils/Logger";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+
+import { api, type MembershipResponse, type Coupon, type RedeemResult } from "@/services/api";
+import Logger from "@/utils/Logger";
+
 import { useSettingsStore } from "./settingsStore";
 
 const logger = Logger.withTag("MembershipStore");
@@ -11,12 +13,12 @@ interface MembershipState {
   membershipInfo: MembershipResponse | null;
   isLoadingMembership: boolean;
   membershipError: string | null;
-  
+
   // 卡券相关状态
   userCoupons: Coupon[];
   isLoadingCoupons: boolean;
   couponsError: string | null;
-  
+
   // 操作方法
   fetchMembershipInfo: () => Promise<void>;
   fetchUserCoupons: () => Promise<void>;
@@ -29,12 +31,12 @@ const useMembershipStore = create<MembershipState>((set, get) => ({
   membershipInfo: null,
   isLoadingMembership: false,
   membershipError: null,
-  
+
   // 卡券相关状态
   userCoupons: [],
   isLoadingCoupons: false,
   couponsError: null,
-  
+
   // 操作方法
   fetchMembershipInfo: async () => {
     set({ isLoadingMembership: true, membershipError: null });
@@ -52,9 +54,9 @@ const useMembershipStore = create<MembershipState>((set, get) => ({
           errorMessage = "会员系统暂未启用";
         }
       }
-      set({ 
-        membershipError: errorMessage, 
-        isLoadingMembership: false 
+      set({
+        membershipError: errorMessage,
+        isLoadingMembership: false
       });
     }
   },
@@ -69,7 +71,7 @@ const useMembershipStore = create<MembershipState>((set, get) => ({
       const sortedCoupons = filteredCoupons.sort((a, b) => a.expireTime - b.expireTime);
       // 只保留前3张卡券
       const limitedCoupons = sortedCoupons.slice(0, 3);
-      
+
       set({ userCoupons: limitedCoupons, isLoadingCoupons: false });
     } catch (error) {
       logger.debug("Failed to fetch user coupons:", error);
@@ -82,13 +84,13 @@ const useMembershipStore = create<MembershipState>((set, get) => ({
           errorMessage = "卡券系统暂未启用";
         }
       }
-      set({ 
-        couponsError: errorMessage, 
-        isLoadingCoupons: false 
+      set({
+        couponsError: errorMessage,
+        isLoadingCoupons: false
       });
     }
   },
-  
+
   redeemCoupon: async (code: string) => {
     try {
       const result = await api.redeemCard(code);
@@ -103,7 +105,7 @@ const useMembershipStore = create<MembershipState>((set, get) => ({
       throw error;
     }
   },
-  
+
   clearErrors: () => {
     set({ membershipError: null, couponsError: null });
   },

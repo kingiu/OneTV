@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet, Text } from "react-native";
+
 import usePlayerStore from "@/stores/playerStore";
 
 const formatTime = (milliseconds: number) => {

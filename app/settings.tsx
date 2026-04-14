@@ -1,25 +1,28 @@
 import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, Alert, Platform } from "react-native";
 import { useTVEventHandler } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
-import { StyledButton } from "@/components/StyledButton";
-import { useThemeColor } from "@/hooks/useThemeColor";
-import { useSettingsStore } from "@/stores/settingsStore";
-// import useAuthStore from "@/stores/authStore";
-import { useRemoteControlStore } from "@/stores/remoteControlStore";
+import Toast from "react-native-toast-message";
+
+import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
+import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
 import { APIConfigSection } from "@/components/settings/APIConfigSection";
 import { RemoteInputSection } from "@/components/settings/RemoteInputSection";
 import { UpdateSection } from "@/components/settings/UpdateSection";
-// import { VideoSourceSection } from "@/components/settings/VideoSourceSection";
-import Toast from "react-native-toast-message";
+import { StyledButton } from "@/components/StyledButton";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
-import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
-import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
-import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
+import { useThemeColor } from "@/hooks/useThemeColor";
+import { useRemoteControlStore } from "@/stores/remoteControlStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+// import useAuthStore from "@/stores/authStore";
+
+// import { VideoSourceSection } from "@/components/settings/VideoSourceSection";
+
 import { DeviceUtils } from "@/utils/DeviceUtils";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 
 type SectionItem = {
   component: React.ReactElement;
@@ -47,8 +50,8 @@ export default function SettingsScreen() {
   const [currentFocusIndex, setCurrentFocusIndex] = useState(0);
   const [currentSection, setCurrentSection] = useState<string | null>(null);
 
-  const saveButtonRef = useRef<any>(null);
-  const apiSectionRef = useRef<any>(null);
+  const saveButtonRef = useRef<View>(null);
+  const apiSectionRef = useRef<View>(null);
 
   useEffect(() => {
     loadSettings();
@@ -187,8 +190,13 @@ export default function SettingsScreen() {
   const sections: SectionItem[] = rawSections.filter(isSectionItem);
 
   // TV遥控器事件处理 - 仅在TV设备上启用
+  interface TVEvent {
+    eventType: string;
+    [key: string]: unknown;
+  }
+
   const handleTVEvent = React.useCallback(
-    (event: any) => {
+    (event: TVEvent) => {
       if (deviceType !== "tv") return;
 
       if (event.eventType === "down") {
@@ -277,7 +285,14 @@ export default function SettingsScreen() {
   );
 }
 
-const createResponsiveStyles = (deviceType: string, spacing: number, insets: any) => {
+interface Insets {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+}
+
+const createResponsiveStyles = (deviceType: string, spacing: number, insets: Insets) => {
   const isMobile = deviceType === "mobile";
   const isTablet = deviceType === "tablet";
   const isTV = deviceType === "tv";

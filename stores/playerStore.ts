@@ -1,12 +1,14 @@
-import { create } from "zustand";
+import { type AVPlaybackStatus, type Video } from "expo-av";
+import { type RefObject } from "react";
 import Toast from "react-native-toast-message";
-import { AVPlaybackStatus, Video } from "expo-av";
-import { RefObject } from "react";
-import { PlayRecord, PlayRecordManager, PlayerSettingsManager } from "@/services/storage";
+import { create } from "zustand";
+
 import { getPlaybackUrlCandidates } from "@/services/m3u";
+import { type PlayRecord, PlayRecordManager, PlayerSettingsManager } from "@/services/storage";
 import { useSettingsStore } from "@/stores/settingsStore";
-import useDetailStore, { episodesSelectorBySource } from "./detailStore";
 import Logger from "@/utils/Logger";
+
+import useDetailStore, { episodesSelectorBySource } from "./detailStore";
 
 const logger = Logger.withTag("PlayerStore");
 
@@ -72,7 +74,7 @@ interface PlayerState {
     episodeIndex: number;
     position?: number;
     skipAutoSourceSelection?: boolean;
-    preferredDetail?: any;
+    preferredDetail?: unknown;
   }) => Promise<void>;
   playEpisode: (index: number) => void;
   togglePlayPause: () => void;
@@ -98,7 +100,7 @@ interface PlayerState {
   handleVideoError: (errorType: "ssl" | "network" | "other", failedUrl: string) => Promise<void>;
   onLineChange: (lineIndex: number) => void;
   testLineSpeed: (url: string) => Promise<number>;
-  selectBestLine: (playSources: any[]) => Promise<number>;
+  selectBestLine: (playSources: Array<{ episodes: string[]; name?: string }>) => Promise<number>;
 }
 
 const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -152,7 +154,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   // 选择最佳线路的函数
-  selectBestLine: async (playSources: any[]): Promise<number> => {
+  selectBestLine: async (playSources: Array<{ episodes: string[]; name?: string }>): Promise<number> => {
     if (!playSources || playSources.length === 0) {
       return 0;
     }
@@ -217,8 +219,8 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
     if (detail && detail.source) {
       logger.info(`[INFO] Using detail source "${detail.source}" to get episodes (preferred: ${!!preferredDetail})`);
-      episodes = detail.episodes && detail.episodes.length > 0 
-        ? detail.episodes 
+      episodes = detail.episodes && detail.episodes.length > 0
+        ? detail.episodes
         : episodesSelectorBySource(detail.source)(useDetailStore.getState());
     } else {
       logger.info(`[INFO] No existing detail, using provided source "${source}" to get episodes`);
@@ -328,7 +330,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
           episodes = detail.episodes && detail.episodes.length > 0
             ? detail.episodes
             : episodesSelectorBySource(detail.source)(useDetailStore.getState());
-          
+
           // If cached source also has no episodes, try to find any source with episodes
           if (!episodes || episodes.length === 0) {
             const detailStoreState = useDetailStore.getState();
@@ -351,7 +353,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         episodes = detail.episodes && detail.episodes.length > 0
           ? detail.episodes
           : episodesSelectorBySource(detail.source)(useDetailStore.getState());
-        
+
         if (!episodes || episodes.length === 0) {
           // 如果是用户手动选择的源，不要自动切换到其他源
           if (preferredDetail) {
@@ -364,9 +366,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
             set({ isLoading: false });
             return;
           }
-          
+
           logger.error(`[ERROR] No episodes found for "${title}" from source "${detail.source}" (${detail.source_name})`);
-          
+
           // Try to find any source with episodes
           const detailStoreState = useDetailStore.getState();
           const sourceWithEpisodes = detailStoreState.searchResults.find((r) => r.episodes && r.episodes.length > 0);
@@ -456,17 +458,17 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       );
 
       set({
-      isLoading: false,
-      currentEpisodeIndex: episodeIndex,
-      currentPlaySourceIndex: currentPlaySourceIndex,
-      initialPosition: position || initialPositionFromRecord,
-      playbackRate: savedPlaybackRate,
-      episodes: mappedEpisodes,
-      introEndTime: playRecord?.introEndTime || playerSettings?.introEndTime,
-      outroStartTime: playRecord?.outroStartTime || playerSettings?.outroStartTime,
-    });
-    
-    logger.info(`[DEBUG] Loaded video with play_sources: ${detail.play_sources?.length || 0}, selected line: ${currentPlaySourceIndex + 1}`);
+        isLoading: false,
+        currentEpisodeIndex: episodeIndex,
+        currentPlaySourceIndex: currentPlaySourceIndex,
+        initialPosition: position || initialPositionFromRecord,
+        playbackRate: savedPlaybackRate,
+        episodes: mappedEpisodes,
+        introEndTime: playRecord?.introEndTime || playerSettings?.introEndTime,
+        outroStartTime: playRecord?.outroStartTime || playerSettings?.outroStartTime,
+      });
+
+      logger.info(`[DEBUG] Loaded video with play_sources: ${detail.play_sources?.length || 0}, selected line: ${currentPlaySourceIndex + 1}`);
 
       const perfEnd = performance.now();
       logger.info(`[PERF] PlayerStore.loadVideo COMPLETE - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
@@ -683,9 +685,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setLoading: (loading) => set({ isLoading: loading }),
   setShowControls: (show) => set({ showControls: show }),
-  setShowEpisodeModal: (show, initialTab) => set({ 
-    showEpisodeModal: show, 
-    episodeModalInitialTab: initialTab || 'episodes' 
+  setShowEpisodeModal: (show, initialTab) => set({
+    showEpisodeModal: show,
+    episodeModalInitialTab: initialTab || 'episodes'
   }),
   setShowSourceModal: (show) => set({ showSourceModal: show }),
   setShowSpeedModal: (show) => set({ showSpeedModal: show }),

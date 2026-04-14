@@ -1,11 +1,14 @@
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
-import useMembershipStore from "@/stores/membershipStore";
+
+import { Colors } from "@/constants/Colors";
 import { useAuthStore } from "@/stores/authStore";
+import useMembershipStore from "@/stores/membershipStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
-import { Colors } from "@/constants/Colors";
+
 
 const MembershipInfo: React.FC = () => {
   const { membershipInfo, isLoadingMembership, membershipError, fetchMembershipInfo } = useMembershipStore();
@@ -25,13 +28,13 @@ const MembershipInfo: React.FC = () => {
         fetchMembershipInfo();
       }
     };
-    
+
     initMembership();
   }, [isLoggedIn, autoLogin, serverConfig]);
 
   // 检查服务器是否启用了会员系统
   const isMembershipEnabled = serverConfig?.ApiConfig?.EnableMembership || serverConfig?.MembershipConfig?.Enable;
-  
+
   if (!isMembershipEnabled) {
     return (
       <ThemedView style={styles.container}>
@@ -84,7 +87,7 @@ const MembershipInfo: React.FC = () => {
     <ScrollView style={styles.container}>
       <ThemedView style={styles.card}>
         <ThemedText style={styles.title}>会员信息</ThemedText>
-        
+
         <ThemedView style={styles.infoRow}>
           <ThemedText style={styles.label}>会员等级：</ThemedText>
           <ThemedText style={[styles.value, { color: membership.status === "active" ? Colors.success : Colors.error }]}>

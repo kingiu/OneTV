@@ -1,7 +1,7 @@
+import { Video, ResizeMode, type AVPlaybackStatus } from "expo-av";
+import { useKeepAwake } from "expo-keep-awake";
 import React, { useRef, useState, useEffect } from "react";
 import { View, StyleSheet, Text, ActivityIndicator } from "react-native";
-import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
-import { useKeepAwake } from "expo-keep-awake";
 
 interface LivePlayerProps {
   streamUrl: string | null;

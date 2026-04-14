@@ -1,17 +1,19 @@
 import React from "react";
 import { View, StyleSheet, Platform, ActivityIndicator } from "react-native";
-import { ThemedText } from "../ThemedText";
-import { StyledButton } from "../StyledButton";
+
 import { useUpdateStore } from "@/stores/updateStore";
+
+import { StyledButton } from "../StyledButton";
+import { ThemedText } from "../ThemedText";
 // import { UPDATE_CONFIG } from "@/constants/UpdateConfig";
 
 export function UpdateSection() {
-  const { 
-    currentVersion, 
-    remoteVersion, 
-    updateAvailable, 
-    downloading, 
-    downloadProgress, 
+  const {
+    currentVersion,
+    remoteVersion,
+    updateAvailable,
+    downloading,
+    downloadProgress,
     checkForUpdate,
     isLatestVersion,
     error

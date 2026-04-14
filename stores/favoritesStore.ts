@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import { Favorite, FavoriteManager } from "@/services/storage";
+
+import { type Favorite, FavoriteManager } from "@/services/storage";
 
 interface FavoritesState {
-  favorites: (Favorite & { key: string })[];
+  favorites: Array<Favorite & { key: string }>;
   loading: boolean;
   error: string | null;
   fetchFavorites: () => Promise<void>;

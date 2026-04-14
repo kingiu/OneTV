@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
-import useMembershipStore from "@/stores/membershipStore";
+
+import { Colors } from "@/constants/Colors";
 import { useAuthStore } from "@/stores/authStore";
+import useMembershipStore from "@/stores/membershipStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+
 import { ThemedText } from "./ThemedText";
 import { ThemedView } from "./ThemedView";
-import { Colors } from "@/constants/Colors";
+
 
 const CouponManager: React.FC = () => {
   const { userCoupons, isLoadingCoupons, couponsError, fetchUserCoupons, redeemCoupon } = useMembershipStore();
@@ -28,7 +31,7 @@ const CouponManager: React.FC = () => {
         fetchUserCoupons();
       }
     };
-    
+
     initCoupons();
   }, [isLoggedIn, autoLogin, serverConfig]);
 
@@ -67,34 +70,34 @@ const CouponManager: React.FC = () => {
   const getStatusColor = (status: string, isExpired?: boolean) => {
     if (isExpired) return Colors.error;
     switch (status) {
-      case "active":
-        return Colors.success;
-      case "used":
-        return Colors.gray;
-      case "expired":
-        return Colors.error;
-      default:
-        return Colors.gray;
+    case "active":
+      return Colors.success;
+    case "used":
+      return Colors.gray;
+    case "expired":
+      return Colors.error;
+    default:
+      return Colors.gray;
     }
   };
 
   const getStatusText = (status: string, isExpired?: boolean) => {
     if (isExpired) return "已过期";
     switch (status) {
-      case "active":
-        return "未使用";
-      case "used":
-        return "已使用";
-      case "expired":
-        return "已过期";
-      default:
-        return "未知";
+    case "active":
+      return "未使用";
+    case "used":
+      return "已使用";
+    case "expired":
+      return "已过期";
+    default:
+      return "未知";
     }
   };
 
   // 检查服务器是否启用了卡券系统
   const isCouponEnabled = serverConfig?.ApiConfig?.EnableCoupon;
-  
+
   if (!isCouponEnabled) {
     return (
       <ThemedView style={styles.container}>
@@ -132,7 +135,7 @@ const CouponManager: React.FC = () => {
       {/* 卡券列表 */}
       <ThemedView style={styles.listSection}>
         <ThemedText style={styles.sectionTitle}>我的卡券</ThemedText>
-        
+
         {isLoadingCoupons ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" />
@@ -150,13 +153,13 @@ const CouponManager: React.FC = () => {
                   {getStatusText(coupon.status, coupon.isExpired)}
                 </ThemedText>
               </ThemedView>
-              
+
               <ThemedView style={styles.couponInfo}>
                 <ThemedText style={styles.couponType}>类型：{coupon.type || "会员卡"}</ThemedText>
                 <ThemedText style={styles.couponTier}>等级：{coupon.tier}</ThemedText>
                 <ThemedText style={styles.couponDuration}>有效期：{coupon.durationDays} 天</ThemedText>
               </ThemedView>
-              
+
               <ThemedView style={styles.couponFooter}>
                 <ThemedText style={styles.couponDate}>创建时间：{formatDate(coupon.createdAt)}</ThemedText>
                 {coupon.redeemedAt && (

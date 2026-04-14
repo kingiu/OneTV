@@ -1,5 +1,6 @@
-import TcpSocket from 'react-native-tcp-socket';
 import NetInfo from '@react-native-community/netinfo';
+import TcpSocket from 'react-native-tcp-socket';
+
 import Logger from '@/utils/Logger';
 
 const logger = Logger.withTag('TCPHttpServer');
@@ -34,7 +35,7 @@ class TCPHttpServer {
     try {
       const lines = data.split('\r\n');
       const requestLine = lines[0].split(' ');
-      
+
       if (requestLine.length < 3) {
         return null;
       }
@@ -42,7 +43,7 @@ class TCPHttpServer {
       const method = requestLine[0];
       const url = requestLine[1];
       const headers: { [key: string]: string } = {};
-      
+
       let bodyStartIndex = -1;
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
@@ -83,11 +84,11 @@ class TCPHttpServer {
     };
 
     let httpResponse = `HTTP/1.1 ${response.statusCode} ${statusText}\r\n`;
-    
+
     for (const [key, value] of Object.entries(headers)) {
       httpResponse += `${key}: ${value}\r\n`;
     }
-    
+
     httpResponse += '\r\n';
     httpResponse += response.body;
 
@@ -140,9 +141,9 @@ class TCPHttpServer {
   public async start(): Promise<string> {
     const netState = await NetInfo.fetch();
     let ipAddress: string | null = null;
-    
+
     if (netState.type === 'wifi' || netState.type === 'ethernet') {
-      ipAddress = (netState.details as any)?.ipAddress ?? null;
+      ipAddress = (netState.details as { ipAddress?: string })?.ipAddress ?? null;
     }
 
     if (!ipAddress) {
@@ -161,12 +162,12 @@ class TCPHttpServer {
       try {
         this.server = TcpSocket.createServer((socket: TcpSocket.Socket) => {
           logger.debug('[TCPHttpServer] Client connected');
-          
+
           let requestData = '';
-          
+
           socket.on('data', async (data: string | Buffer) => {
             requestData += data.toString();
-            
+
             // Check if we have a complete HTTP request
             if (requestData.includes('\r\n\r\n')) {
               try {
@@ -193,7 +194,7 @@ class TCPHttpServer {
                 });
                 socket.write(errorResponse);
               }
-              
+
               socket.end();
               requestData = '';
             }

@@ -1,9 +1,10 @@
-import { create } from "zustand";
-import { SettingsManager } from "@/services/storage";
-import { api, ServerConfig } from "@/services/api";
-import { storageConfig } from "@/services/storageConfig";
-import { proxyService } from "@/services/proxyService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { create } from "zustand";
+
+import { api, type ServerConfig } from "@/services/api";
+import { proxyService } from "@/services/proxyService";
+import { SettingsManager } from "@/services/storage";
+import { storageConfig } from "@/services/storageConfig";
 import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag("SettingsStore");
@@ -81,55 +82,128 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     cacheTTL: 3600,
   },
   loadSettings: async () => {
-      const defaultUrl = __DEV__ ? "http://192.168.100.101:3000" : "https://onetv.aisxuexi.com";
+    const defaultUrl = __DEV__ ? "http://192.168.100.101:3000" : "https://onetv.aisxuexi.com";
+
+    // 检查是否有保存的设置
+    try {
+      const settingsJson = await AsyncStorage.getItem('mytv_settings');
+      if (settingsJson) {
+        const settings = JSON.parse(settingsJson);
+        console.log('Loaded settings from storage:', settings);
+
+        // 使用保存的 API 地址
+        const apiUrl = settings.apiBaseUrl || defaultUrl;
+        api.setBaseUrl(apiUrl);
+        proxyService.setBaseUrl(apiUrl);
+
+        // 使用默认的代理配置
+        const proxyConfig = {
+          enabled: true,
+          useBackendProxy: true,
+          cacheEnabled: true,
+          cacheTTL: 3600,
+        };
+
+        set({
+          apiBaseUrl: apiUrl,
+          cronPassword: settings.cronPassword || DEFAULT_CRON_PASSWORD,
+          m3uUrl: settings.m3uUrl || '',
+          remoteInputEnabled: settings.remoteInputEnabled || false,
+          vodProxyEnabled: settings.vodProxyEnabled ?? settings.vodAdBlockEnabled ?? true,
+          liveAdBlockEnabled: settings.liveAdBlockEnabled ?? true,
+          vodAdBlockEnabled: settings.vodAdBlockEnabled ?? settings.vodProxyEnabled ?? true,
+          videoSource: settings.videoSource || {
+            enabledAll: true,
+            sources: {},
+          },
+          sourceWeights: settings.sourceWeights || {},
+          proxyConfig: proxyConfig,
+        });
+      } else {
+        // 没有保存的设置，使用当前环境的默认值
+        console.log('No saved settings, using default for environment:', defaultUrl);
+        api.setBaseUrl(defaultUrl);
+        proxyService.setBaseUrl(defaultUrl);
+
+        // 使用默认的代理配置
+        const proxyConfig = {
+          enabled: true,
+          useBackendProxy: true,
+          cacheEnabled: true,
+          cacheTTL: 3600,
+        };
+
+        set({
+          apiBaseUrl: defaultUrl,
+          cronPassword: DEFAULT_CRON_PASSWORD,
+          m3uUrl: '',
+          remoteInputEnabled: false,
+          vodProxyEnabled: true,
+          liveAdBlockEnabled: true,
+          vodAdBlockEnabled: true,
+          videoSource: {
+            enabledAll: true,
+            sources: {},
+          },
+          sourceWeights: {},
+          proxyConfig: proxyConfig,
+        });
+      }
+    } catch (error) {
+      // 读取设置失败，使用当前环境的默认值
+      console.error('Failed to load settings:', error);
       api.setBaseUrl(defaultUrl);
       proxyService.setBaseUrl(defaultUrl);
-      
-      const settings = await SettingsManager.get();
-      console.log('Loaded settings:', settings);
-      
-      const proxyConfig = await proxyService.getConfig();
-      
+
+      // 使用默认的代理配置
+      const proxyConfig = {
+        enabled: true,
+        useBackendProxy: true,
+        cacheEnabled: true,
+        cacheTTL: 3600,
+      };
+
       set({
         apiBaseUrl: defaultUrl,
-        cronPassword: settings.cronPassword || DEFAULT_CRON_PASSWORD,
-        m3uUrl: settings.m3uUrl,
-        remoteInputEnabled: settings.remoteInputEnabled || false,
-        vodProxyEnabled: settings.vodProxyEnabled ?? settings.vodAdBlockEnabled ?? true,
-        liveAdBlockEnabled: settings.liveAdBlockEnabled ?? true,
-        vodAdBlockEnabled: settings.vodAdBlockEnabled ?? settings.vodProxyEnabled ?? true,
-        videoSource: settings.videoSource || {
+        cronPassword: DEFAULT_CRON_PASSWORD,
+        m3uUrl: '',
+        remoteInputEnabled: false,
+        vodProxyEnabled: true,
+        liveAdBlockEnabled: true,
+        vodAdBlockEnabled: true,
+        videoSource: {
           enabledAll: true,
           sources: {},
         },
-        sourceWeights: settings.sourceWeights || {},
-        proxyConfig,
+        sourceWeights: {},
+        proxyConfig: proxyConfig,
       });
-      
-      get().checkBackendAndSyncProxyConfig();
-      
-      get().fetchServerConfig().catch((error) => {
-        logger.error("Failed to fetch server config:", error);
-      });
-    },
+    }
+
+    get().checkBackendAndSyncProxyConfig();
+
+    get().fetchServerConfig().catch((error) => {
+      logger.error("Failed to fetch server config:", error);
+    });
+  },
   checkBackendAndSyncProxyConfig: async () => {
     const state = get();
     const { apiBaseUrl } = state;
-    
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
+
       const response = await fetch(`${apiBaseUrl}/api/health`, {
         method: 'GET',
         signal: controller.signal,
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       const isBackendAvailable = response.ok;
       console.log(`Backend health check: ${isBackendAvailable ? 'available' : 'unavailable'}`);
-      
+
       if (!isBackendAvailable && state.proxyConfig.useBackendProxy) {
         console.warn('Backend unavailable, auto-disabling proxy');
         state.setProxyConfig({ enabled: false });
@@ -167,7 +241,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ apiBaseUrl: url });
     api.setBaseUrl(url);
     proxyService.setBaseUrl(url);
-    
+
     get().checkBackendAndSyncProxyConfig();
   },
   setCronPassword: (password) => set({ cronPassword: password }),
@@ -234,10 +308,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       videoSource,
       sourceWeights,
     });
-    
-    // 保存代理配置
-    await proxyService.saveConfig(proxyConfig);
-    
+
+    // 代理配置不需要单独保存，因为 proxyService 是内存中的单例
+    // 如果需要持久化代理配置，可以将其添加到 SettingsManager 中
+
     if (currentApiBaseUrl !== processedApiBaseUrl) {
       // 清除登录凭证，但不清除 authCookies，因为服务端可能已经返回了有效的 cookie
       try {

@@ -1,18 +1,19 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, FlatList, StyleSheet, ActivityIndicator, Modal, useTVEventHandler, HWEvent, Text } from "react-native";
 import type { AVPlaybackStatus } from "expo-av";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { View, FlatList, StyleSheet, ActivityIndicator, Modal, useTVEventHandler, type HWEvent, Text } from "react-native";
+
 import LivePlayer from "@/components/LivePlayer";
-import { getAdFilteredLiveUrl, getLegacyAdFilteredLiveUrl, getPlayableUrl } from "@/services/m3u";
-import { ThemedView } from "@/components/ThemedView";
-import { StyledButton } from "@/components/StyledButton";
-import { useSettingsStore } from "@/stores/settingsStore";
-import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
-import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
-import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
 import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
-import { DeviceUtils } from "@/utils/DeviceUtils";
-import { api, LiveChannel, LiveSource } from "@/services/api";
+import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
+import { StyledButton } from "@/components/StyledButton";
+import { ThemedView } from "@/components/ThemedView";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { api, type LiveChannel, type LiveSource } from "@/services/api";
+import { getAdFilteredLiveUrl, getLegacyAdFilteredLiveUrl, getPlayableUrl } from "@/services/m3u";
 import { LiveFavoriteManager } from "@/services/storage";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { DeviceUtils } from "@/utils/DeviceUtils";
+import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 
 const FAVORITES_GROUP_NAME = "收藏";
 
@@ -302,7 +303,7 @@ export default function LiveScreen() {
   const changeChannel = useCallback(
     (direction: "next" | "prev") => {
       if (channels.length === 0) return;
-      let newIndex =
+      const newIndex =
         direction === "next"
           ? (currentChannelIndex + 1) % channels.length
           : (currentChannelIndex - 1 + channels.length) % channels.length;

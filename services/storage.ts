@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { api } from "./api";
-import { PlayRecord, Favorite } from "./types";
-import { storageConfig } from "./storageConfig";
+
 import Logger from "@/utils/Logger";
+
+import { api } from "./api";
+import { storageConfig } from "./storageConfig";
+import { type PlayRecord, type Favorite } from "./types";
 
 const logger = Logger.withTag("Storage");
 
@@ -123,7 +125,7 @@ export class FavoriteManager {
 
   static async getAll(): Promise<Record<string, Favorite>> {
     const storageType = this.getStorageType();
-    
+
     // 始终从本地存储获取收藏，确保能够显示
     let favorites: Record<string, Favorite> = {};
     try {
@@ -155,7 +157,7 @@ export class FavoriteManager {
   static async save(source: string, id: string, item: Favorite): Promise<void> {
     const key = generateKey(source, id);
     const storageType = this.getStorageType();
-    
+
     // 始终保存到本地存储，确保收藏能够显示
     try {
       const allFavorites = await this.getAllLocal();
@@ -164,7 +166,7 @@ export class FavoriteManager {
     } catch (error) {
       logger.info("Failed to save favorite to local storage:", error);
     }
-    
+
     // 如果存储类型不是本地存储，也尝试保存到 API
     if (storageType && storageType !== "localstorage") {
       try {
@@ -174,7 +176,7 @@ export class FavoriteManager {
       }
     }
   }
-  
+
   // 从本地存储获取所有收藏
   static async getAllLocal(): Promise<Record<string, Favorite>> {
     try {
@@ -294,7 +296,7 @@ export class PlayRecordManager {
     logger.info(`[PERF] PlayRecordManager.getAll START - storageType: ${storageType}`);
 
     let apiRecords: Record<string, PlayRecord> = {};
-    
+
     // 始终从本地存储获取播放记录，确保能够显示
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.PLAY_RECORDS);
@@ -357,7 +359,7 @@ export class PlayRecordManager {
   static async save(source: string, id: string, record: Omit<PlayRecord, "save_time">): Promise<void> {
     const key = generateKey(source, id);
     const { introEndTime, outroStartTime, ...apiRecord } = record;
-    
+
     logger.info(`[DEBUG] PlayRecordManager.save START - key: ${key}, record: ${JSON.stringify(apiRecord)}`);
 
     // Player settings are always saved locally
@@ -386,7 +388,7 @@ export class PlayRecordManager {
         logger.info("Failed to save play record to API:", error);
       }
     }
-    
+
     logger.info(`[DEBUG] PlayRecordManager.save END`);
   }
 
@@ -491,8 +493,11 @@ export class SearchHistoryManager {
 // --- SettingsManager (Uses AsyncStorage) ---
 export class SettingsManager {
   static async get(): Promise<AppSettings> {
+    // 根据环境设置默认 API 地址
+    const defaultApiBaseUrl = __DEV__ ? "http://192.168.100.101:3000" : "https://onetv.aisxuexi.com";
+
     const defaultSettings: AppSettings = {
-      apiBaseUrl: "https://onetv.aisxuexi.com",
+      apiBaseUrl: defaultApiBaseUrl,
       cronPassword: "cron_secure_password",
       vodProxyEnabled: true,
       remoteInputEnabled: true,

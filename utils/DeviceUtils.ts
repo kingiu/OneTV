@@ -1,5 +1,6 @@
 import { Platform, Dimensions } from "react-native";
-import { DeviceType } from "@/hooks/useResponsiveLayout";
+
+import { type DeviceType } from "@/hooks/useResponsiveLayout";
 
 export const DeviceUtils = {
   /**
@@ -56,14 +57,14 @@ export const DeviceUtils = {
   getMinTouchTargetSize(): number {
     const deviceType = this.getDeviceType();
     switch (deviceType) {
-      case "mobile":
-        return 44; // iOS HIG minimum
-      case "tablet":
-        return 48; // Material Design minimum
-      case "tv":
-        return 60; // TV optimized
-      default:
-        return 44;
+    case "mobile":
+      return 44; // iOS HIG minimum
+    case "tablet":
+      return 48; // Material Design minimum
+    case "tv":
+      return 60; // TV optimized
+    default:
+      return 44;
     }
   },
 

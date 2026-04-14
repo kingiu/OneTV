@@ -1,5 +1,5 @@
-import Logger from '@/utils/Logger';
 import { proxyService } from '@/services/proxyService';
+import Logger from '@/utils/Logger';
 
 const logger = Logger.withTag('M3U8');
 
@@ -17,7 +17,7 @@ export const getResolutionFromM3U8 = async (
 ): Promise<string | null> => {
   const perfStart = performance.now();
   logger.info(`[PERF] M3U8 resolution detection START - url: ${url.substring(0, 100)}...`);
-  
+
   // 1. Check cache first
   const cachedEntry = resolutionCache[url];
   if (cachedEntry && Date.now() - cachedEntry.timestamp < CACHE_DURATION) {
@@ -37,7 +37,7 @@ export const getResolutionFromM3U8 = async (
     // 创建超时控制器
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-    
+
     // 不再将外部的 signal 与内部的 AbortController 关联起来
     // 这样即使外部的 signal 被中止，内部的请求也能继续进行
 
@@ -50,15 +50,15 @@ export const getResolutionFromM3U8 = async (
           'User-Agent': 'Mozilla/5.0 (compatible; OneTV/1.0)',
         }
       });
-      
+
       clearTimeout(timeoutId);
       const fetchEnd = performance.now();
       logger.info(`[PERF] M3U8 fetch took ${(fetchEnd - fetchStart).toFixed(2)}ms, status: ${response.status}`);
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error ${response.status}`);
       }
-      
+
       const parseStart = performance.now();
       const playlist = await response.text();
       const lines = playlist.split("\n");
@@ -77,7 +77,7 @@ export const getResolutionFromM3U8 = async (
           }
         }
       }
-      
+
       const parseEnd = performance.now();
       logger.info(`[PERF] M3U8 parsing took ${(parseEnd - parseStart).toFixed(2)}ms, lines: ${lines.length}`);
 
@@ -89,12 +89,12 @@ export const getResolutionFromM3U8 = async (
 
       const perfEnd = performance.now();
       logger.info(`[PERF] M3U8 resolution detection COMPLETE - took ${(perfEnd - perfStart).toFixed(2)}ms, resolution: ${resolutionString}`);
-      
+
       return resolutionString;
     } catch (error) {
       clearTimeout(timeoutId);
       const perfEnd = performance.now();
-      
+
       // 区分不同类型的错误
       if (error instanceof DOMException && error.name === 'AbortError') {
         logger.warn(`[PERF] M3U8 resolution detection TIMEOUT/ABORTED - took ${(perfEnd - perfStart).toFixed(2)}ms, attempt ${i + 1}/${maxRetries}`);
@@ -111,6 +111,6 @@ export const getResolutionFromM3U8 = async (
       }
     }
   }
-  
+
   return null;
 };

@@ -1,11 +1,13 @@
+import { FontAwesome } from "@expo/vector-icons";
 import React, { useState, useCallback } from "react";
 import { StyleSheet, Switch, FlatList, Pressable, Animated, View, TouchableOpacity } from "react-native";
 import { useTVEventHandler } from "react-native";
+
 import { ThemedText } from "@/components/ThemedText";
-import { SettingsSection } from "./SettingsSection";
 import { useSettingsStore } from "@/stores/settingsStore";
 import useSourceStore, { useSources } from "@/stores/sourceStore";
-import { FontAwesome } from "@expo/vector-icons";
+
+import { SettingsSection } from "./SettingsSection";
 
 interface VideoSourceSectionProps {
   onChanged: () => void;
@@ -48,8 +50,13 @@ export const VideoSourceSection: React.FC<VideoSourceSectionProps> = ({ onChange
   };
 
   // TV遥控器事件处理
+  interface TVEvent {
+    eventType: string;
+    [key: string]: unknown;
+  }
+
   const handleTVEvent = useCallback(
-    (event: any) => {
+    (event: TVEvent) => {
       if (event.eventType === "select") {
         if (focusedIndex !== null) {
           const resource = resources[focusedIndex];

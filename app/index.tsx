@@ -1,21 +1,22 @@
+import { useFocusEffect, useRouter } from "expo-router";
+import { Search, Settings, LogOut, Heart, User } from "lucide-react-native";
 import React, { useEffect, useCallback, useRef, useState } from "react";
 import { View, StyleSheet, ActivityIndicator, FlatList, Pressable, Animated, StatusBar, Platform, BackHandler, ToastAndroid } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ThemedView } from "@/components/ThemedView";
-import { ThemedText } from "@/components/ThemedText";
-import { api } from "@/services/api";
-import VideoCard from "@/components/VideoCard";
-import { useFocusEffect, useRouter } from "expo-router";
-import { Search, Settings, LogOut, Heart, User } from "lucide-react-native";
-import { StyledButton } from "@/components/StyledButton";
-import useHomeStore, { RowItem, Category } from "@/stores/homeStore";
-import { useAuthStore } from "@/stores/authStore";
+
 import CustomScrollView from "@/components/CustomScrollView";
-import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
-import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
-import { useApiConfig, getApiConfigErrorMessage } from "@/hooks/useApiConfig";
+import { StyledButton } from "@/components/StyledButton";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import VideoCard from "@/components/VideoCard";
 import { Colors } from "@/constants/Colors";
+import { useApiConfig, getApiConfigErrorMessage } from "@/hooks/useApiConfig";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { api } from "@/services/api";
+import { useAuthStore } from "@/stores/authStore";
+import useHomeStore, { type RowItem, type Category } from "@/stores/homeStore";
+import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 
 const LOAD_MORE_THRESHOLD = 200;
 
@@ -62,38 +63,38 @@ export default function HomeScreen() {
     }, [refreshPlayRecords])
   );
 
-    // 双击返回退出逻辑（只限当前页面）
+  // 双击返回退出逻辑（只限当前页面）
   const backPressTimeRef = useRef<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
-    const handleBackPress = () => {
-      const now = Date.now();
+      const handleBackPress = () => {
+        const now = Date.now();
 
-      // 如果还没按过返回键，或距离上次超过2秒
-      if (!backPressTimeRef.current || now - backPressTimeRef.current > 2000) {
-        backPressTimeRef.current = now;
-        ToastAndroid.show("再按一次返回键退出", ToastAndroid.SHORT);
-        return true; // 拦截返回事件，不退出
-      }
+        // 如果还没按过返回键，或距离上次超过2秒
+        if (!backPressTimeRef.current || now - backPressTimeRef.current > 2000) {
+          backPressTimeRef.current = now;
+          ToastAndroid.show("再按一次返回键退出", ToastAndroid.SHORT);
+          return true; // 拦截返回事件，不退出
+        }
 
-      // 两次返回键间隔小于2秒，退出应用
-      BackHandler.exitApp();
-      return true;
-    };
-
-    // 仅限 Android 平台启用此功能
-    if (Platform.OS === "android") {
-      const backHandler = BackHandler.addEventListener("hardwareBackPress", handleBackPress);
-
-      // 返回首页时重置状态
-      return () => {
-        backHandler.remove();
-        backPressTimeRef.current = null;
+        // 两次返回键间隔小于2秒，退出应用
+        BackHandler.exitApp();
+        return true;
       };
-    }
-  }, [])
-);
+
+      // 仅限 Android 平台启用此功能
+      if (Platform.OS === "android") {
+        const backHandler = BackHandler.addEventListener("hardwareBackPress", handleBackPress);
+
+        // 返回首页时重置状态
+        return () => {
+          backHandler.remove();
+          backPressTimeRef.current = null;
+        };
+      }
+    }, [])
+  );
 
   // 统一的数据获取逻辑
   useEffect(() => {

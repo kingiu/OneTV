@@ -1,14 +1,16 @@
 import { StyleSheet } from "react-native";
+
+import { type ResponsiveConfig } from "@/hooks/useResponsiveLayout";
+
+import { DeviceUtils } from "../DeviceUtils";
 import {
   createResponsiveStyles,
   useResponsiveStyles,
   getCommonResponsiveStyles,
   getResponsiveTextSize,
   getResponsiveSpacing,
-  ResponsiveStyleCreator,
+  type ResponsiveStyleCreator,
 } from "../ResponsiveStyles";
-import { ResponsiveConfig } from "@/hooks/useResponsiveLayout";
-import { DeviceUtils } from "../DeviceUtils";
 
 jest.mock("react-native", () => ({
   StyleSheet: {

@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ScrollView } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Home, Search, Heart, Settings, Tv, Menu, X, User } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, ScrollView } from 'react-native';
+
+import { ThemedText } from '@/components/ThemedText';
 import { Colors } from '@/constants/Colors';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { DeviceUtils } from '@/utils/DeviceUtils';
-import { ThemedText } from '@/components/ThemedText';
 
 interface SidebarItem {
   key: string;
   label: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{}>;
   route: string;
   section?: string;
 }
@@ -38,12 +39,12 @@ const TabletSidebarNavigator: React.FC<TabletSidebarNavigatorProps> = ({
   const router = useRouter();
   const pathname = usePathname();
   const { spacing, isPortrait } = useResponsiveLayout();
-  
+
   const [internalCollapsed, setInternalCollapsed] = useState(false);
-  
+
   // 使用外部控制的collapsed状态，如果没有则使用内部状态
   const collapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
-  
+
   const handleToggleCollapse = () => {
     if (onToggleCollapse) {
       onToggleCollapse(!collapsed);
@@ -56,9 +57,9 @@ const TabletSidebarNavigator: React.FC<TabletSidebarNavigatorProps> = ({
     if (route === '/') {
       router.push('/');
     } else {
-      router.push(route as any);
+      router.push(route);
     }
-    
+
     // 在竖屏模式下，导航后自动折叠侧边栏
     if (isPortrait && !controlledCollapsed) {
       setInternalCollapsed(true);
@@ -76,10 +77,10 @@ const TabletSidebarNavigator: React.FC<TabletSidebarNavigatorProps> = ({
 
   const renderSidebarItems = () => {
     const sections = ['main', 'user'];
-    
+
     return sections.map((section) => {
       const sectionItems = sidebarItems.filter(item => item.section === section);
-      
+
       return (
         <View key={section} style={dynamicStyles.section}>
           {!collapsed && (
@@ -90,7 +91,7 @@ const TabletSidebarNavigator: React.FC<TabletSidebarNavigatorProps> = ({
           {sectionItems.map((item) => {
             const isActive = isItemActive(item.route);
             const IconComponent = item.icon;
-            
+
             return (
               <TouchableOpacity
                 key={item.key}
@@ -157,7 +158,7 @@ const TabletSidebarNavigator: React.FC<TabletSidebarNavigatorProps> = ({
 
 const createStyles = (spacing: number, sidebarWidth: number, isPortrait: boolean) => {
   const minTouchTarget = DeviceUtils.getMinTouchTargetSize();
-  
+
   return StyleSheet.create({
     container: {
       flex: 1,

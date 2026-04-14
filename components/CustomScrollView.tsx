@@ -1,12 +1,13 @@
 import React, { useCallback, useRef, useState, useEffect } from "react";
 import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, BackHandler } from "react-native";
+
 import { ThemedText } from "@/components/ThemedText";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 
-interface CustomScrollViewProps {
-  data: any[];
-  renderItem: ({ item, index }: { item: any; index: number }) => React.ReactNode;
+interface CustomScrollViewProps<T> {
+  data: T[];
+  renderItem: ({ item, index }: { item: T; index: number }) => React.ReactNode;
   numColumns?: number; // 如果不提供，将使用响应式默认值
   loading?: boolean;
   loadingMore?: boolean;
@@ -14,10 +15,10 @@ interface CustomScrollViewProps {
   onEndReached?: () => void;
   loadMoreThreshold?: number;
   emptyMessage?: string;
-  ListFooterComponent?: React.ComponentType<any> | React.ReactElement | null;
+  ListFooterComponent?: React.ComponentType<{}> | React.ReactElement | null;
 }
 
-const CustomScrollView: React.FC<CustomScrollViewProps> = ({
+const CustomScrollView = <T,>({
   data,
   renderItem,
   numColumns,
@@ -28,9 +29,9 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
   loadMoreThreshold = 200,
   emptyMessage = "暂无内容",
   ListFooterComponent,
-}) => {
+}: CustomScrollViewProps<T>) => {
   const scrollViewRef = useRef<ScrollView>(null);
-  const firstCardRef = useRef<any>(null); // <--- 新增
+  const firstCardRef = useRef<View>(null); // <--- 新增
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const responsiveConfig = useResponsiveLayout();
   const commonStyles = getCommonResponsiveStyles(responsiveConfig);
@@ -55,7 +56,11 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
   const effectiveColumns = numColumns || responsiveConfig.columns;
 
   const handleScroll = useCallback(
-    ({ nativeEvent }: { nativeEvent: any }) => {
+    ({ nativeEvent }: { nativeEvent: {
+      layoutMeasurement: { height: number };
+      contentOffset: { y: number };
+      contentSize: { height: number };
+    } }) => {
       const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
       const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - loadMoreThreshold;
 
@@ -82,7 +87,7 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
       if (React.isValidElement(ListFooterComponent)) {
         return ListFooterComponent;
       } else if (typeof ListFooterComponent === "function") {
-        const Component = ListFooterComponent as React.ComponentType<any>;
+        const Component = ListFooterComponent as React.ComponentType<{}>;
         return <Component />;
       }
       return null;
@@ -120,8 +125,8 @@ const CustomScrollView: React.FC<CustomScrollViewProps> = ({
   }
 
   // 将数据按行分组
-  const groupItemsByRow = (items: any[], columns: number) => {
-    const rows = [];
+  const groupItemsByRow = (items: T[], columns: number) => {
+    const rows: T[][] = [];
     for (let i = 0; i < items.length; i += columns) {
       rows.push(items.slice(i, i + columns));
     }

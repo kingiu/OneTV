@@ -1,7 +1,9 @@
 import React from "react";
 import { View, Text, StyleSheet, Modal, FlatList } from "react-native";
-import { StyledButton } from "./StyledButton";
+
 import usePlayerStore from "@/stores/playerStore";
+
+import { StyledButton } from "./StyledButton";
 
 interface SpeedOption {
   rate: number;

@@ -1,24 +1,25 @@
+import { useRouter } from "expo-router";
+import { Search, QrCode } from "lucide-react-native";
 import React, { useState, useRef, useEffect } from "react";
 import { View, TextInput, StyleSheet, Alert, Keyboard, TouchableOpacity } from "react-native";
-import { ThemedView } from "@/components/ThemedView";
+
+import CustomScrollView from "@/components/CustomScrollView";
+import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
+import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
+import { RemoteControlModal } from "@/components/RemoteControlModal";
+import { StyledButton } from "@/components/StyledButton";
 import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
 import VideoCard from "@/components/VideoCard";
 import VideoLoadingAnimation from "@/components/VideoLoadingAnimation";
-import { api, SearchResult } from "@/services/api";
-import { Search, QrCode } from "lucide-react-native";
-import { StyledButton } from "@/components/StyledButton";
-import { useRemoteControlStore } from "@/stores/remoteControlStore";
-import { RemoteControlModal } from "@/components/RemoteControlModal";
-import { useSettingsStore } from "@/stores/settingsStore";
-import { useRouter } from "expo-router";
 import { Colors } from "@/constants/Colors";
-import CustomScrollView from "@/components/CustomScrollView";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
-import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
-import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
-import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
+import { api, type SearchResult } from "@/services/api";
+import { useRemoteControlStore } from "@/stores/remoteControlStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { DeviceUtils } from "@/utils/DeviceUtils";
 import Logger from '@/utils/Logger';
+import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 
 const logger = Logger.withTag('SearchScreen');
 
@@ -89,7 +90,7 @@ export default function SearchScreen() {
 
     results.forEach(item => {
       const uniqueKey = `${item.title}_${item.year || ''}`;
-      
+
       if (titleMap.has(uniqueKey)) {
         // 如果标题+年份已存在，增加源数量
         const existingItem = titleMap.get(uniqueKey)!;

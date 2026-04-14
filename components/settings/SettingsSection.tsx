@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { StyleSheet, Pressable, Platform } from "react-native";
+
 import { ThemedView } from "@/components/ThemedView";
 import { Colors } from "@/constants/Colors";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
@@ -28,7 +29,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({ children, onFo
 
   const handlePress = () => {
     onPress?.();
-  }
+  };
 
   if (!focusable) {
     return <ThemedView style={styles.section}>{children}</ThemedView>;

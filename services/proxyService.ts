@@ -1,10 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag("ProxyService");
 
 interface CacheItem {
-  data: any;
+  data: unknown;
   timestamp: number;
   ttl: number;
 }
@@ -30,7 +31,7 @@ class ProxyService {
   private generateCacheKey(url: string, method: string, body?: string): string {
     const key = `${method}:${url}`;
     if (!body) return key;
-    
+
     try {
       return `${key}:${btoa(unescape(encodeURIComponent(body)))}`;
     } catch (error) {
@@ -45,7 +46,7 @@ class ProxyService {
   }
 
   // 从缓存获取数据
-  private getFromCache(key: string): any {
+  private getFromCache(key: string): unknown {
     const item = this.cache.get(key);
     if (!item) return null;
 
@@ -59,7 +60,7 @@ class ProxyService {
   }
 
   // 保存到缓存
-  private saveToCache(key: string, data: any, ttl: number = this.DEFAULT_CACHE_TTL) {
+  private saveToCache(key: string, data: unknown, ttl: number = this.DEFAULT_CACHE_TTL) {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
@@ -83,9 +84,9 @@ class ProxyService {
   }
 
   // 分析网络错误原因
-  private analyzeNetworkError(error: any): string {
+  private analyzeNetworkError(error: unknown): string {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    
+
     if (errorMsg.includes("Network request failed")) {
       return "Possible causes:\n" +
              "  1. Device is offline or network unstable\n" +
@@ -95,23 +96,23 @@ class ProxyService {
              "  5. Firewall or VPN blocking the request\n" +
              "  6. Request timeout (server not responding)";
     }
-    
+
     if (errorMsg.includes("abort") || errorMsg.includes("AbortError") || errorMsg === "Aborted") {
       return "Request was aborted (timeout or manual cancellation)";
     }
-    
+
     if (errorMsg.includes("timeout")) {
       return "Request timed out - server took too long to respond";
     }
-    
+
     if (errorMsg.includes("SSL") || errorMsg.includes("certificate")) {
       return "SSL certificate error - server certificate invalid or expired";
     }
-    
+
     if (errorMsg.includes("CORS") || errorMsg.includes("cross-origin")) {
       return "CORS policy blocked the request";
     }
-    
+
     return `Unknown error type: ${errorMsg}`;
   }
 
@@ -142,20 +143,26 @@ class ProxyService {
           ...options,
           signal: options.signal,
         };
-        
-        if (!fetchOptions.signal) {
+
+        interface FetchOptionsWithTimeout extends RequestInit {
+          _timeoutId?: NodeJS.Timeout;
+        }
+
+        const typedFetchOptions = fetchOptions as FetchOptionsWithTimeout;
+
+        if (!typedFetchOptions.signal) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 60000);
-          fetchOptions.signal = controller.signal;
-          (fetchOptions as any)._timeoutId = timeoutId;
+          typedFetchOptions.signal = controller.signal;
+          typedFetchOptions._timeoutId = timeoutId;
         }
-        
-        const response = await fetch(requestUrl, fetchOptions);
-        
-        if ((fetchOptions as any)._timeoutId) {
-          clearTimeout((fetchOptions as any)._timeoutId);
+
+        const response = await fetch(requestUrl, typedFetchOptions);
+
+        if (typedFetchOptions._timeoutId) {
+          clearTimeout(typedFetchOptions._timeoutId);
         }
-        
+
         if (response.ok && options.method === "GET") {
           try {
             const data = await response.clone().json();
@@ -163,19 +170,19 @@ class ProxyService {
           } catch {
           }
         }
-        
+
         return response;
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
         const errorDetails = this.analyzeNetworkError(error);
-        
+
         logger.error(
-          "Direct fetch error:", 
+          "Direct fetch error:",
           `\n  URL: ${requestUrl.substring(0, 100)}...`,
           `\n  Error: ${errorMsg}`,
           `\n  Analysis: ${errorDetails}`
         );
-        
+
         throw error;
       }
     };

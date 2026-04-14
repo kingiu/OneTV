@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { Star, Play } from "lucide-react-native";
-import { PlayRecordManager } from "@/services/storage";
-import { API } from "@/services/api";
+import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
+import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Animated } from "react-native";
+
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { type API } from "@/services/api";
+import { PlayRecordManager } from "@/services/storage";
 import { DeviceUtils } from "@/utils/DeviceUtils";
 import Logger from '@/utils/Logger';
 
@@ -63,7 +64,7 @@ const VideoCardTablet = forwardRef<View, VideoCardTabletProps>(
         longPressTriggered.current = false;
         return;
       }
-      
+
       if (progress !== undefined && episodeIndex !== undefined) {
         router.push({
           pathname: "/play",
@@ -153,7 +154,7 @@ const VideoCardTablet = forwardRef<View, VideoCardTabletProps>(
         >
           <View style={[styles.card, isPressed && styles.cardPressed]}>
             <Image source={{ uri: api.getImageProxyUrl(poster) }} style={styles.poster} />
-            
+
             {/* 悬停效果遮罩 */}
             {isPressed && (
               <View style={styles.pressOverlay}>

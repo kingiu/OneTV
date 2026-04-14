@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Modal, FlatList, ScrollView } from "react-native";
-import { StyledButton } from "./StyledButton";
-import usePlayerStore from "@/stores/playerStore";
+
 import useDetailStore from "@/stores/detailStore";
+import usePlayerStore from "@/stores/playerStore";
+
+import { StyledButton } from "./StyledButton";
 
 interface EpisodeSelectionModalProps {}
 
 export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () => {
   const { showEpisodeModal, currentEpisodeIndex, playEpisode, setShowEpisodeModal, currentPlaySourceIndex, onLineChange, episodeModalInitialTab, episodes: playerEpisodes } = usePlayerStore();
   const { detail } = useDetailStore();
-  
+
   // 使用 playerStore 中的剧集数据，因为它已经处理了加载和映射
   const playSources: Array<{ name: string; episodes: string[]; episodes_titles: string[] }> = detail?.play_sources || [];
   const episodes = playerEpisodes;
@@ -17,17 +19,17 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
   const [episodeGroupSize] = useState(30);
   const [selectedEpisodeGroup, setSelectedEpisodeGroup] = useState(Math.floor(currentEpisodeIndex / episodeGroupSize));
   const [activeTab, setActiveTab] = useState<'episodes' | 'lines'>(episodeModalInitialTab);
-  
+
   // 当 currentEpisodeIndex 变化时，更新选中的剧集分组
   useEffect(() => {
     setSelectedEpisodeGroup(Math.floor(currentEpisodeIndex / episodeGroupSize));
   }, [currentEpisodeIndex, episodeGroupSize]);
-  
+
   // Update activeTab when episodeModalInitialTab changes
   useEffect(() => {
     setActiveTab(episodeModalInitialTab);
   }, [episodeModalInitialTab]);
-  
+
   console.log('[DEBUG] EpisodeSelectionModal rendered, initialTab:', episodeModalInitialTab, 'activeTab:', activeTab);
 
   const onSelectEpisode = (index: number) => {
@@ -95,7 +97,7 @@ export const EpisodeSelectionModal: React.FC<EpisodeSelectionModalProps> = () =>
           ) : (
             <ScrollView contentContainerStyle={styles.linesList}>
               {playSources.length > 0 ? (
-                playSources.map((source: any, index) => (
+                playSources.map((source: { name?: string; episodes: string[] }, index) => (
                   <StyledButton
                     key={index}
                     text={source.name || `线路${index + 1}`}

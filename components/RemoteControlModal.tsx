@@ -1,10 +1,12 @@
 import React from "react";
 import { Modal, View, StyleSheet } from "react-native";
 import QRCode from "react-native-qrcode-svg";
+
 import { useRemoteControlStore } from "@/stores/remoteControlStore";
-import { ThemedView } from "./ThemedView";
-import { ThemedText } from "./ThemedText";
+
 import { StyledButton } from "./StyledButton";
+import { ThemedText } from "./ThemedText";
+import { ThemedView } from "./ThemedView";
 
 export const RemoteControlModal: React.FC = () => {
   const { isModalVisible, hideModal, serverUrl, error } = useRemoteControlStore();

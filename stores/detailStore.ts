@@ -1,9 +1,10 @@
 import { create } from "zustand";
-import { SearchResult, api } from "@/services/api";
-import { resourceMatcher } from "@/services/resourceMatcher";
+
+import { type SearchResult, api } from "@/services/api";
 import { getResolutionFromM3U8 } from "@/services/m3u8";
-import { useSettingsStore } from "@/stores/settingsStore";
+import { resourceMatcher } from "@/services/resourceMatcher";
 import { FavoriteManager } from "@/services/storage";
+import { useSettingsStore } from "@/stores/settingsStore";
 import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag('DetailStore');
@@ -21,7 +22,7 @@ interface DetailState {
   year: string | null;
   doubanId: string | null;
   searchResults: SearchResultWithResolution[];
-  sources: { source: string; source_name: string; resolution: string | null | undefined }[];
+  sources: Array<{ source: string; source_name: string; resolution: string | null | undefined }>;
   resourceWeights: { [key: string]: number }; // 后端返回的资源权重
   detail: SearchResultWithResolution | null;
   loading: boolean;
@@ -59,7 +60,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
   init: async (q, preferredSource, id, year, doubanId) => {
     const perfStart = performance.now();
     logger.info(`[PERF] DetailStore.init START - q: ${q}, preferredSource: ${preferredSource}, id: ${id}, year: ${year}, doubanId: ${doubanId}`);
-    
+
     const { controller: oldController } = get();
     if (oldController) {
       oldController.abort();
@@ -91,7 +92,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
     const processAndSetResults = async (results: SearchResult[], merge = false) => {
       const resolutionStart = performance.now();
       logger.info(`[PERF] Resolution detection START - processing ${results.length} sources`);
-      
+
       const resultsWithResolution = await Promise.all(
         results.map(async (searchResult) => {
           let resolution;
@@ -113,7 +114,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
           return { ...searchResult, resolution };
         })
       );
-      
+
       const resolutionEnd = performance.now();
       logger.info(`[PERF] Resolution detection COMPLETE - took ${(resolutionEnd - resolutionStart).toFixed(2)}ms`);
 
@@ -123,7 +124,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
         // 统一去重逻辑：使用 source_id 作为唯一键（参考 LunaTV）
         const seenKeys = new Set<string>();
         const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
-        
+
         const deduplicatedResults = allResults.filter((r) => {
           const uniqueKey = `${r.source}_${r.id}`;
           if (seenKeys.has(uniqueKey)) {
@@ -132,15 +133,15 @@ const useDetailStore = create<DetailState>((set, get) => ({
           seenKeys.add(uniqueKey);
           return true;
         });
-        
+
         logger.info(`[MATCHING] Before dedup: ${allResults.length} results, After dedup: ${deduplicatedResults.length} results`);
-        
+
         // 检测去重后的视频源数量是否超过后端限制（24个）
         const MAX_SOURCES = 24;
         if (deduplicatedResults.length > MAX_SOURCES) {
           logger.warn(`[WARN] After initial dedup: ${deduplicatedResults.length} results exceeds limit of ${MAX_SOURCES}`);
         }
-        
+
         let processedResults = deduplicatedResults;
         let finalDeduplicatedResults = deduplicatedResults;
 
@@ -161,7 +162,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
         });
 
         logger.info(`[MATCHING] After final deduplication: ${finalDeduplicatedResults.length} results`);
-        
+
         // 检测最终视频源数量是否超过后端限制（24个）
         if (finalDeduplicatedResults.length > MAX_SOURCES) {
           logger.warn(`[WARN] Final results count (${finalDeduplicatedResults.length}) exceeds limit of ${MAX_SOURCES}`);
@@ -176,14 +177,14 @@ const useDetailStore = create<DetailState>((set, get) => ({
           if (state.doubanId) {
             // 从所有结果中查找，不考虑source_name去重
             const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
-            bestDetail = allResults.find((r) => 
+            bestDetail = allResults.find((r) =>
               r.doubanId === state.doubanId
             );
           }
-          
+
           // 然后尝试年份精确匹配
           if (!bestDetail && state.year && finalDeduplicatedResults.length > 0) {
-            const yearMatch = finalDeduplicatedResults.find((r) => 
+            const yearMatch = finalDeduplicatedResults.find((r) =>
               r.year === state.year || r.year === String(state.year)
             );
             if (yearMatch) {
@@ -191,7 +192,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
               bestDetail = yearMatch;
             }
           }
-          
+
           // 最后使用匹配引擎的结果
           if (!bestDetail && finalDeduplicatedResults.length > 0) {
             bestDetail = finalDeduplicatedResults[0];
@@ -215,33 +216,33 @@ const useDetailStore = create<DetailState>((set, get) => ({
       // 这样可以确保获取到所有可用的视频源，而不仅仅是首选源
       const searchStart = performance.now();
       logger.info(`[PERF] API searchVideos (all sources) START - query: "${searchQuery}"`);
-      
+
       try {
         const { results: allResults } = await api.searchVideos(searchQuery, doubanId);
         const searchEnd = performance.now();
         logger.info(`[PERF] API searchVideos (all sources) END - took ${(searchEnd - searchStart).toFixed(2)}ms, results: ${allResults.length}`);
-        
+
         if (signal.aborted) return;
-        
+
         if (allResults.length > 0) {
           logger.info(`[SUCCESS] searchVideos found ${allResults.length} results for "${q}"`);
           await processAndSetResults(allResults, false);
           set({ loading: false }); // Stop loading indicator
         } else {
           logger.error(`[ERROR] searchVideos found no results for "${q}"`);
-          set({ 
+          set({
             error: `未找到 "${q}" 的播放源，请尝试其他关键词或稍后重试`,
-            loading: false 
+            loading: false
           });
         }
       } catch (searchError) {
         logger.error(`[ERROR] searchVideos failed:`, searchError);
-        set({ 
+        set({
           error: `搜索失败：${searchError instanceof Error ? searchError.message : '网络错误，请稍后重试'}`,
-          loading: false 
+          loading: false
         });
       }
-      
+
       // 保存后端返回的资源权重
       try {
         const allResources = await api.getResources(signal);
@@ -254,12 +255,12 @@ const useDetailStore = create<DetailState>((set, get) => ({
       } catch (resourceError) {
         logger.warn(`[WARN] Failed to get resources (non-fatal):`, resourceError);
       }
-      
+
       // 旧的 preferredSource 逻辑已被替换，因为我们现在总是使用 searchVideos
 
       const favoriteCheckStart = performance.now();
       const finalState = get();
-      
+
       // 最终检查：如果所有搜索都完成但仍然没有结果
       const MAX_SOURCES = 24;
       if (finalState.searchResults.length === 0 && !finalState.error) {
@@ -287,10 +288,10 @@ const useDetailStore = create<DetailState>((set, get) => ({
       } else {
         logger.warn(`[WARN] No detail found after all search attempts for "${q}"`);
       }
-      
+
       const favoriteCheckEnd = performance.now();
       logger.info(`[PERF] Favorite check took ${(favoriteCheckEnd - favoriteCheckStart).toFixed(2)}ms`);
-      
+
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         logger.error(`[ERROR] DetailStore.init caught unexpected error:`, e);
@@ -304,7 +305,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
         set({ loading: false, allSourcesLoaded: true });
         logger.info(`[INFO] DetailStore.init cleanup completed`);
       }
-      
+
       const perfEnd = performance.now();
       logger.info(`[PERF] DetailStore.init COMPLETE - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);
     }
@@ -344,42 +345,42 @@ const useDetailStore = create<DetailState>((set, get) => ({
     const { failedSources } = get();
     const newFailedSources = new Set(failedSources);
     newFailedSources.add(source);
-    
+
     logger.warn(`[SOURCE_FAILED] Marking source "${source}" as failed due to: ${reason}`);
     logger.info(`[SOURCE_FAILED] Total failed sources: ${newFailedSources.size}`);
-    
+
     set({ failedSources: newFailedSources });
   },
 
   getNextAvailableSource: (currentSource: string, episodeIndex: number) => {
     const { searchResults, failedSources } = get();
-    
+
     logger.info(`[SOURCE_SELECTION] Looking for alternative to "${currentSource}" for episode ${episodeIndex + 1}`);
     logger.info(`[SOURCE_SELECTION] Failed sources: [${Array.from(failedSources).join(', ')}]`);
-    
+
     // 过滤掉当前source和已失败的sources
-    const availableSources = searchResults.filter(result => 
-      result.source !== currentSource && 
+    const availableSources = searchResults.filter(result =>
+      result.source !== currentSource &&
       !failedSources.has(result.source) &&
-      result.episodes && 
+      result.episodes &&
       result.episodes.length > episodeIndex
     );
-    
+
     logger.info(`[SOURCE_SELECTION] Available sources: ${availableSources.length}`);
     availableSources.forEach(source => {
       logger.info(`[SOURCE_SELECTION] - ${source.source} (${source.source_name}): ${source.episodes?.length || 0} episodes`);
     });
-    
+
     if (availableSources.length === 0) {
       logger.error(`[SOURCE_SELECTION] No available sources for episode ${episodeIndex + 1}`);
       return null;
     }
-    
+
     // 优先选择有高分辨率的source
     const sortedSources = availableSources.sort((a, b) => {
       const aResolution = a.resolution || '';
       const bResolution = b.resolution || '';
-      
+
       // 优先级: 1080p > 720p > 其他 > 无分辨率
       const resolutionPriority = (res: string) => {
         if (res.includes('1080')) return 4;
@@ -388,13 +389,13 @@ const useDetailStore = create<DetailState>((set, get) => ({
         if (res.includes('360')) return 1;
         return 0;
       };
-      
+
       return resolutionPriority(bResolution) - resolutionPriority(aResolution);
     });
-    
+
     const selectedSource = sortedSources[0];
     logger.info(`[SOURCE_SELECTION] Selected fallback source: ${selectedSource.source} (${selectedSource.source_name}) with resolution: ${selectedSource.resolution || 'unknown'}`);
-    
+
     return selectedSource;
   },
 
@@ -452,7 +453,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
         const localWeight = sourceWeights[source.source];
         const weight = backendWeight ?? localWeight ?? 50;
         const weightScore = weight;
-        
+
         logger.info(`[BEST_SOURCE] ${source.source_name} weight: backend=${backendWeight}, local=${localWeight}, using=${weight}`);
 
         // 2. 清晰度分数 (0-40)

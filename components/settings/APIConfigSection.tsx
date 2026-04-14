@@ -1,13 +1,15 @@
 import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { View, TextInput, StyleSheet, Animated, Platform, Switch } from "react-native";
 import { useTVEventHandler } from "react-native";
+
 import { ThemedText } from "@/components/ThemedText";
-import { SettingsSection } from "./SettingsSection";
-import { useSettingsStore } from "@/stores/settingsStore";
-import { useRemoteControlStore } from "@/stores/remoteControlStore";
-import { useButtonAnimation } from "@/hooks/useAnimation";
 import { Colors } from "@/constants/Colors";
+import { useButtonAnimation } from "@/hooks/useAnimation";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { useRemoteControlStore } from "@/stores/remoteControlStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+
+import { SettingsSection } from "./SettingsSection";
 
 interface APIConfigSectionProps {
   onChanged: () => void;
@@ -72,8 +74,13 @@ export const APIConfigSection = forwardRef<APIConfigSectionRef, APIConfigSection
     };
 
     // TV遥控器事件处理
+    interface TVEvent {
+      eventType: string;
+      [key: string]: unknown;
+    }
+
     const handleTVEvent = React.useCallback(
-      (event: any) => {
+      (event: TVEvent) => {
         if (isSectionFocused && event.eventType === "select") {
           inputRef.current?.focus();
         }
@@ -93,7 +100,13 @@ export const APIConfigSection = forwardRef<APIConfigSectionRef, APIConfigSection
       end: 0,
     });
     // 当用户手动移动光标或选中文本时，同步到 state（可选）
-    const onSelectionChange = ({ nativeEvent: { selection } }: any) => {
+    interface SelectionEvent {
+      nativeEvent: {
+        selection: { start: number; end: number };
+      };
+    }
+
+    const onSelectionChange = ({ nativeEvent: { selection } }: SelectionEvent) => {
       setSelection(selection);
     };
 

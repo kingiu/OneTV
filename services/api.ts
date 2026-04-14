@@ -1,23 +1,24 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { resourceMatcher } from "./resourceMatcher";
 import {
   MembershipTier,
   UserMembership,
-  MembershipConfig,
-  MembershipResponse,
-  Coupon,
+  type MembershipConfig,
+  type MembershipResponse,
+  type Coupon,
   CouponBatch,
-  RedeemResult,
-  LiveApiResponse,
-  LiveSource,
-  SearchResult,
-  VideoDetail,
-  ApiSite,
-  DoubanResponse,
-  PlayRecord,
-  Favorite,
-  ServerConfig
+  type RedeemResult,
+  type LiveApiResponse,
+  type LiveSource,
+  type SearchResult,
+  type VideoDetail,
+  type ApiSite,
+  type DoubanResponse,
+  type PlayRecord,
+  type Favorite,
+  type ServerConfig
 } from "./types";
-import { resourceMatcher } from "./resourceMatcher";
 
 // 主API类
 export class Api {
@@ -40,54 +41,54 @@ export class Api {
 
   private async buildHeaders(headers?: HeadersInit): Promise<Headers> {
     const requestHeaders = new Headers(headers);
-    
+
     // 检查是否是登录请求，如果是，不添加认证头
     const isLoginRequest = requestHeaders.has('X-Login-Request');
     console.log('Building headers, isLoginRequest:', isLoginRequest);
-    
+
     if (!isLoginRequest) {
       // 添加认证 cookie
       try {
         console.log('Attempting to get auth cookie from AsyncStorage');
         let authCookieValue = await AsyncStorage.getItem("authCookies");
         console.log('Auth cookie value from AsyncStorage:', authCookieValue);
-        
+
         if (!authCookieValue) {
           console.warn('No auth cookie found in AsyncStorage, attempting to login...');
           // 尝试登录获取 cookie
           try {
             const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
             console.log('Saved credentials:', credentialsStr);
-            
+
             // 确保 username 和 password 不是 undefined，而是空字符串
             let username = "admin";
             let password = "admin123";
-            
+
             if (credentialsStr) {
               const authInfo = JSON.parse(credentialsStr);
               username = authInfo.username || "admin";
               password = authInfo.password || "admin123";
             }
-            
+
             console.log('Attempting login with username:', username);
-              
+
             // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
             const loginResponse = await fetch(`${this.baseURL}/api/login`, {
               method: "POST",
-              headers: { 
+              headers: {
                 "Content-Type": "application/json",
                 "X-Login-Request": "true"
               },
               body: JSON.stringify({ username, password }),
             });
-              
+
             console.log('Login response status:', loginResponse.status);
-              
+
             if (loginResponse.ok) {
               // 保存认证 cookie
               const loginSetCookie = loginResponse.headers.get('Set-Cookie');
               console.log('Login Set-Cookie header:', loginSetCookie);
-              
+
               if (loginSetCookie) {
                 // 提取 user_auth cookie
                 const cookieParts = loginSetCookie.split(';');
@@ -99,7 +100,7 @@ export class Api {
                     break;
                   }
                 }
-                
+
                 if (authCookieValue) {
                   // 保存解码后的值
                   await AsyncStorage.setItem("authCookies", authCookieValue);
@@ -111,7 +112,7 @@ export class Api {
             console.warn("Login failed:", loginError);
           }
         }
-        
+
         if (authCookieValue) {
           // 组合完整的 cookie 字符串
           const cookieString = `user_auth=${authCookieValue}`;
@@ -137,7 +138,7 @@ export class Api {
         console.error('Failed to add auth cookies:', error);
       }
     }
-    
+
     return requestHeaders;
   }
 
@@ -168,11 +169,11 @@ export class Api {
       const fullUrl = `${this.baseURL}${url}`;
       console.log('Full URL:', fullUrl);
       console.log('Request headers:', headers);
-      
+
       // 定义处理响应的通用函数
       const handleResponse = async (response: Response, isProxy: boolean): Promise<Response> => {
         console.log(`${isProxy ? 'Proxy' : 'Direct'} response status:`, response.status);
-        
+
         // 尝试获取所有响应头部，以便更好地调试
         const responseHeaders: Record<string, string> = {};
         response.headers.forEach((value, key) => {
@@ -183,14 +184,14 @@ export class Api {
         // 保存服务端返回的 cookie（无论状态码是什么）
         const setCookie = response.headers.get('Set-Cookie');
         console.log('Set-Cookie header:', setCookie);
-        
+
         if (setCookie) {
           try {
             console.log('Processing Set-Cookie header:', setCookie);
             // 提取 user_auth cookie
             const cookieParts = setCookie.split(';');
             console.log('Cookie parts:', cookieParts);
-            
+
             let userAuthValue = '';
             for (const part of cookieParts) {
               console.log('Checking cookie part:', part);
@@ -201,18 +202,18 @@ export class Api {
                 break;
               }
             }
-            
+
             if (userAuthValue) {
               // 保存解码后的值
               console.log('Attempting to save auth cookie to AsyncStorage:', userAuthValue);
               try {
                 await AsyncStorage.setItem("authCookies", userAuthValue);
                 console.log('Auth cookie value saved successfully:', userAuthValue);
-                
+
                 // 验证保存是否成功
                 const savedCookie = await AsyncStorage.getItem("authCookies");
                 console.log('Saved cookie in AsyncStorage:', savedCookie);
-                
+
                 // 尝试获取所有 AsyncStorage 键，确认保存成功
                 const allKeys = await AsyncStorage.getAllKeys();
                 console.log('All AsyncStorage keys:', allKeys);
@@ -232,72 +233,72 @@ export class Api {
         } else {
           console.warn('No Set-Cookie header found in response');
         }
-        
+
         if (response.status === 401 && retryCount < 1 && !avoidReLogin) {
           console.log('Received 401 error, attempting to re-login');
-          
+
           // 尝试自动重新登录
           try {
             const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
             console.log('Saved credentials:', credentialsStr);
-            
+
             // 确保 username 和 password 不是 undefined，而是空字符串
             let username = "admin";
             let password = "admin123";
-            
+
             if (credentialsStr) {
               const authInfo = JSON.parse(credentialsStr);
               username = authInfo.username || "admin";
               password = authInfo.password || "admin123";
             }
-            
+
             console.log('Attempting re-login with username:', username);
-              
-              // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
-              const loginResponse = await fetch(`${this.baseURL}/api/login`, {
-                method: "POST",
-                headers: { 
-                  "Content-Type": "application/json",
-                  "X-Login-Request": "true"
-                },
-                body: JSON.stringify({ username, password }),
-              });
-              
-              console.log('Re-login response status:', loginResponse.status);
-              
-              if (loginResponse.ok) {
-                // 保存认证 cookie
-                const loginSetCookie = loginResponse.headers.get('Set-Cookie');
-                console.log('Re-login Set-Cookie header:', loginSetCookie);
-                
-                if (loginSetCookie) {
-                  try {
-                    // 提取 user_auth cookie
-                    const cookieParts = loginSetCookie.split(';');
-                    let userAuthValue = '';
-                    for (const part of cookieParts) {
-                      if (part.trim().startsWith('user_auth=')) {
-                        // 提取 user_auth 的值（不包含键名）
-                        userAuthValue = part.trim().substring('user_auth='.length);
-                        break;
-                      }
+
+            // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
+            const loginResponse = await fetch(`${this.baseURL}/api/login`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Login-Request": "true"
+              },
+              body: JSON.stringify({ username, password }),
+            });
+
+            console.log('Re-login response status:', loginResponse.status);
+
+            if (loginResponse.ok) {
+              // 保存认证 cookie
+              const loginSetCookie = loginResponse.headers.get('Set-Cookie');
+              console.log('Re-login Set-Cookie header:', loginSetCookie);
+
+              if (loginSetCookie) {
+                try {
+                  // 提取 user_auth cookie
+                  const cookieParts = loginSetCookie.split(';');
+                  let userAuthValue = '';
+                  for (const part of cookieParts) {
+                    if (part.trim().startsWith('user_auth=')) {
+                      // 提取 user_auth 的值（不包含键名）
+                      userAuthValue = part.trim().substring('user_auth='.length);
+                      break;
                     }
-                    console.log('Extracted re-login user_auth value:', userAuthValue);
-                    
-                    if (userAuthValue) {
-                      // 保存解码后的值
-                      await AsyncStorage.setItem("authCookies", userAuthValue);
-                      console.log('Auth cookie value saved successfully after re-login:', userAuthValue);
-                    }
-                  } catch (storageError) {
-                    console.error('Failed to save auth cookies after re-login:', storageError);
                   }
+                  console.log('Extracted re-login user_auth value:', userAuthValue);
+
+                  if (userAuthValue) {
+                    // 保存解码后的值
+                    await AsyncStorage.setItem("authCookies", userAuthValue);
+                    console.log('Auth cookie value saved successfully after re-login:', userAuthValue);
+                  }
+                } catch (storageError) {
+                  console.error('Failed to save auth cookies after re-login:', storageError);
                 }
-                
-                console.log('重新登录成功，重试原请求...');
-                // 重新尝试原请求
-                return this._fetch(url, options, retryCount + 1);
               }
+
+              console.log('重新登录成功，重试原请求...');
+              // 重新尝试原请求
+              return this._fetch(url, options, retryCount + 1);
+            }
           } catch (loginError) {
             console.warn("Auto re-login failed:", loginError);
           }
@@ -317,10 +318,10 @@ export class Api {
           // 即使出错也要保存 cookie，所以不在这里抛出错误
           // 而是让调用者处理错误
         }
-        
+
         return response;
       };
-      
+
       // 直接使用 fetch 发送请求，避免代理服务可能导致的头部丢失问题
       try {
         console.log('Sending direct fetch request to:', fullUrl);
@@ -347,9 +348,9 @@ export class Api {
       if (!username || !password) {
         throw new Error("用户名和密码不能为空");
       }
-      
+
       console.log('Login with username:', username);
-      
+
       // 保存用户凭证到 AsyncStorage，以便自动重新登录时使用
       try {
         await AsyncStorage.setItem("mytv_login_credentials", JSON.stringify({ username, password }));
@@ -357,22 +358,22 @@ export class Api {
       } catch (saveError) {
         console.error('Failed to save user credentials:', saveError);
       }
-      
+
       // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
       const fullUrl = `${this.baseURL}/api/login`;
       console.log('Sending login request to:', fullUrl);
-      
+
       const response = await fetch(fullUrl, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "X-Login-Request": "true"
         },
         body: JSON.stringify({ username, password }),
       });
-      
+
       console.log('Login response status:', response.status);
-      
+
       // 尝试获取所有响应头部
       const responseHeaders: Record<string, string> = {};
       response.headers.forEach((value, key) => {
@@ -383,13 +384,13 @@ export class Api {
       // 保存认证 cookie（无论登录是否成功，都保存 cookie）
       const setCookie = response.headers.get('Set-Cookie');
       console.log('Login Set-Cookie header:', setCookie);
-      
+
       if (setCookie) {
         try {
           // 提取 user_auth cookie
           const cookieParts = setCookie.split(';');
           console.log('Login cookie parts:', cookieParts);
-          
+
           let userAuthValue = '';
           for (const part of cookieParts) {
             console.log('Checking login cookie part:', part);
@@ -400,17 +401,17 @@ export class Api {
               break;
             }
           }
-          
+
           if (userAuthValue) {
             // 保存解码后的值
             console.log('Attempting to save login auth cookie to AsyncStorage:', userAuthValue);
             await AsyncStorage.setItem("authCookies", userAuthValue);
             console.log('Login auth cookie value saved successfully:', userAuthValue);
-            
+
             // 验证保存是否成功
             const savedCookie = await AsyncStorage.getItem("authCookies");
             console.log('Saved login cookie in AsyncStorage:', savedCookie);
-            
+
             // 尝试获取所有 AsyncStorage 键，确认保存成功
             const allKeys = await AsyncStorage.getAllKeys();
             console.log('All AsyncStorage keys after save:', allKeys);
@@ -443,7 +444,7 @@ export class Api {
     try {
       const response = await this._fetch("/api/register", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "X-Login-Request": "true"
         },
@@ -453,13 +454,13 @@ export class Api {
       // 保存认证 cookie（无论注册是否成功，都保存 cookie）
       const setCookie = response.headers.get('Set-Cookie');
       console.log('Register Set-Cookie header:', setCookie);
-      
+
       if (setCookie) {
         try {
           // 提取 user_auth cookie
           const cookieParts = setCookie.split(';');
           console.log('Register cookie parts:', cookieParts);
-          
+
           let userAuthValue = '';
           for (const part of cookieParts) {
             console.log('Checking register cookie part:', part);
@@ -470,13 +471,13 @@ export class Api {
               break;
             }
           }
-          
+
           if (userAuthValue) {
             // 保存解码后的值
             console.log('Attempting to save register auth cookie to AsyncStorage:', userAuthValue);
             await AsyncStorage.setItem("authCookies", userAuthValue);
             console.log('Register auth cookie value saved successfully:', userAuthValue);
-            
+
             // 验证保存是否成功
             const savedCookie = await AsyncStorage.getItem("authCookies");
             console.log('Saved register cookie in AsyncStorage:', savedCookie);
@@ -499,11 +500,11 @@ export class Api {
     }
   }
 
-  async cardLogin(code: string): Promise<{ success: boolean; message: string; username?: string; redeemSuccess?: boolean; redeemMessage?: string; data?: any; cardStatus?: string }> {
+  async cardLogin(code: string): Promise<{ success: boolean; message: string; username?: string; redeemSuccess?: boolean; redeemMessage?: string; data?: unknown; cardStatus?: string }> {
     try {
       const response = await this._fetch("/api/login/card", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "X-Login-Request": "true"
         },
@@ -551,7 +552,7 @@ export class Api {
     // 1. 生成搜索变体（参考 LunaTV 实现）
     const searchVariants = resourceMatcher.generateSearchVariants(query);
     console.log('Search variants (searchVideos):', searchVariants);
-    
+
     // 2. 并行搜索所有变体，合并所有结果（参考 LunaTV）
     const variantPromises = searchVariants.map(async (variant) => {
       try {
@@ -559,7 +560,7 @@ export class Api {
         const response = await this._fetch(url);
         const data = await response.json();
         const variantResults = data.results || [];
-        
+
         console.log(`Variant "${variant}" found ${variantResults.length} results`);
         return variantResults;
       } catch (error) {
@@ -567,29 +568,29 @@ export class Api {
         return [];
       }
     });
-    
+
     // 等待所有搜索完成
     const variantResultsArray = await Promise.all(variantPromises);
-    
+
     // 合并所有结果
     const allResults = variantResultsArray.flat();
-    
+
     // 如果没有匹配结果，返回所有结果并去重
     if (allResults.length === 0) {
       console.log('No results found');
       return { results: [] };
     }
-    
+
     console.log(`Total results from all variants: ${allResults.length}`);
-    
+
     // 使用智能匹配过滤所有结果（参考 LunaTV）
     const filteredResults = this.filterSearchResults(allResults, query, doubanId);
-    
+
     console.log(`After filterSearchResults: ${filteredResults.length}`);
-    
+
     // 如果有匹配结果，返回匹配结果；否则返回所有结果
     const finalResults = filteredResults.length > 0 ? filteredResults : allResults;
-    
+
     // 对最终结果进行去重
     const seenIds = new Set<string>();
     const deduplicatedResults = finalResults.filter((result) => {
@@ -600,16 +601,16 @@ export class Api {
       seenIds.add(uniqueKey);
       return true;
     });
-    
+
     // 限制返回结果数量，确保不超过24个
     const MAX_RESULTS = 24;
     const limitedResults = deduplicatedResults.slice(0, MAX_RESULTS);
-    
+
     console.log(`Final results before deduplication: ${finalResults.length}, after deduplication: ${deduplicatedResults.length}, after limit: ${limitedResults.length}`);
-    
+
     return { results: limitedResults };
   }
-  
+
   /**
    * 智能过滤搜索结果（参考 LunaTV 实现）
    */
@@ -624,9 +625,9 @@ export class Api {
       seenIds.add(uniqueKey);
       return true;
     });
-    
+
     console.log(`After deduplication: ${deduplicatedResults.length} results`);
-    
+
     // 如果有豆瓣 ID，优先返回匹配豆瓣 ID 的结果
     if (doubanId) {
       const doubanMatches = deduplicatedResults.filter(r => r.doubanId === doubanId || r.douban_id?.toString() === doubanId);
@@ -635,13 +636,13 @@ export class Api {
         return doubanMatches;
       }
     }
-    
+
     // 否则使用匹配引擎处理搜索结果
     console.log('Before matching (filterSearchResults) - total unique results:', deduplicatedResults.length);
     const processed = resourceMatcher.processSearchResults(query, deduplicatedResults);
     console.log('After matching (filterSearchResults) - total matches:', processed.matches.length);
     console.log('Match quality (filterSearchResults):', processed.quality);
-    
+
     // 如果有匹配结果，返回匹配结果；否则返回所有去重后的结果
     if (processed.matches.length > 0) {
       console.log(`Returning ${processed.matches.length} matched results`);
@@ -668,7 +669,7 @@ export class Api {
     // 1. 生成搜索变体（参考 LunaTV 实现）
     const searchVariants = resourceMatcher.generateSearchVariants(query);
     console.log('Search variants:', searchVariants);
-    
+
     // 2. 并行搜索所有变体
     const variantPromises = searchVariants.map(async (variant, index) => {
       try {
@@ -681,41 +682,68 @@ export class Api {
         return { variant, index, results: [] };
       }
     });
-    
+
     // 3. 等待所有搜索完成
     const variantResults = await Promise.all(variantPromises);
-    
+
     // 4. 合并结果
-    let allResults: any[] = [];
-    
+    interface Line {
+      name?: string;
+      episodes?: string[];
+      episodes_titles?: string[];
+    }
+
+    interface PlaySource {
+      name: string;
+      episodes: string[];
+      episodes_titles: string[];
+    }
+
+    interface SearchItem {
+      lines?: Line[];
+      play_sources?: PlaySource[];
+      vod_play_from?: string;
+      vod_play_url?: string;
+      year?: number | string;
+      vod_year?: number | string;
+      release_date?: string;
+      info?: string;
+      doubanId?: string;
+      episodes?: string[];
+      episodes_titles?: string[];
+      [key: string]: unknown;
+    }
+
+    const allResults: SearchItem[] = [];
+
     // 按原始顺序处理结果（保持优先级）
     variantResults.sort((a, b) => a.index - b.index);
-    
+
     for (const { variant, results: variantData } of variantResults) {
       if (variantData.length > 0) {
         console.log(`Variant "${variant}" found ${variantData.length} results`);
-        
+
         // 处理每个结果
-        const processedVariantData = variantData.map((item: any) => {
+        const processedVariantData = variantData.map((item: SearchItem) => {
           // 优先使用 API 返回的 lines 字段（LunaTV 格式）
           if (item.lines && Array.isArray(item.lines) && item.lines.length > 0) {
-            item.play_sources = item.lines.map((line: any) => ({
+            item.play_sources = item.lines.map((line: Line) => ({
               name: line.name || '未知线路',
               episodes: line.episodes || [],
               episodes_titles: line.episodes_titles || [],
             }));
           } else if (item.vod_play_from && item.vod_play_url) {
-            const play_sources: { name: string; episodes: string[]; episodes_titles: string[] }[] = [];
+            const play_sources: Array<{ name: string; episodes: string[]; episodes_titles: string[] }> = [];
             const sources = item.vod_play_from.split('$$$');
             const urls = item.vod_play_url.split('$$$');
-            
+
             sources.forEach((source: string, index: number) => {
               if (urls[index]) {
                 const sourceName = source.replace(/\(.*\)/, '').trim();
                 const episodePairs = urls[index].split('#');
                 const episodes: string[] = [];
                 const episodes_titles: string[] = [];
-                
+
                 episodePairs.forEach((pair: string) => {
                   const parts = pair.split('$');
                   if (parts.length >= 2) {
@@ -723,17 +751,17 @@ export class Api {
                     episodes.push(parts[1].trim());
                   }
                 });
-                
+
                 // 即使没有剧集，也添加线路信息
                 play_sources.push({ name: sourceName, episodes, episodes_titles });
               }
             });
-            
+
             if (play_sources.length > 0) {
               item.play_sources = play_sources;
             }
           }
-          
+
           // 处理年份字段
           if (item.year) {
             // 已经有 year 字段，保持不变
@@ -753,34 +781,34 @@ export class Api {
               item.year = parseInt(infoYear[0]);
             }
           }
-          
+
           // 设置 doubanId 字段
           item.doubanId = resourceId;
-          
+
           // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
           if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
             item.episodes = item.play_sources[0].episodes;
             item.episodes_titles = item.play_sources[0].episodes_titles;
           }
-          
+
           return item;
         });
-        
+
         // 添加结果
         allResults.push(...processedVariantData);
       }
     }
-    
+
     console.log(`Total results from all variants: ${allResults.length}`);
-    
+
     // 使用智能匹配过滤所有结果（参考 LunaTV）
     const filteredResults = this.filterSearchResults(allResults, query, resourceId);
-    
+
     console.log(`After filterSearchResults: ${filteredResults.length}`);
-    
+
     // 如果有匹配结果，返回匹配结果；否则返回所有结果
     const finalResults = filteredResults.length > 0 ? filteredResults : allResults;
-    
+
     // 对最终结果进行去重
     const seenIds = new Set<string>();
     const deduplicatedResults = finalResults.filter((r) => {
@@ -789,12 +817,12 @@ export class Api {
       seenIds.add(uniqueKey);
       return true;
     });
-    
+
     // 限制结果数量为24个
     const limitedResults = deduplicatedResults.slice(0, 24);
-    
+
     console.log(`Final results: ${limitedResults.length} (after dedup and limit)`);
-    
+
     return { results: limitedResults };
   }
 
@@ -814,10 +842,18 @@ export class Api {
   async getMembershipConfig(): Promise<MembershipConfig> {
     // 适配 LunaTV API - 使用 /api/member/level 端点
     try {
+      interface LunaTVLevel {
+        id: string | number;
+        name: string;
+        description?: string;
+        userGroupId: string | number;
+        [key: string]: unknown;
+      }
+
       const response = await this._fetch("/api/member/level");
       const data = await response.json();
       // 转换为前端期望的格式
-      const tiers = (data.data || []).map((level: any) => ({
+      const tiers = (data.data || []).map((level: LunaTVLevel) => ({
         id: level.id,
         name: level.name,
         displayName: level.name, // LunaTV 没有 displayName 字段，使用 name 代替
@@ -851,7 +887,7 @@ export class Api {
       // 1. 尝试使用 /api/member/level/user 端点获取用户会员信息 (LunaTV 专用)
       const response = await this._fetch("/api/member/level/user");
       const data = await response.json();
-      
+
       // 检查返回格式是否符合规范
       if (data && data.success) {
         // 如果 data 为 null，返回默认信息
@@ -872,18 +908,18 @@ export class Api {
             config: config
           };
         }
-        
+
         const membershipData = data.data;
         const config = await this.getMembershipConfig().catch(() => ({
           tiers: [],
           levels: [],
           enable: true
         }));
-        
+
         // 处理 tierId，确保它是合理的等级标识符
-        let tierId = membershipData.levelId || membershipData.memberLevelId || membershipData.tierId || "0";
+        const tierId = membershipData.levelId || membershipData.memberLevelId || membershipData.tierId || "0";
         // 保留原始的 tierId，不再强制转换为 "1"
-        
+
         // 处理过期时间
         let endDate = 0;
         if (membershipData.expiryTime) {
@@ -893,13 +929,13 @@ export class Api {
         } else if (membershipData.endTime) {
           endDate = membershipData.endTime;
         }
-        
+
         // 处理开始时间，只使用LunaTV API实际返回的字段
         let startDate = 0;
         if (membershipData.createdAt) {
           startDate = new Date(membershipData.createdAt).getTime();
         }
-        
+
         return {
           membership: {
             tierId: tierId,
@@ -937,7 +973,7 @@ export class Api {
       // 记录错误
       console.warn("Failed to fetch membership info:", error);
     }
-    
+
     // 所有尝试都失败，返回默认信息
     const config = await this.getMembershipConfig().catch(() => ({
       tiers: [],
@@ -961,19 +997,29 @@ export class Api {
   async getUserCoupons(): Promise<Coupon[]> {
     // 适配 LunaTV API - 使用 /api/coupon 端点
     try {
+      interface LunaTVCoupon {
+        id: string | number;
+        name: string;
+        value: number;
+        expiryTime?: string | number;
+        validityDays?: number;
+        minSpend?: number;
+        [key: string]: unknown;
+      }
+
       const response = await this._fetch("/api/coupon");
       const data = await response.json();
       const now = Date.now();
-      
+
       // 转换为前端期望的格式
-      const coupons = (data.data || []).map((coupon: any) => {
+      const coupons = (data.data || []).map((coupon: LunaTVCoupon) => {
         // 计算过期时间
         const expireTime = coupon.expiryTime ? new Date(coupon.expiryTime).getTime() : coupon.validityDays ? new Date(Date.now() + coupon.validityDays * 24 * 60 * 60 * 1000).getTime() : Date.now() + 30 * 24 * 60 * 60 * 1000;
         // 检查是否过期
         const isExpired = expireTime < now;
         // 确定卡券状态
         let status: 'active' | 'used' | 'expired' | 'invalid' = 'invalid';
-        
+
         if (isExpired) {
           status = 'expired';
         } else if (coupon.status === 0) {
@@ -983,7 +1029,7 @@ export class Api {
         } else {
           status = 'used';
         }
-        
+
         return {
           code: coupon.code,
           batchId: coupon.batchId || "",
@@ -1016,7 +1062,7 @@ export class Api {
       } catch (error) {
         console.error("Failed to get username from storage:", error);
       }
-      
+
       // 调用后端API进行卡券兑换
       // 适配 LunaTV API - 使用 /api/coupon/redeem 端点
       const response = await this._fetch("/api/coupon/redeem", {
@@ -1024,9 +1070,9 @@ export class Api {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, username, useScene: "manual" }),
       });
-      
+
       const result = await response.json();
-      
+
       // 转换为前端期望的格式
       if (result.success) {
         return {
@@ -1176,7 +1222,7 @@ export class Api {
     // 参数映射逻辑
     let category: string;
     let categoryType: string;
-    
+
     if (type === "movie") {
       // 电影分类
       category = "热门";
@@ -1198,7 +1244,7 @@ export class Api {
         categoryType = tag;
       }
     }
-    
+
     const url = `/api/douban/categories?kind=${type}&category=${encodeURIComponent(category)}&type=${encodeURIComponent(categoryType)}&limit=${pageSize}&start=${pageStart}`;
     const response = await this._fetch(url);
     return response.json();

@@ -1,16 +1,18 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { usePathname } from "expo-router";
 import React, { useState, useRef, useEffect } from "react";
 import { Modal, View, TextInput, StyleSheet, ActivityIndicator, Keyboard, TouchableOpacity } from "react-native";
-import { usePathname } from "expo-router";
 import Toast from "react-native-toast-message";
-import { useAuthStore } from "@/stores/authStore";
-import { useSettingsStore } from "@/stores/settingsStore";
-import useHomeStore from "@/stores/homeStore";
+
 import { api } from "@/services/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ThemedView } from "./ThemedView";
-import { ThemedText } from "./ThemedText";
-import { StyledButton } from "./StyledButton";
+import { useAuthStore } from "@/stores/authStore";
+import useHomeStore from "@/stores/homeStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+
 import CardLoginModal from "./CardLoginModal";
+import { StyledButton } from "./StyledButton";
+import { ThemedText } from "./ThemedText";
+import { ThemedView } from "./ThemedView";
 
 const LoginModal = () => {
   const { isLoginModalVisible, hideLoginModal, checkLoginStatus, loginMode, setLoginMode } = useAuthStore();

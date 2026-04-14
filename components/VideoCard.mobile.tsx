@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef, forwardRef } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { Star, Play } from "lucide-react-native";
-import { PlayRecordManager } from "@/services/storage";
-import { API } from "@/services/api";
+import React, { useState, useEffect, useRef, forwardRef } from "react";
+import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Animated } from "react-native";
+
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { type API } from "@/services/api";
+import { PlayRecordManager } from "@/services/storage";
 import { DeviceUtils } from "@/utils/DeviceUtils";
 import Logger from '@/utils/Logger';
 
@@ -61,7 +62,7 @@ const VideoCardMobile = forwardRef<View, VideoCardMobileProps>(
         longPressTriggered.current = false;
         return;
       }
-      
+
       if (progress !== undefined && episodeIndex !== undefined) {
         router.push({
           pathname: "/play",
@@ -125,7 +126,7 @@ const VideoCardMobile = forwardRef<View, VideoCardMobileProps>(
         >
           <View style={styles.card}>
             <Image source={{ uri: api.getImageProxyUrl(poster) }} style={styles.poster} />
-            
+
             {/* 进度条 */}
             {isContinueWatching && (
               <View style={styles.progressContainer}>

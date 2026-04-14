@@ -1,6 +1,8 @@
 import { create } from "zustand";
-import { api, SearchResult, PlayRecord } from "@/services/api";
+
+import { api, type SearchResult, type PlayRecord } from "@/services/api";
 import { PlayRecordManager } from "@/services/storage";
+
 import { useAuthStore } from "./authStore";
 import { useSettingsStore } from "./settingsStore";
 
@@ -249,23 +251,23 @@ const useHomeStore = create<HomeState>((set, get) => ({
       } else {
         set({ hasMore: false });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       let errorMessage = "加载失败，请重试";
 
-      if (err.message === "API_URL_NOT_SET") {
+      if (err instanceof Error && err.message === "API_URL_NOT_SET") {
         errorMessage = "请点击右上角设置按钮，配置您的服务器地址";
-      } else if (err.message === "UNAUTHORIZED") {
+      } else if (err instanceof Error && err.message === "UNAUTHORIZED") {
         errorMessage = "认证失败，请重新登录";
         useAuthStore.setState({ isLoggedIn: false, isLoginModalVisible: true });
-      } else if (err.message.includes("Network")) {
+      } else if (err instanceof Error && err.message.includes("Network")) {
         errorMessage = "网络连接失败，请检查网络连接";
-      } else if (err.message.includes("timeout")) {
+      } else if (err instanceof Error && err.message.includes("timeout")) {
         errorMessage = "请求超时，请检查网络或服务器状态";
-      } else if (err.message.includes("404")) {
+      } else if (err instanceof Error && err.message.includes("404")) {
         errorMessage = "服务器API路径不正确，请检查服务器配置";
-      } else if (err.message.includes("500")) {
+      } else if (err instanceof Error && err.message.includes("500")) {
         errorMessage = "服务器内部错误，请联系管理员";
-      } else if (err.message.includes("403")) {
+      } else if (err instanceof Error && err.message.includes("403")) {
         errorMessage = "访问被拒绝，请检查权限设置";
       }
 

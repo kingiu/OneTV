@@ -1,9 +1,12 @@
-import { create } from "zustand";
-import { api } from "@/services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Logger from "@/utils/Logger";
 import Constants from 'expo-constants';
+import { create } from "zustand";
+
+import { api } from "@/services/api";
 import { storageConfig } from "@/services/storageConfig";
+import Logger from "@/utils/Logger";
+
+
 
 const logger = Logger.withTag("AuthStore");
 
@@ -44,7 +47,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         logger.error("Failed to fetch server config during auto-login:", configError);
         // 继续执行，使用默认存储类型
       }
-      
+
       // 获取保存的登录凭证
       let credentials = null;
       try {
@@ -58,7 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch (storageError) {
         logger.error("Failed to get login credentials:", storageError);
       }
-      
+
       if (credentials) {
         // 确保凭证中有用户名
         if (!credentials.username) {
@@ -116,16 +119,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         }
       }
-      
+
       // 没有保存的凭证或登录失败，尝试自动注册
       logger.info("No saved credentials, attempting auto-register");
-      
+
       // 获取设备唯一标识符（使用 AsyncStorage 存储，确保设备ID稳定）
       let deviceId: string;
       try {
         // 尝试从 AsyncStorage 中获取已存储的设备ID
         let storedDeviceId = await AsyncStorage.getItem('device_id');
-        
+
         // 如果 AsyncStorage 中没有，尝试从备用存储中获取
         if (!storedDeviceId) {
           try {
@@ -137,13 +140,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             logger.warn("Failed to get device ID from localStorage:", localStorageError);
           }
         }
-        
+
         if (storedDeviceId) {
           deviceId = storedDeviceId;
         } else {
           // 如果没有存储的设备ID，生成一个新的
           let newDeviceId = '';
-          
+
           // 尝试多种方式获取设备标识符，确保稳定性
           try {
             // 1. 尝试使用 Constants 中的各种设备标识符
@@ -167,15 +170,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           } catch (innerError) {
             logger.warn("Failed to get device ID:", innerError);
           }
-          
+
           // 如果所有尝试都失败，使用随机数生成器创建一个唯一ID
           if (!newDeviceId) {
             newDeviceId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
           }
-          
+
           // 对设备ID进行处理，确保符合用户名要求
           newDeviceId = newDeviceId.replace(/[^a-zA-Z0-9]/g, '');
-          
+
           // 确保设备ID长度为6位
           if (newDeviceId.length > 6) {
             // 提取后6位
@@ -185,10 +188,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const padding = Math.floor(Math.random() * Math.pow(10, 6 - newDeviceId.length)).toString();
             newDeviceId = (newDeviceId + padding).padEnd(6, '0');
           }
-          
+
           // 确保设备ID只包含字母和数字，且长度为6位
           newDeviceId = newDeviceId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).padEnd(6, '0');
-          
+
           // 存储生成的设备ID，确保后续启动时使用相同的ID
           try {
             // 主存储：AsyncStorage
@@ -204,7 +207,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               logger.error("Failed to store device ID in localStorage:", localStorageError);
             }
           }
-          
+
           deviceId = newDeviceId;
         }
       } catch (error) {
@@ -212,21 +215,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // 如果获取设备ID失败，使用随机数作为备用方案
         deviceId = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
       }
-      
+
       // 最后再次验证设备ID格式，确保符合要求
       deviceId = deviceId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 6).padEnd(6, '0');
-      
+
       // 记录设备ID生成结果
       console.log("Generated device ID:", deviceId);
-      
+
       // 强制使用数据库模式，因为服务端存储类型是 kvrocks
       const forcedStorageType = "kvrocks";
       console.log("Forced storage type:", forcedStorageType);
-      
+
       // 根据存储类型生成登录凭证
       let username: string;
       let password: string;
-      
+
       if (forcedStorageType === "localstorage") {
         // localStorage 模式，只需要密码
         username = "";
@@ -236,9 +239,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         username = deviceId;
         password = `auto_${deviceId}`;
       }
-      
+
       console.log(`Attempting auto-register with username: ${username}, storage type: ${forcedStorageType}`);
-      
+
       // 先尝试登录，看看是否已经存在该账号
       try {
         const loginResponse = await api.login(username, password);
@@ -469,7 +472,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } catch (storageError) {
         logger.error("Failed to get login credentials:", storageError);
       }
-      
+
       if (credentials) {
         // 确保凭证中有用户名
         if (!credentials.username) {

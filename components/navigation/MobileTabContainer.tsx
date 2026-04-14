@@ -1,7 +1,8 @@
-import React from "react";
-import { View, StyleSheet, TouchableOpacity, Text, Platform } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { Home, Search, Heart, Settings, Tv } from "lucide-react-native";
+import React from "react";
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from "react-native";
+
 import { Colors } from "@/constants/Colors";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { DeviceUtils } from "@/utils/DeviceUtils";
@@ -9,7 +10,7 @@ import { DeviceUtils } from "@/utils/DeviceUtils";
 interface TabItem {
   key: string;
   label: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{}>;
   route: string;
 }
 
@@ -36,7 +37,7 @@ const MobileTabContainer: React.FC<MobileTabContainerProps> = ({ children }) => 
     if (route === "/") {
       router.push("/");
     } else {
-      router.push(route as any);
+      router.push(route);
     }
   };
 

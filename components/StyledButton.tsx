@@ -1,9 +1,11 @@
 import React, { forwardRef } from "react";
-import { Animated, Pressable, StyleSheet, StyleProp, ViewStyle, PressableProps, TextStyle, View, Platform } from "react-native";
-import { ThemedText } from "./ThemedText";
+import { Animated, Pressable, StyleSheet, type StyleProp, type ViewStyle, type PressableProps, type TextStyle, type View, Platform } from "react-native";
+
 import { Colors } from "@/constants/Colors";
 import { useButtonAnimation } from "@/hooks/useAnimation";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+
+import { ThemedText } from "./ThemedText";
 
 interface StyledButtonProps extends PressableProps {
   children?: React.ReactNode;

@@ -1,13 +1,13 @@
+import { Pause, Play, SkipForward, List, Tv, ArrowDownToDot, ArrowUpFromDot, Gauge, Link } from "lucide-react-native";
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
-import { Pause, Play, SkipForward, List, Tv, ArrowDownToDot, ArrowUpFromDot, Gauge, Link } from "lucide-react-native";
-import { ThemedText } from "@/components/ThemedText";
-import { MediaButton } from "@/components/MediaButton";
 
-import usePlayerStore from "@/stores/playerStore";
+import { MediaButton } from "@/components/MediaButton";
+import { ThemedText } from "@/components/ThemedText";
 import useDetailStore from "@/stores/detailStore";
-import { useSources } from "@/stores/sourceStore";
+import usePlayerStore from "@/stores/playerStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useSources } from "@/stores/sourceStore";
 
 interface PlayerControlsProps {
   showControls: boolean;
@@ -48,7 +48,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ showControls, se
   const hasNextEpisode = currentEpisodeIndex < (episodes.length || 0) - 1;
   const playSources = detail?.play_sources || [];
   const currentLineName = playSources.length > 0 && currentPlaySourceIndex < playSources.length ? playSources[currentPlaySourceIndex].name : "";
-  
+
   // 调试日志
   console.log('Detail:', detail);
   console.log('Play sources:', playSources);

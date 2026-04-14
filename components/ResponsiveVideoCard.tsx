@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { Star, Play } from "lucide-react-native";
-import { PlayRecordManager } from "@/services/storage";
-import { API } from "@/services/api";
+import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
+import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, Animated } from "react-native";
+
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { type API } from "@/services/api";
+import { PlayRecordManager } from "@/services/storage";
 import { DeviceUtils } from "@/utils/DeviceUtils";
 import Logger from '@/utils/Logger';
 
@@ -232,41 +233,41 @@ const ResponsiveVideoCard = forwardRef<View, VideoCardProps>(
             )}
 
             {rate && (
-              <View style={[styles.ratingContainer, { 
+              <View style={[styles.ratingContainer, {
                 top: responsiveConfig.spacing / 2,
-                right: responsiveConfig.spacing / 2 
+                right: responsiveConfig.spacing / 2
               }]}>
                 <Star size={responsiveConfig.deviceType === 'mobile' ? 10 : 12} color="#FFD700" fill="#FFD700" />
-                <ThemedText style={[styles.ratingText, { 
-                  fontSize: responsiveConfig.deviceType === 'mobile' ? 10 : 12 
+                <ThemedText style={[styles.ratingText, {
+                  fontSize: responsiveConfig.deviceType === 'mobile' ? 10 : 12
                 }]}>{rate}</ThemedText>
               </View>
             )}
             {year && (
-              <View style={[styles.yearBadge, { 
+              <View style={[styles.yearBadge, {
                 top: responsiveConfig.spacing / 2,
-                right: responsiveConfig.spacing / 2 
+                right: responsiveConfig.spacing / 2
               }]}>
-                <Text style={[styles.badgeText, { 
-                  fontSize: responsiveConfig.deviceType === 'mobile' ? 10 : 12 
+                <Text style={[styles.badgeText, {
+                  fontSize: responsiveConfig.deviceType === 'mobile' ? 10 : 12
                 }]}>{year}</Text>
               </View>
             )}
             {sourceName && (
-              <View style={[styles.sourceNameBadge, { 
+              <View style={[styles.sourceNameBadge, {
                 top: responsiveConfig.spacing / 2,
-                left: responsiveConfig.spacing / 2 
+                left: responsiveConfig.spacing / 2
               }]}>
-                <Text style={[styles.badgeText, { 
-                  fontSize: responsiveConfig.deviceType === 'mobile' ? 10 : 12 
+                <Text style={[styles.badgeText, {
+                  fontSize: responsiveConfig.deviceType === 'mobile' ? 10 : 12
                 }]}>{sourceName}</Text>
               </View>
             )}
           </View>
           <View style={dynamicStyles.infoContainer}>
-            <ThemedText 
+            <ThemedText
               numberOfLines={responsiveConfig.deviceType === 'mobile' ? 2 : 1}
-              style={{ 
+              style={{
                 fontSize: responsiveConfig.deviceType === 'mobile' ? 14 : 16,
                 lineHeight: responsiveConfig.deviceType === 'mobile' ? 18 : 20,
               }}
@@ -275,8 +276,8 @@ const ResponsiveVideoCard = forwardRef<View, VideoCardProps>(
             </ThemedText>
             {isContinueWatching && (
               <View style={styles.infoRow}>
-                <ThemedText style={[styles.continueLabel, { 
-                  fontSize: responsiveConfig.deviceType === 'mobile' ? 10 : 12 
+                <ThemedText style={[styles.continueLabel, {
+                  fontSize: responsiveConfig.deviceType === 'mobile' ? 10 : 12
                 }]}>
                   第{episodeIndex! + 1}集 已观看 {Math.round((progress || 0) * 100)}%
                 </ThemedText>

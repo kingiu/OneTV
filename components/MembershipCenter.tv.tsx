@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useState, useRef } from "react";
 import {
   View,
@@ -11,12 +12,12 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
-import useMembershipStore from "@/stores/membershipStore";
-import { useAuthStore } from "@/stores/authStore";
-import { useSettingsStore } from "@/stores/settingsStore";
+
 import { Colors } from "@/constants/Colors";
 import { useThemeColor } from "@/hooks/useThemeColor";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuthStore } from "@/stores/authStore";
+import useMembershipStore from "@/stores/membershipStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -28,32 +29,32 @@ const TVOS_CARD_ELEVATION = 10;
 const TVOS_SHADOW_OPACITY = 0.4;
 
 const MembershipCenter: React.FC = () => {
-  const { 
+  const {
     fetchMembershipInfo,
-    fetchUserCoupons, 
+    fetchUserCoupons,
     redeemCoupon,
     userCoupons,
     isLoadingCoupons,
     membershipInfo,
     isLoadingMembership
   } = useMembershipStore();
-  
+
   // 根据tierId获取会员等级名称
   const getMembershipLevelName = (tierId: string): string => {
     if (!membershipInfo?.config?.levels) {
       return '普通会员';
     }
-    
+
     const level = membershipInfo.config.levels.find(level => level.id === tierId);
     return level?.name || '普通会员';
   };
-  
+
   const { isLoggedIn, autoLogin } = useAuthStore();
   const { serverConfig } = useSettingsStore();
-  
+
   // 获取当前登录用户的用户名
   const [currentUsername, setCurrentUsername] = useState<string>('');
-  
+
   useEffect(() => {
     const getUsername = async () => {
       try {
@@ -66,21 +67,21 @@ const MembershipCenter: React.FC = () => {
         console.error('Failed to get username:', error);
       }
     };
-    
+
     getUsername();
   }, [isLoggedIn]);
-  
+
   const [couponCode, setCouponCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
-  
+
   // 动画值
   const inputScale = useRef(new Animated.Value(1)).current;
   const redeemButtonScale = useRef(new Animated.Value(1)).current;
-  
+
   const inputRef = useRef<TextInput>(null);
   const redeemButtonRef = useRef<TouchableOpacity>(null);
   const scrollViewRef = useRef<ScrollView>(null);
-  
+
   // 获取主题颜色
   const textColor = useThemeColor({}, 'text');
   const grayColor = useThemeColor({}, 'gray');
@@ -100,7 +101,7 @@ const MembershipCenter: React.FC = () => {
         fetchUserCoupons();
       }
     };
-    
+
     initMembership();
   }, [isLoggedIn, autoLogin, serverConfig, fetchMembershipInfo, fetchUserCoupons]);
 
@@ -185,9 +186,9 @@ const MembershipCenter: React.FC = () => {
       </View>
 
       {/* 内容区域 */}
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
-        style={styles.content} 
+        style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
@@ -195,7 +196,7 @@ const MembershipCenter: React.FC = () => {
           {/* 核心特权 */}
           <View style={styles.privilegesSection}>
             <Text style={[styles.sectionHeader, { color: textColor }]}>核心特权</Text>
-            
+
             <View style={styles.privilegeCard}>
               <View style={styles.privilegeIcon}>
                 <Text style={styles.privilegeIconText}>🎬</Text>
@@ -231,7 +232,7 @@ const MembershipCenter: React.FC = () => {
           {/* 卡券区域 */}
           <View style={styles.couponsSection}>
             <Text style={[styles.sectionHeader, { color: textColor }]}>我的卡券 (可用券)</Text>
-            
+
             {isLoadingCoupons ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#FFD700" />
@@ -246,7 +247,7 @@ const MembershipCenter: React.FC = () => {
                     <Text style={[styles.couponExpiry, { color: grayColor }]}>有效期至 {new Date(coupon.expireTime).toLocaleDateString()}</Text>
                   </View>
                   {coupon.status === 'active' ? (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.couponRedeemButton}
                       onPress={() => {
                         Alert.alert(

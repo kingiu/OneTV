@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system";
-import Logger from "@/utils/Logger";
+
 import { proxyService } from "@/services/proxyService";
+import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag("M3U");
 

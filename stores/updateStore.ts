@@ -1,8 +1,10 @@
-import { create } from 'zustand';
-import updateService from '../services/updateService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import { create } from 'zustand';
+
 import Logger from '@/utils/Logger';
+
+import updateService from '../services/updateService';
 
 const logger = Logger.withTag('UpdateStore');
 
@@ -20,7 +22,7 @@ interface UpdateState {
   skipVersion: string | null;
   showUpdateModal: boolean;
   isLatestVersion: boolean; // 新增：是否已是最新版本
-  
+
   // 操作
   checkForUpdate: (silent?: boolean) => Promise<void>;
   startDownload: () => Promise<void>;
@@ -57,10 +59,10 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
 
       // 获取跳过的版本
       const skipVersion = await AsyncStorage.getItem(STORAGE_KEYS.SKIP_VERSION);
-      
+
       const versionInfo = await updateService.checkVersion();
       const isUpdateAvailable = updateService.isUpdateAvailable(versionInfo.version);
-      
+
       // 如果有更新且不是要跳过的版本
       const shouldShowUpdate = isUpdateAvailable && versionInfo.version !== skipVersion;
 
@@ -94,7 +96,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       );
     } catch (error) {
       // console.info('检查更新失败:', error);
-      set({ 
+      set({
         error: error instanceof Error ? error.message : '检查更新失败',
         updateAvailable: false,
         isLatestVersion: false,
@@ -105,17 +107,17 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   // 开始下载
   startDownload: async () => {
     const { downloadUrl } = get();
-    
+
     if (!downloadUrl) {
       set({ error: '下载地址无效' });
       return;
     }
 
     try {
-      set({ 
-        downloading: true, 
-        downloadProgress: 0, 
-        error: null 
+      set({
+        downloading: true,
+        downloadProgress: 0,
+        error: null
       });
 
       const filePath = await updateService.downloadApk(
@@ -125,14 +127,14 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
         }
       );
 
-      set({ 
+      set({
         downloadedPath: filePath,
         downloading: false,
         downloadProgress: 100,
       });
     } catch (error) {
       // console.info('下载失败:', error);
-      set({ 
+      set({
         downloading: false,
         downloadProgress: 0,
         error: error instanceof Error ? error.message : '下载失败',
@@ -143,7 +145,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   // 安装更新
   installUpdate: async () => {
     const { downloadedPath } = get();
-    
+
     if (!downloadedPath) {
       set({ error: '安装文件不存在' });
       return;
@@ -155,7 +157,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       set({ showUpdateModal: false });
     } catch (error) {
       logger.error('安装失败:', error);
-      set({ 
+      set({
         error: error instanceof Error ? error.message : '安装失败',
       });
     }
@@ -169,10 +171,10 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
   // 跳过此版本
   skipThisVersion: async () => {
     const { remoteVersion } = get();
-    
+
     if (remoteVersion) {
       await AsyncStorage.setItem(STORAGE_KEYS.SKIP_VERSION, remoteVersion);
-      set({ 
+      set({
         skipVersion: remoteVersion,
         showUpdateModal: false,
       });
@@ -197,7 +199,7 @@ export const initUpdateStore = async () => {
   try {
     const lastCheckTime = await AsyncStorage.getItem(STORAGE_KEYS.LAST_CHECK_TIME);
     const skipVersion = await AsyncStorage.getItem(STORAGE_KEYS.SKIP_VERSION);
-    
+
     useUpdateStore.setState({
       lastCheckTime: lastCheckTime ? parseInt(lastCheckTime, 10) : 0,
       skipVersion: skipVersion || null,

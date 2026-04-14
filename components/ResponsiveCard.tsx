@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, type ViewStyle, TouchableOpacity } from 'react-native';
+
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 
 interface ResponsiveCardProps {

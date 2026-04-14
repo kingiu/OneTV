@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
-import { View, Text, Image, StyleSheet, Pressable, TouchableOpacity, Alert, Animated, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { Star, Play } from "lucide-react-native";
-import { PlayRecordManager } from "@/services/storage";
-import { API } from "@/services/api";
+import React, { useState, useEffect, useCallback, useRef, forwardRef } from "react";
+import { View, Text, Image, StyleSheet, Pressable, type TouchableOpacity, Alert, Animated, Platform } from "react-native";
+
 import { ThemedText } from "@/components/ThemedText";
 import { Colors } from "@/constants/Colors";
-import Logger from '@/utils/Logger';
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { type API } from "@/services/api";
+import { PlayRecordManager } from "@/services/storage";
+import Logger from '@/utils/Logger';
 
 const logger = Logger.withTag('VideoCardTV');
 

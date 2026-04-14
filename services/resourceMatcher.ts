@@ -115,7 +115,7 @@ export class ResourceMatcher {
    */
   extractMetadata(result: SearchResult): VideoMetadata {
     // 处理极速资源的标题格式
-    let processedTitle = result.title || '';
+    const processedTitle = result.title || '';
     // 不再移除标题中的年份信息，因为这会影响匹配准确性
 
     const metadata: VideoMetadata = {
@@ -147,7 +147,7 @@ export class ResourceMatcher {
    */
   normalizeTitle(title: string): string {
     if (!title) return '';
-    
+
     // 移除特殊字符和多余空格
     let normalized = title.trim()
       .replace(/\s+/g, ' ')
@@ -209,19 +209,19 @@ export class ResourceMatcher {
   generateSearchVariants(query: string): string[] {
     const trimmed = query.trim();
     const variants: string[] = [trimmed];
-    
+
     // 1. 智能检测：数字变体（最高优先级的变体）
     const numberVariant = this.generateNumberVariant(trimmed);
     if (numberVariant && numberVariant !== trimmed) {
       variants.push(numberVariant);
     }
-    
+
     // 2. 智能检测：中文标点变体（冒号等）
     const punctuationVariant = this.generatePunctuationVariant(trimmed);
     if (punctuationVariant && punctuationVariant !== trimmed) {
       variants.push(punctuationVariant);
     }
-    
+
     // 3. 智能检测：空格变体（多词搜索）
     if (trimmed.includes(' ')) {
       const keywords = trimmed.split(/\s+/);
@@ -237,7 +237,7 @@ export class ResourceMatcher {
         if (noSpaces !== trimmed) variants.push(noSpaces);
       }
     }
-    
+
     // 4. 繁体检测：如果是繁体输入，添加简体变体
     const detectedType = converter.detect(trimmed);
     if (detectedType !== ChineseType.SIMPLIFIED) {
@@ -246,7 +246,7 @@ export class ResourceMatcher {
         variants.push(simplified);
       }
     }
-    
+
     // 5. 年份处理：如果查询包含年份，添加不含年份的变体
     const yearMatch = trimmed.match(/\s*(19|20)\d{2}\s*$/);
     if (yearMatch) {
@@ -255,7 +255,7 @@ export class ResourceMatcher {
         variants.push(withoutYear);
       }
     }
-    
+
     // 6. 年份处理：如果查询不含年份，尝试添加常见年份变体（最近5年）
     if (!yearMatch) {
       const currentYear = new Date().getFullYear();
@@ -265,7 +265,7 @@ export class ResourceMatcher {
         variants.push(withYear);
       }
     }
-    
+
     // 7. 移除重复变体
     return Array.from(new Set(variants));
   }
@@ -316,7 +316,7 @@ export class ResourceMatcher {
    */
   private generatePunctuationVariant(query: string): string {
     let variant = query;
-    
+
     // 中文冒号 → 空格
     if (variant.includes('：')) {
       variant = variant.replace(/：/g, ' ');
@@ -343,7 +343,7 @@ export class ResourceMatcher {
    */
   private generateSynonymVariant(query: string): string {
     let variant = query;
-    
+
     // 替换常见同义词
     Object.entries(SYNONYMS).forEach(([key, synonyms]) => {
       synonyms.forEach(synonym => {
@@ -518,8 +518,13 @@ export class ResourceMatcher {
     }).filter(result => result.score > 10) // 降低阈值，获取更多相关结果
       .filter(result => {
         // 检查是否有剧集或播放源
+        interface PlaySource {
+          episodes?: string[];
+          [key: string]: unknown;
+        }
+
         const hasEpisodes = result.result.episodes && result.result.episodes.length > 0;
-        const hasPlaySources = result.result.play_sources && result.result.play_sources.some((ps: any) => 
+        const hasPlaySources = result.result.play_sources && result.result.play_sources.some((ps: PlaySource) =>
           ps.episodes && ps.episodes.length > 0
         );
         return hasEpisodes || hasPlaySources;
@@ -529,21 +534,21 @@ export class ResourceMatcher {
         if (b.score !== a.score) {
           return b.score - a.score;
         }
-        
+
         // 分数相同时，按年份倒序（新的在前）
         const yearA = parseInt(a.metadata.year || '0');
         const yearB = parseInt(b.metadata.year || '0');
         if (yearB !== yearA) {
           return yearB - yearA;
         }
-        
+
         // 年份也相同时，按来源可靠性排序
         const sourceScoreA = this.getSourceScore(a.metadata.source || '');
         const sourceScoreB = this.getSourceScore(b.metadata.source || '');
         if (sourceScoreB !== sourceScoreA) {
           return sourceScoreB - sourceScoreA;
         }
-        
+
         // 最后按标题长度排序（短的在前，更精确）
         return a.metadata.title.length - b.metadata.title.length;
       });

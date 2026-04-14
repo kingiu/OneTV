@@ -1,4 +1,4 @@
-import { StyleSheet, ViewStyle, TextStyle, ImageStyle } from 'react-native';
+import { StyleSheet, type ViewStyle, type TextStyle, type ImageStyle } from 'react-native';
 
 import { useResponsiveLayout, type ResponsiveConfig } from '@/hooks/useResponsiveLayout';
 import { DeviceUtils } from '@/utils/DeviceUtils';

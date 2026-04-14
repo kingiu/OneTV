@@ -5,20 +5,20 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useRef } from "react";
 import { useState } from "react";
 import { Platform, View, StyleSheet } from "react-native";
-import Toast from "react-native-toast-message";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
 
-import { useSettingsStore } from "@/stores/settingsStore";
-import { useRemoteControlStore } from "@/stores/remoteControlStore";
 import LoginModal from "@/components/LoginModal";
-import { useAuthStore } from "@/stores/authStore";
-import { useUpdateStore, initUpdateStore } from "@/stores/updateStore";
+import { SessionTracker } from "@/components/SessionTracker";
 import { UpdateModal } from "@/components/UpdateModal";
 import { UPDATE_CONFIG } from "@/constants/UpdateConfig";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
-import Logger from "@/utils/Logger";
 import { api } from "@/services/api";
-import { SessionTracker } from "@/components/SessionTracker";
+import { useAuthStore } from "@/stores/authStore";
+import { useRemoteControlStore } from "@/stores/remoteControlStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { useUpdateStore, initUpdateStore } from "@/stores/updateStore";
+import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag("RootLayout");
 

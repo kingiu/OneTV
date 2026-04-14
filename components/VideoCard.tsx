@@ -1,7 +1,8 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { type TouchableOpacity } from 'react-native';
+
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
-import { API } from '@/services/api';
+import { type API } from '@/services/api';
 
 // 导入不同平台的VideoCard组件
 import VideoCardMobile from './VideoCard.mobile';
@@ -31,19 +32,19 @@ interface VideoCardProps extends React.ComponentProps<typeof TouchableOpacity> {
  * 响应式VideoCard组件
  * 根据设备类型自动选择合适的VideoCard实现
  */
-const VideoCard = React.forwardRef<any, VideoCardProps>((props, ref) => {
+const VideoCard = React.forwardRef<TouchableOpacity, VideoCardProps>((props, ref) => {
   const { deviceType } = useResponsiveLayout();
 
   switch (deviceType) {
-    case 'mobile':
-      return <VideoCardMobile {...props} ref={ref} />;
-    
-    case 'tablet':
-      return <VideoCardTablet {...props} ref={ref} />;
-    
-    case 'tv':
-    default:
-      return <VideoCardTV {...props} ref={ref} />;
+  case 'mobile':
+    return <VideoCardMobile {...props} ref={ref} />;
+
+  case 'tablet':
+    return <VideoCardTablet {...props} ref={ref} />;
+
+  case 'tv':
+  default:
+    return <VideoCardTV {...props} ref={ref} />;
   }
 });
 

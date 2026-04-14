@@ -1,5 +1,7 @@
 import { create } from "zustand";
+
 import { useSettingsStore } from "@/stores/settingsStore";
+
 import useDetailStore, { sourcesSelector } from "./detailStore";
 
 interface SourceState {

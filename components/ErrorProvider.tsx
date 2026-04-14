@@ -79,7 +79,12 @@ interface ErrorModalProps {
 }
 
 function ErrorModal({ visible, message, details, type, onClose }: ErrorModalProps) {
-  useTVEventHandler((event: any) => {
+  interface TVEvent {
+    eventType: string;
+    [key: string]: unknown;
+  }
+
+  useTVEventHandler((event: TVEvent) => {
     if (event.eventType === 'select' || event.eventType === 'back') {
       onClose();
     }
@@ -89,37 +94,37 @@ function ErrorModal({ visible, message, details, type, onClose }: ErrorModalProp
 
   const getIcon = () => {
     switch (type) {
-      case 'success':
-        return '✓';
-      case 'warning':
-        return '⚠';
-      case 'error':
-      default:
-        return '✕';
+    case 'success':
+      return '✓';
+    case 'warning':
+      return '⚠';
+    case 'error':
+    default:
+      return '✕';
     }
   };
 
   const getBackgroundColor = () => {
     switch (type) {
-      case 'success':
-        return 'rgba(0, 200, 83, 0.1)';
-      case 'warning':
-        return 'rgba(255, 160, 0, 0.1)';
-      case 'error':
-      default:
-        return 'rgba(255, 82, 82, 0.1)';
+    case 'success':
+      return 'rgba(0, 200, 83, 0.1)';
+    case 'warning':
+      return 'rgba(255, 160, 0, 0.1)';
+    case 'error':
+    default:
+      return 'rgba(255, 82, 82, 0.1)';
     }
   };
 
   const getBorderColor = () => {
     switch (type) {
-      case 'success':
-        return '#00C853';
-      case 'warning':
-        return '#FFA000';
-      case 'error':
-      default:
-        return '#FF5252';
+    case 'success':
+      return '#00C853';
+    case 'warning':
+      return '#FFA000';
+    case 'error':
+    default:
+      return '#FF5252';
     }
   };
 

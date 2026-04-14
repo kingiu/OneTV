@@ -1,6 +1,7 @@
-import React, { ComponentProps } from "react";
-import { StyledButton } from "./StyledButton";
+import React, { type ComponentProps } from "react";
 import { StyleSheet, View, Text } from "react-native";
+
+import { StyledButton } from "./StyledButton";
 
 type StyledButtonProps = ComponentProps<typeof StyledButton> & {
   timeLabel?: string;

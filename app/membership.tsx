@@ -1,10 +1,11 @@
 import React from "react";
 import { View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
-import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
-import MembershipInfo from "@/components/MembershipInfo";
+
 import CouponManager from "@/components/CouponManager";
 import MembershipCenterTV from "@/components/MembershipCenter.tv";
+import MembershipInfo from "@/components/MembershipInfo";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 
 const MembershipScreen: React.FC = () => {

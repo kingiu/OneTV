@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
-import { TextInput, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { TextInput, View, StyleSheet, type ViewStyle, type TextStyle } from 'react-native';
+
 import { ThemedText } from '@/components/ThemedText';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { DeviceUtils } from '@/utils/DeviceUtils';
@@ -49,7 +50,7 @@ const ResponsiveTextInput = forwardRef<TextInput, ResponsiveTextInputProps>(
         {label && (
           <ThemedText style={dynamicStyles.label}>{label}</ThemedText>
         )}
-        
+
         <View style={[
           dynamicStyles.inputContainer,
           error ? dynamicStyles.errorContainer : undefined,

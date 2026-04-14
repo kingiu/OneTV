@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect } from 'react';
+
 import { api } from '../services/api';
 
 /**
@@ -13,10 +14,10 @@ export function SessionTracker() {
         // 获取认证信息
         const credentialsStr = await AsyncStorage.getItem('mytv_login_credentials');
         const authInfo = credentialsStr ? JSON.parse(credentialsStr) : null;
-        
+
         if (authInfo) {
           console.log('检查认证状态...');
-          
+
           // 验证认证状态
           try {
             // 使用公开的API方法来检查认证状态
@@ -30,7 +31,7 @@ export function SessionTracker() {
                 ...(authInfo.timestamp && { 'X-Auth-Timestamp': authInfo.timestamp.toString() }),
               },
             });
-            
+
             if (response.status === 401) {
               console.log('认证已过期，需要重新登录');
               // 清除认证信息

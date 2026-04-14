@@ -1,16 +1,17 @@
 import React, { useEffect } from "react";
 import { View, StyleSheet } from "react-native";
-import { ThemedView } from "@/components/ThemedView";
-import { ThemedText } from "@/components/ThemedText";
-import useFavoritesStore from "@/stores/favoritesStore";
-import { Favorite } from "@/services/storage";
-import VideoCard from "@/components/VideoCard";
-import { api } from "@/services/api";
+
 import CustomScrollView from "@/components/CustomScrollView";
-import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
-import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
-import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
 import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
+import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import VideoCard from "@/components/VideoCard";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { api } from "@/services/api";
+import { type Favorite } from "@/services/storage";
+import useFavoritesStore from "@/stores/favoritesStore";
+import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 
 export default function FavoritesScreen() {
   const { favorites, loading, error, fetchFavorites } = useFavoritesStore();

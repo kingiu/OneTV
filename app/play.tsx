@@ -1,29 +1,31 @@
-import React, { useEffect, useRef, useCallback, memo, useMemo } from "react";
-import { StyleSheet, TouchableOpacity, BackHandler, AppState, AppStateStatus, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import { Video } from "expo-av";
 import { useKeepAwake } from "expo-keep-awake";
-import { ThemedView } from "@/components/ThemedView";
-import { PlayerControls } from "@/components/PlayerControls";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useRef, useCallback, memo, useMemo } from "react";
+import { StyleSheet, TouchableOpacity, BackHandler, AppState, type AppStateStatus, View } from "react-native";
+import { type ViewStyle, type StyleProp } from 'react-native';
+import Toast from "react-native-toast-message";
+
 import { EpisodeSelectionModal } from "@/components/EpisodeSelectionModal";
+import { PlayerControls } from "@/components/PlayerControls";
+import { SeekingBar } from "@/components/SeekingBar";
 import { SourceSelectionModal } from "@/components/SourceSelectionModal";
 import { SpeedSelectionModal } from "@/components/SpeedSelectionModal";
-import { SeekingBar } from "@/components/SeekingBar";
+import { ThemedView } from "@/components/ThemedView";
 // import { NextEpisodeOverlay } from "@/components/NextEpisodeOverlay";
 import VideoLoadingAnimation from "@/components/VideoLoadingAnimation";
-import useDetailStore from "@/stores/detailStore";
-import { useTVRemoteHandler } from "@/hooks/useTVRemoteHandler";
-import Toast from "react-native-toast-message";
-import usePlayerStore, { selectCurrentEpisode } from "@/stores/playerStore";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import { useTVRemoteHandler } from "@/hooks/useTVRemoteHandler";
 import { useVideoHandlers } from "@/hooks/useVideoHandlers";
+import useDetailStore from "@/stores/detailStore";
+import usePlayerStore, { selectCurrentEpisode } from "@/stores/playerStore";
 import Logger from '@/utils/Logger';
 
 const logger = Logger.withTag('PlayScreen');
 
 // 优化的加载动画组件
 const LoadingContainer = memo(
-  ({ style, currentEpisode }: { style: any; currentEpisode: { url: string; title: string } | undefined }) => {
+  ({ style, currentEpisode }: { style: StyleProp<ViewStyle>; currentEpisode: { url: string; title: string } | undefined }) => {
     logger.info(
       `[PERF] Video component NOT rendered - waiting for valid URL. currentEpisode: ${!!currentEpisode}, url: ${
         currentEpisode?.url ? "exists" : "missing"

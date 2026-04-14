@@ -1,13 +1,15 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useState, useRef, useEffect } from "react";
 import { Modal, View, TextInput, StyleSheet, ActivityIndicator, Keyboard, TouchableOpacity } from "react-native";
 import Toast from "react-native-toast-message";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { api } from "@/services/api";
 import useAuthStore from "@/stores/authStore";
 import useMembershipStore from "@/stores/membershipStore";
-import { api } from "@/services/api";
-import { ThemedView } from "./ThemedView";
-import { ThemedText } from "./ThemedText";
+
 import { StyledButton } from "./StyledButton";
+import { ThemedText } from "./ThemedText";
+import { ThemedView } from "./ThemedView";
 
 const CardLoginModal = () => {
   const { isLoginModalVisible, hideLoginModal, setLoginMode, setLoginStatus } = useAuthStore();
@@ -59,20 +61,20 @@ const CardLoginModal = () => {
       Toast.show({ type: "error", text1: "请输入卡券代码" });
       return;
     }
-    
+
     setIsLoading(true);
     try {
       console.log('开始卡券登录流程，卡券代码:', couponCode.trim());
-      
+
       // 使用专门的卡券登录API
       const result = await api.cardLogin(couponCode.trim());
-      
+
       if (result.success) {
         console.log('卡券登录成功:', result);
-        Toast.show({ 
-          type: "success", 
+        Toast.show({
+          type: "success",
           text1: "卡券登录成功",
-          text2: result.message 
+          text2: result.message
         });
         // 卡券登录成功后，保存用户名到本地存储
         if (result.username) {
@@ -88,16 +90,16 @@ const CardLoginModal = () => {
         Keyboard.dismiss();
       } else {
         console.log('卡券登录失败:', result);
-        Toast.show({ 
-          type: "error", 
+        Toast.show({
+          type: "error",
           text1: "卡券登录失败",
-          text2: result.message 
+          text2: result.message
         });
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "请检查网络连接";
       console.error('卡券登录异常:', error);
-      
+
       let displayMessage = errorMessage;
       if (errorMessage === "UNAUTHORIZED") {
         displayMessage = "卡券代码无效或已过期";
@@ -106,11 +108,11 @@ const CardLoginModal = () => {
       } else if (errorMessage.includes("Network")) {
         displayMessage = "网络连接失败，请检查网络设置";
       }
-      
-      Toast.show({ 
-        type: "error", 
+
+      Toast.show({
+        type: "error",
         text1: "卡券登录失败",
-        text2: displayMessage 
+        text2: displayMessage
       });
     } finally {
       setIsLoading(false);
@@ -128,7 +130,7 @@ const CardLoginModal = () => {
         <ThemedView style={styles.container}>
           <ThemedText style={styles.title}>卡券登录</ThemedText>
           <ThemedText style={styles.subtitle}>使用卡券代码兑换会员权限</ThemedText>
-          
+
           <TextInput
             ref={couponInputRef}
             style={styles.input}
@@ -140,7 +142,7 @@ const CardLoginModal = () => {
             onSubmitEditing={handleRedeemCoupon}
             autoCapitalize="characters"
           />
-          
+
           <StyledButton
             text={isLoading ? "" : "兑换卡券"}
             onPress={handleRedeemCoupon}
@@ -150,7 +152,7 @@ const CardLoginModal = () => {
           >
             {isLoading && <ActivityIndicator color="#fff" />}
           </StyledButton>
-          
+
           <ThemedText style={styles.hint}>
             卡券代码区分大小写，请确保输入正确
           </ThemedText>

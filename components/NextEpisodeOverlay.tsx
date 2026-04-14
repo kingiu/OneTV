@@ -1,6 +1,8 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
+
 import { ThemedText } from "@/components/ThemedText";
+
 import { StyledButton } from "./StyledButton";
 
 interface NextEpisodeOverlayProps {

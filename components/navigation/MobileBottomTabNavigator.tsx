@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Home, Search, Heart, Settings, Tv, User } from 'lucide-react-native';
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
+
 import { Colors } from '@/constants/Colors';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { DeviceUtils } from '@/utils/DeviceUtils';
@@ -9,7 +10,7 @@ import { DeviceUtils } from '@/utils/DeviceUtils';
 interface TabItem {
   key: string;
   label: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{}>;
   route: string;
 }
 
@@ -26,17 +27,17 @@ const MobileBottomTabNavigator: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const { spacing, deviceType } = useResponsiveLayout();
-  
+
   // 在手机端过滤掉直播 tab
-  const filteredTabs = tabs.filter(tab => 
+  const filteredTabs = tabs.filter(tab =>
     deviceType !== 'mobile' || tab.key !== 'live'
   );
-  
+
   const handleTabPress = (route: string) => {
     if (route === '/') {
       router.push('/');
     } else {
-      router.push(route as any);
+      router.push(route);
     }
   };
 
@@ -53,7 +54,7 @@ const MobileBottomTabNavigator: React.FC = () => {
       {filteredTabs.map((tab) => {
         const isActive = isTabActive(tab.route);
         const IconComponent = tab.icon;
-        
+
         return (
           <TouchableOpacity
             key={tab.key}
@@ -81,7 +82,7 @@ const MobileBottomTabNavigator: React.FC = () => {
 
 const createStyles = (spacing: number) => {
   const minTouchTarget = DeviceUtils.getMinTouchTargetSize();
-  
+
   return StyleSheet.create({
     container: {
       flexDirection: 'row',

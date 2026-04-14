@@ -1,9 +1,10 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, StyleSheet, type ViewStyle, type TextStyle } from 'react-native';
+
 import { ThemedText } from '@/components/ThemedText';
+import { Colors } from '@/constants/Colors';
 import { useResponsiveLayout } from '@/hooks/useResponsiveLayout';
 import { DeviceUtils } from '@/utils/DeviceUtils';
-import { Colors } from '@/constants/Colors';
 
 interface ResponsiveButtonProps {
   title: string;
@@ -76,7 +77,7 @@ const createResponsiveStyles = (deviceType: string, spacing: number) => {
       paddingVertical: spacing * 0.75,
       minHeight: isMobile ? minTouchTarget : isTablet ? 48 : 44,
     },
-    
+
     // Variants
     primary: {
       backgroundColor: Colors.dark.primary,
@@ -131,7 +132,7 @@ const createResponsiveStyles = (deviceType: string, spacing: number) => {
     ghostText: {
       color: '#ccc',
     },
-    
+
     // Text sizes
     smallText: {
       fontSize: isMobile ? 14 : 12,

@@ -1,16 +1,17 @@
+import { FontAwesome } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect } from "react";
 import { View, StyleSheet, Image, ScrollView, ActivityIndicator } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { ThemedView } from "@/components/ThemedView";
-import { ThemedText } from "@/components/ThemedText";
-import { StyledButton } from "@/components/StyledButton";
-import VideoLoadingAnimation from "@/components/VideoLoadingAnimation";
-import useDetailStore from "@/stores/detailStore";
-import { FontAwesome } from "@expo/vector-icons";
-import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
-import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
-import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
+
 import ResponsiveHeader from "@/components/navigation/ResponsiveHeader";
+import ResponsiveNavigation from "@/components/navigation/ResponsiveNavigation";
+import { StyledButton } from "@/components/StyledButton";
+import { ThemedText } from "@/components/ThemedText";
+import { ThemedView } from "@/components/ThemedView";
+import VideoLoadingAnimation from "@/components/VideoLoadingAnimation";
+import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
+import useDetailStore from "@/stores/detailStore";
+import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
 
 export default function DetailScreen() {
   const { q, source, id, year, doubanId } = useLocalSearchParams<{ q: string; source?: string; id?: string; year?: string; doubanId?: string }>();
