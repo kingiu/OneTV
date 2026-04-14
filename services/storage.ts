@@ -22,6 +22,7 @@ export interface PlayerSettings {
   introEndTime?: number;
   outroStartTime?: number;
   playbackRate?: number;
+  videoQuality?: 'high' | 'medium' | 'low';
 }
 
 export interface AppSettings {
@@ -62,16 +63,31 @@ export interface LiveFavorite {
 // --- Helper ---
 const generateKey = (source: string, id: string) => `${source}+${id}`;
 
+/**
+ * 安全的存储操作函数，处理存储操作中的错误
+ * @param operation 存储操作函数
+ * @param fallback 出错时的默认返回值
+ * @returns 存储操作的结果或默认值
+ */
+export const safeStorageOperation = async <T>(
+  operation: () => Promise<T>,
+  fallback: T
+): Promise<T> => {
+  try {
+    return await operation();
+  } catch (error) {
+    logger.error(`Storage operation failed: ${error}`);
+    return fallback;
+  }
+};
+
 // --- PlayerSettingsManager (Uses AsyncStorage) ---
 export class PlayerSettingsManager {
   static async getAll(): Promise<Record<string, PlayerSettings>> {
-    try {
+    return safeStorageOperation(async () => {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.PLAYER_SETTINGS);
       return data ? JSON.parse(data) : {};
-    } catch (error) {
-      logger.info("Failed to get all player settings:", error);
-      return {};
-    }
+    }, {});
   }
 
   static async get(source: string, id: string): Promise<PlayerSettings | null> {
@@ -90,30 +106,36 @@ export class PlayerSettingsManager {
   }
 
   static async save(source: string, id: string, settings: PlayerSettings): Promise<void> {
-    const allSettings = await this.getAll();
-    const key = generateKey(source, id);
-    // Only save if there are actual values to save
-    if (
-      settings.introEndTime !== undefined ||
-      settings.outroStartTime !== undefined ||
-      settings.playbackRate !== undefined
-    ) {
-      allSettings[key] = { ...allSettings[key], ...settings };
-    } else {
-      // If all are undefined, remove the key
-      delete allSettings[key];
-    }
-    await AsyncStorage.setItem(STORAGE_KEYS.PLAYER_SETTINGS, JSON.stringify(allSettings));
+    await safeStorageOperation(async () => {
+      const allSettings = await this.getAll();
+      const key = generateKey(source, id);
+      // Only save if there are actual values to save
+      if (
+        settings.introEndTime !== undefined ||
+        settings.outroStartTime !== undefined ||
+        settings.playbackRate !== undefined
+      ) {
+        allSettings[key] = { ...allSettings[key], ...settings };
+      } else {
+        // If all are undefined, remove the key
+        delete allSettings[key];
+      }
+      await AsyncStorage.setItem(STORAGE_KEYS.PLAYER_SETTINGS, JSON.stringify(allSettings));
+    }, undefined);
   }
 
   static async remove(source: string, id: string): Promise<void> {
-    const allSettings = await this.getAll();
-    delete allSettings[generateKey(source, id)];
-    await AsyncStorage.setItem(STORAGE_KEYS.PLAYER_SETTINGS, JSON.stringify(allSettings));
+    await safeStorageOperation(async () => {
+      const allSettings = await this.getAll();
+      delete allSettings[generateKey(source, id)];
+      await AsyncStorage.setItem(STORAGE_KEYS.PLAYER_SETTINGS, JSON.stringify(allSettings));
+    }, undefined);
   }
 
   static async clearAll(): Promise<void> {
-    await AsyncStorage.removeItem(STORAGE_KEYS.PLAYER_SETTINGS);
+    await safeStorageOperation(async () => {
+      await AsyncStorage.removeItem(STORAGE_KEYS.PLAYER_SETTINGS);
+    }, undefined);
   }
 }
 
@@ -159,13 +181,11 @@ export class FavoriteManager {
     const storageType = this.getStorageType();
 
     // 始终保存到本地存储，确保收藏能够显示
-    try {
+    await safeStorageOperation(async () => {
       const allFavorites = await this.getAllLocal();
       allFavorites[key] = { ...item, save_time: Date.now() };
       await AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(allFavorites));
-    } catch (error) {
-      logger.info("Failed to save favorite to local storage:", error);
-    }
+    }, undefined);
 
     // 如果存储类型不是本地存储，也尝试保存到 API
     if (storageType && storageType !== "localstorage") {
@@ -179,13 +199,10 @@ export class FavoriteManager {
 
   // 从本地存储获取所有收藏
   static async getAllLocal(): Promise<Record<string, Favorite>> {
-    try {
+    return safeStorageOperation(async () => {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
       return data ? JSON.parse(data) : {};
-    } catch (error) {
-      logger.info("Failed to get all local favorites:", error);
-      return {};
-    }
+    }, {});
   }
 
   static async remove(source: string, id: string): Promise<void> {
@@ -193,12 +210,18 @@ export class FavoriteManager {
     const storageType = this.getStorageType();
     // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
     if (!storageType || storageType === "localstorage") {
-      const allFavorites = await this.getAll();
-      delete allFavorites[key];
-      await AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(allFavorites));
+      await safeStorageOperation(async () => {
+        const allFavorites = await this.getAll();
+        delete allFavorites[key];
+        await AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(allFavorites));
+      }, undefined);
       return;
     }
-    await api.deleteFavorite(key);
+    try {
+      await api.deleteFavorite(key);
+    } catch (error) {
+      logger.info("Failed to delete favorite from API:", error);
+    }
   }
 
   static async isFavorited(source: string, id: string): Promise<boolean> {
@@ -228,23 +251,26 @@ export class FavoriteManager {
     const storageType = this.getStorageType();
     // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
     if (!storageType || storageType === "localstorage") {
-      await AsyncStorage.removeItem(STORAGE_KEYS.FAVORITES);
+      await safeStorageOperation(async () => {
+        await AsyncStorage.removeItem(STORAGE_KEYS.FAVORITES);
+      }, undefined);
       return;
     }
-    await api.deleteFavorite();
+    try {
+      await api.deleteFavorite();
+    } catch (error) {
+      logger.info("Failed to clear all favorites from API:", error);
+    }
   }
 }
 
 // --- LiveFavoriteManager (Uses AsyncStorage) ---
 export class LiveFavoriteManager {
   static async getAll(): Promise<Record<string, LiveFavorite>> {
-    try {
+    return safeStorageOperation(async () => {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.LIVE_FAVORITES);
       return data ? JSON.parse(data) : {};
-    } catch (error) {
-      logger.info("Failed to get live favorites:", error);
-      return {};
-    }
+    }, {});
   }
 
   static async getBySource(source: string): Promise<Record<string, LiveFavorite>> {
@@ -258,15 +284,19 @@ export class LiveFavoriteManager {
   }
 
   static async save(source: string, channelId: string, item: Omit<LiveFavorite, "save_time">): Promise<void> {
-    const allFavorites = await this.getAll();
-    allFavorites[generateKey(source, channelId)] = { ...item, save_time: Date.now() };
-    await AsyncStorage.setItem(STORAGE_KEYS.LIVE_FAVORITES, JSON.stringify(allFavorites));
+    await safeStorageOperation(async () => {
+      const allFavorites = await this.getAll();
+      allFavorites[generateKey(source, channelId)] = { ...item, save_time: Date.now() };
+      await AsyncStorage.setItem(STORAGE_KEYS.LIVE_FAVORITES, JSON.stringify(allFavorites));
+    }, undefined);
   }
 
   static async remove(source: string, channelId: string): Promise<void> {
-    const allFavorites = await this.getAll();
-    delete allFavorites[generateKey(source, channelId)];
-    await AsyncStorage.setItem(STORAGE_KEYS.LIVE_FAVORITES, JSON.stringify(allFavorites));
+    await safeStorageOperation(async () => {
+      const allFavorites = await this.getAll();
+      delete allFavorites[generateKey(source, channelId)];
+      await AsyncStorage.setItem(STORAGE_KEYS.LIVE_FAVORITES, JSON.stringify(allFavorites));
+    }, undefined);
   }
 
   static async toggle(source: string, channelId: string, item: Omit<LiveFavorite, "save_time">): Promise<boolean> {
@@ -280,7 +310,9 @@ export class LiveFavoriteManager {
   }
 
   static async clearAll(): Promise<void> {
-    await AsyncStorage.removeItem(STORAGE_KEYS.LIVE_FAVORITES);
+    await safeStorageOperation(async () => {
+      await AsyncStorage.removeItem(STORAGE_KEYS.LIVE_FAVORITES);
+    }, undefined);
   }
 }
 
@@ -366,7 +398,7 @@ export class PlayRecordManager {
     await PlayerSettingsManager.save(source, id, { introEndTime, outroStartTime });
 
     // 始终保存到本地存储，确保播放记录能够显示
-    try {
+    await safeStorageOperation(async () => {
       // 直接从本地存储获取播放记录，避免 API 数据覆盖本地数据
       const data = await AsyncStorage.getItem(STORAGE_KEYS.PLAY_RECORDS);
       const allRecords = data ? JSON.parse(data) : {};
@@ -374,9 +406,7 @@ export class PlayRecordManager {
       allRecords[key] = { ...allRecords[key], ...fullRecord };
       await AsyncStorage.setItem(STORAGE_KEYS.PLAY_RECORDS, JSON.stringify(allRecords));
       logger.info(`[DEBUG] PlayRecordManager.save SUCCESS - saved to local storage, total records: ${Object.keys(allRecords).length}`);
-    } catch (error) {
-      logger.info("Failed to save play record to local storage:", error);
-    }
+    }, undefined);
 
     // 如果存储类型不是本地存储，也尝试保存到 API
     const storageType = this.getStorageType();
@@ -414,9 +444,11 @@ export class PlayRecordManager {
     const storageType = this.getStorageType();
     // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
     if (!storageType || storageType === "localstorage") {
-      const allRecords = await this.getAll();
-      delete allRecords[key];
-      await AsyncStorage.setItem(STORAGE_KEYS.PLAY_RECORDS, JSON.stringify(allRecords));
+      await safeStorageOperation(async () => {
+        const allRecords = await this.getAll();
+        delete allRecords[key];
+        await AsyncStorage.setItem(STORAGE_KEYS.PLAY_RECORDS, JSON.stringify(allRecords));
+      }, undefined);
     } else {
       try {
         await api.deletePlayRecord(key);
@@ -432,7 +464,9 @@ export class PlayRecordManager {
     const storageType = this.getStorageType();
     // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
     if (!storageType || storageType === "localstorage") {
-      await AsyncStorage.removeItem(STORAGE_KEYS.PLAY_RECORDS);
+      await safeStorageOperation(async () => {
+        await AsyncStorage.removeItem(STORAGE_KEYS.PLAY_RECORDS);
+      }, undefined);
     } else {
       try {
         await api.deletePlayRecord();
@@ -453,15 +487,17 @@ export class SearchHistoryManager {
     const storageType = this.getStorageType();
     // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
     if (!storageType || storageType === "localstorage") {
-      try {
+      return safeStorageOperation(async () => {
         const data = await AsyncStorage.getItem(STORAGE_KEYS.SEARCH_HISTORY);
         return data ? JSON.parse(data) : [];
-      } catch (error) {
-        logger.info("Failed to get local search history:", error);
-        return [];
-      }
+      }, []);
     }
-    return api.getSearchHistory();
+    try {
+      return await api.getSearchHistory();
+    } catch (error) {
+      logger.info("Failed to get search history from API:", error);
+      return [];
+    }
   }
 
   static async add(keyword: string): Promise<void> {
@@ -471,22 +507,34 @@ export class SearchHistoryManager {
     const storageType = this.getStorageType();
     // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
     if (!storageType || storageType === "localstorage") {
-      let history = await this.get();
-      history = [trimmed, ...history.filter((k) => k !== trimmed)].slice(0, 20); // Keep latest 20
-      await AsyncStorage.setItem(STORAGE_KEYS.SEARCH_HISTORY, JSON.stringify(history));
+      await safeStorageOperation(async () => {
+        let history = await this.get();
+        history = [trimmed, ...history.filter((k) => k !== trimmed)].slice(0, 20); // Keep latest 20
+        await AsyncStorage.setItem(STORAGE_KEYS.SEARCH_HISTORY, JSON.stringify(history));
+      }, undefined);
       return;
     }
-    await api.addSearchHistory(trimmed);
+    try {
+      await api.addSearchHistory(trimmed);
+    } catch (error) {
+      logger.info("Failed to add search history to API:", error);
+    }
   }
 
   static async clear(): Promise<void> {
     const storageType = this.getStorageType();
     // 如果 storageType 未设置或不是 "localstorage"，默认使用本地存储
     if (!storageType || storageType === "localstorage") {
-      await AsyncStorage.removeItem(STORAGE_KEYS.SEARCH_HISTORY);
+      await safeStorageOperation(async () => {
+        await AsyncStorage.removeItem(STORAGE_KEYS.SEARCH_HISTORY);
+      }, undefined);
       return;
     }
-    await api.deleteSearchHistory();
+    try {
+      await api.deleteSearchHistory();
+    } catch (error) {
+      logger.info("Failed to clear search history from API:", error);
+    }
   }
 }
 
@@ -509,23 +557,24 @@ export class SettingsManager {
       },
       m3uUrl: "",
     };
-    try {
+    return safeStorageOperation(async () => {
       const data = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
       return data ? JSON.parse(data) : defaultSettings;
-    } catch (error) {
-      logger.info("Failed to get settings:", error);
-      return defaultSettings;
-    }
+    }, defaultSettings);
   }
 
   static async save(settings: Partial<AppSettings>): Promise<void> {
-    const currentSettings = await this.get();
-    const updatedSettings = { ...currentSettings, ...settings };
-    await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updatedSettings));
+    await safeStorageOperation(async () => {
+      const currentSettings = await this.get();
+      const updatedSettings = { ...currentSettings, ...settings };
+      await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updatedSettings));
+    }, undefined);
   }
 
   static async reset(): Promise<void> {
-    await AsyncStorage.removeItem(STORAGE_KEYS.SETTINGS);
+    await safeStorageOperation(async () => {
+      await AsyncStorage.removeItem(STORAGE_KEYS.SETTINGS);
+    }, undefined);
   }
 }
 

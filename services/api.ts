@@ -389,6 +389,24 @@ export class Api {
         return await handleResponse(response, false);
       } catch (directError) {
         console.error('Direct fetch failed:', directError);
+        
+        // 网络错误重试逻辑
+        if (retryCount < 2) { // 最多重试2次
+          const isNetworkError = directError instanceof TypeError && 
+            (directError.message.includes('network') || 
+             directError.message.includes('connect') || 
+             directError.message.includes('timeout') ||
+             directError.name === 'AbortError');
+          
+          if (isNetworkError) {
+            console.log(`Network error detected, retrying (${retryCount + 1}/3)...`);
+            // 指数退避策略
+            const delay = Math.pow(2, retryCount) * 1000; // 1s, 2s, 4s
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return this._fetch(url, options, retryCount + 1, avoidReLogin);
+          }
+        }
+        
         throw directError;
       }
     } catch (error) {

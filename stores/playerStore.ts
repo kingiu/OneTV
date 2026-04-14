@@ -1,5 +1,5 @@
 import { type AVPlaybackStatus, type Video } from "expo-av";
-import { type RefObject } from "react";
+import { type RefObject, useEffect } from "react";
 import Toast from "react-native-toast-message";
 import { create } from "zustand";
 
@@ -8,6 +8,8 @@ import { getResolutionFromM3U8 } from "@/services/m3u8";
 import { type PlayRecord, PlayRecordManager, PlayerSettingsManager } from "@/services/storage";
 import { useSettingsStore } from "@/stores/settingsStore";
 import Logger from "@/utils/Logger";
+import networkMonitor from "@/utils/NetworkMonitor";
+import playerMonitor from "@/utils/PlayerMonitor";
 
 import useDetailStore, { episodesSelectorBySource } from "./detailStore";
 
@@ -67,6 +69,7 @@ interface PlayerState {
   episodeModalInitialTab: 'episodes' | 'lines';
   showSourceModal: boolean;
   showSpeedModal: boolean;
+  showQualityModal: boolean;
   showNextEpisodeOverlay: boolean;
   isSeeking: boolean;
   seekPosition: number;
@@ -75,6 +78,19 @@ interface PlayerState {
   playbackRate: number;
   introEndTime?: number;
   outroStartTime?: number;
+  // 缓冲相关状态
+  bufferProgress: number;
+  isBuffering: boolean;
+  // 预加载相关状态
+  preloadingEpisodeIndex: number | null;
+  isPreloading: boolean;
+  // 网络状态相关
+  isConnected: boolean;
+  connectionType: string | null;
+  recommendedQuality: 'high' | 'medium' | 'low';
+  currentQuality: 'high' | 'medium' | 'low';
+  // 线路测试结果缓存
+  lineTestCache: Map<string, { result: { latency: number; bandwidth: number }; timestamp: number }>;
   setVideoRef: (ref: RefObject<Video>) => void;
   loadVideo: (options: {
     source: string;
@@ -94,8 +110,10 @@ interface PlayerState {
   setShowEpisodeModal: (show: boolean, initialTab?: 'episodes' | 'lines') => void;
   setShowSourceModal: (show: boolean) => void;
   setShowSpeedModal: (show: boolean) => void;
+  setShowQualityModal: (show: boolean) => void;
   setShowNextEpisodeOverlay: (show: boolean) => void;
   setPlaybackRate: (rate: number) => void;
+  setVideoQuality: (quality: 'high' | 'medium' | 'low') => void;
   setIntroEndTime: () => void;
   setOutroStartTime: () => void;
   refreshEpisodeUrls: () => void;
@@ -103,13 +121,22 @@ interface PlayerState {
   tryFallbackUrl: (failedUrl: string) => boolean;
   reset: () => void;
   _seekTimeout?: NodeJS.Timeout;
+  _preloadTimeout?: NodeJS.Timeout;
   _isRecordSaveThrottled: boolean;
   // Internal helper
-  _savePlayRecord: (updates?: Partial<PlayRecord>, options?: { immediate?: boolean }) => void;
+  _savePlayRecord: (updates?: any, options?: { immediate?: boolean }) => void;
   handleVideoError: (errorType: "ssl" | "network" | "other", failedUrl: string) => Promise<void>;
   onLineChange: (lineIndex: number) => void;
-  testLineSpeed: (url: string) => Promise<number>;
+  testLineSpeed: (url: string) => Promise<{ latency: number; bandwidth: number }>;
   selectBestLine: (playSources: Array<{ episodes: string[]; name?: string }>) => Promise<number>;
+  // 缓冲状态更新
+  updateBufferStatus: (isBuffering: boolean, bufferProgress: number) => void;
+  // 预加载方法
+  preloadNextEpisode: () => void;
+  cancelPreload: () => void;
+  // 网络状态方法
+  updateNetworkStatus: (isConnected: boolean, connectionType: string | null) => void;
+  getRecommendedQuality: () => 'high' | 'medium' | 'low';
 }
 
 const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -124,6 +151,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   episodeModalInitialTab: 'episodes' as 'episodes' | 'lines',
   showSourceModal: false,
   showSpeedModal: false,
+  showQualityModal: false,
   showNextEpisodeOverlay: false,
   isSeeking: false,
   seekPosition: 0,
@@ -132,10 +160,31 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   playbackRate: 1.0,
   introEndTime: undefined,
   outroStartTime: undefined,
+  // 缓冲相关状态
+  bufferProgress: 0,
+  isBuffering: false,
+  // 线路测试结果缓存
+  lineTestCache: new Map(),
+  // 预加载相关状态
+  preloadingEpisodeIndex: null,
+  isPreloading: false,
+  // 网络状态相关
+  isConnected: networkMonitor.getIsConnected(),
+  connectionType: networkMonitor.getConnectionType(),
+  recommendedQuality: networkMonitor.getOptimalPlaybackQuality(),
+  currentQuality: networkMonitor.getOptimalPlaybackQuality(),
   _seekTimeout: undefined,
+  _preloadTimeout: undefined,
   _isRecordSaveThrottled: false,
-
   setVideoRef: (ref) => set({ videoRef: ref }),
+
+  // 缓冲状态更新
+  updateBufferStatus: (isBuffering, bufferProgress) => {
+    set({ 
+      isBuffering,
+      bufferProgress 
+    });
+  },
 
   // 测试线路速度的函数（优化：增加带宽测试）
   testLineSpeed: async (url: string): Promise<{ latency: number; bandwidth: number }> => {
@@ -187,6 +236,8 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     }
   },
 
+
+
   // 选择最佳线路的函数（优化：使用带宽和延迟综合评分）
   selectBestLine: async (playSources: Array<{ episodes: string[]; name?: string }>): Promise<number> => {
     if (!playSources || playSources.length === 0) {
@@ -207,22 +258,62 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         }
 
         const testUrl = source.episodes[0];
-        const speedResult = await get().testLineSpeed(testUrl);
+        let speedResult;
+        
+        // 检查缓存
+        const cacheKey = `line_test:${testUrl}`;
+        const cached = get().lineTestCache.get(cacheKey);
+        const now = Date.now();
+        
+        if (cached && (now - cached.timestamp) < 5 * 60 * 1000) { // 5分钟缓存
+          logger.info(`[LINE_SELECTION] Using cached test result for ${source.name}`);
+          speedResult = cached.result;
+        } else {
+          // 带超时的测试
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒超时
+            
+            speedResult = await Promise.race([
+              get().testLineSpeed(testUrl),
+              new Promise<{ latency: number; bandwidth: number }>((_, reject) => {
+                setTimeout(() => reject(new Error('Speed test timeout')), 8000);
+              })
+            ]);
+            
+            clearTimeout(timeoutId);
+            
+            // 缓存结果
+            const updatedCache = new Map(get().lineTestCache);
+            updatedCache.set(cacheKey, { result: speedResult, timestamp: now });
+            set({ lineTestCache: updatedCache });
+          } catch (error) {
+            logger.warn(`[LINE_SELECTION] Speed test failed for ${source.name}:`, error);
+            return { index, latency: Infinity, bandwidth: 0, quality: 0 };
+          }
+        }
 
-        // 简单的质量评分：基于线路名称中的清晰度标识
+        // 改进的质量评分：基于线路名称和其他因素
         let quality = 0;
-        const sourceName = source.name.toLowerCase();
+        const sourceName = source.name ? source.name.toLowerCase() : '';
+        
+        // 基于清晰度的评分
         if (sourceName.includes('1080') || sourceName.includes('fullhd')) quality = 4;
         else if (sourceName.includes('720') || sourceName.includes('hd')) quality = 3;
         else if (sourceName.includes('480') || sourceName.includes('sd')) quality = 2;
         else if (sourceName.includes('360')) quality = 1;
-
+        
+        // 基于线路名称的可靠性评分
+        let reliability = 0;
+        if (sourceName.includes('官方') || sourceName.includes('original')) reliability = 2;
+        else if (sourceName.includes('高清') || sourceName.includes('超清')) reliability = 1;
+        
         logger.info(`[LINE_SELECTION] Line ${index + 1} (${source.name}): latency = ${speedResult.latency.toFixed(2)}ms, bandwidth = ${speedResult.bandwidth.toFixed(2)}KB/s, quality = ${quality}`);
         return {
           index,
           latency: speedResult.latency,
           bandwidth: speedResult.bandwidth,
-          quality
+          quality: quality + reliability // 质量 + 可靠性
         };
       })
     );
@@ -234,16 +325,16 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       return 0;
     }
 
-    // 综合评分：延迟 40% + 带宽 40% + 质量 20%
+    // 综合评分：延迟 35% + 带宽 40% + 质量 25%
     validLines.forEach(line => {
       // 归一化延迟（越低越好，转为 0-100 分）
       const latencyScore = Math.max(0, 100 - line.latency / 10);
       // 归一化带宽（越高越好，转为 0-100 分）
       const bandwidthScore = Math.min(100, line.bandwidth / 10);
-      // 质量分（0-4 转为 0-100 分）
-      const qualityScore = line.quality * 25;
+      // 质量分（0-6 转为 0-100 分）
+      const qualityScore = (line.quality / 6) * 100;
       // 综合评分
-      line.compositeScore = latencyScore * 0.4 + bandwidthScore * 0.4 + qualityScore * 0.2;
+      line.compositeScore = latencyScore * 0.35 + bandwidthScore * 0.4 + qualityScore * 0.25;
     });
 
     // 按综合评分排序
@@ -478,8 +569,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       logger.info(`[PERF] PlayerSettingsManager.get took ${(storageEnd - storagePlayRecordEnd).toFixed(2)}ms`);
       logger.info(`[PERF] Total storage operations took ${(storageEnd - storageStart).toFixed(2)}ms`);
 
-      const initialPositionFromRecord = playRecord?.play_time ? playRecord.play_time * 1000 : 0;
+      const initialPositionFromRecord = playRecord?.currentTime ? playRecord.currentTime * 1000 : 0;
       const savedPlaybackRate = playerSettings?.playbackRate || 1.0;
+      const savedVideoQuality = playerSettings?.videoQuality || networkMonitor.getOptimalPlaybackQuality();
 
       // 自动选择最佳线路
       let currentPlaySourceIndex = 0;
@@ -507,6 +599,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         currentPlaySourceIndex: currentPlaySourceIndex,
         initialPosition: position || initialPositionFromRecord,
         playbackRate: savedPlaybackRate,
+        currentQuality: savedVideoQuality,
         episodes: mappedEpisodes,
         introEndTime: playRecord?.introEndTime || playerSettings?.introEndTime,
         outroStartTime: playRecord?.outroStartTime || playerSettings?.outroStartTime,
@@ -534,8 +627,13 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   playEpisode: async (index) => {
-    const { episodes, videoRef } = get();
+    const { episodes, videoRef, currentEpisodeIndex } = get();
     if (index >= 0 && index < episodes.length) {
+      // 记录剧集变化事件
+      if (currentEpisodeIndex !== index) {
+        playerMonitor.recordEpisodeChange(currentEpisodeIndex, index);
+      }
+      
       set({
         currentEpisodeIndex: index,
         showNextEpisodeOverlay: false,
@@ -545,9 +643,14 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       });
       try {
         await videoRef?.current?.replayAsync();
+        // 记录播放开始事件
+        const detail = useDetailStore.getState().detail;
+        playerMonitor.recordPlay(index, detail?.source || "unknown");
       } catch (error) {
         logger.debug("Failed to replay video:", error);
         Toast.show({ type: "error", text1: "播放失败" });
+        // 记录错误事件
+        playerMonitor.recordError("playback", error instanceof Error ? error.message : "Unknown error");
       }
     }
   },
@@ -670,12 +773,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       PlayRecordManager.save(detail.source, detail.id.toString(), {
         title: detail.title,
         cover: detail.poster || "",
-        index: currentEpisodeIndex + 1,
-        total_episodes: episodes.length,
-        play_time: Math.floor(status.positionMillis / 1000),
-        total_time: status.durationMillis ? Math.floor(status.durationMillis / 1000) : 0,
-        source_name: detail.source_name,
-        year: detail.year || "",
+        currentTime: Math.floor(status.positionMillis / 1000),
+        totalTime: status.durationMillis ? Math.floor(status.durationMillis / 1000) : 0,
+        lastPlayed: Date.now(),
         ...existingRecord,
         ...updates,
       });
@@ -690,9 +790,25 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   handlePlaybackStatusUpdate: (newStatus) => {
+    const previousStatus = get().status;
+    
     if (!newStatus.isLoaded) {
-      if (newStatus.error) {
-        logger.debug(`Playback Error: ${newStatus.error}`);
+      if ('error' in newStatus && newStatus.error) {
+        logger.error(`[PLAYBACK_ERROR] ${newStatus.error}`);
+        // 记录错误事件
+        playerMonitor.recordError("playback", newStatus.error);
+        // 自动尝试恢复播放
+        const currentEpisode = get().episodes[get().currentEpisodeIndex];
+        if (currentEpisode && currentEpisode.url) {
+          logger.info(`[PLAYBACK_RECOVERY] Attempting to recover from error`);
+          // 先尝试使用备用URL
+          if (get().tryFallbackUrl(currentEpisode.url)) {
+            logger.info(`[PLAYBACK_RECOVERY] Switched to fallback URL`);
+          } else {
+            // 如果没有备用URL，尝试切换播放源
+            get().handleVideoError("other", currentEpisode.url);
+          }
+        }
       }
       set({ status: newStatus });
       return;
@@ -701,6 +817,15 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     // 先更新 status，确保 _savePlayRecord 能获取到最新的状态
     const progressPosition = newStatus.durationMillis ? newStatus.positionMillis / newStatus.durationMillis : 0;
     set({ status: newStatus, progressPosition });
+    
+    // 处理播放状态更新，监控事件
+    playerMonitor.handlePlaybackStatusUpdate(newStatus, previousStatus);
+    
+    // 更新缓冲状态
+    if (newStatus.isBuffering !== undefined) {
+      const bufferProgress = 'bufferProgress' in newStatus ? (newStatus.bufferProgress as number) : 0;
+      get().updateBufferStatus(newStatus.isBuffering, bufferProgress || 0);
+    }
 
     const { currentEpisodeIndex, episodes, outroStartTime, playEpisode } = get();
     const detail = useDetailStore.getState().detail;
@@ -720,7 +845,14 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       logger.info(`[DEBUG] playerStore.handlePlaybackStatusUpdate - calling _savePlayRecord`);
       get()._savePlayRecord();
 
-      const isNearEnd = newStatus.positionMillis / newStatus.durationMillis > 0.95;
+      const progress = newStatus.positionMillis / newStatus.durationMillis;
+      const isNearEnd = progress > 0.95;
+      
+      // 当播放到 80% 时开始预加载下一集
+      if (progress > 0.8 && currentEpisodeIndex < episodes.length - 1) {
+        get().preloadNextEpisode();
+      }
+      
       if (isNearEnd && currentEpisodeIndex < episodes.length - 1 && !outroStartTime) {
         set({ showNextEpisodeOverlay: true });
       } else {
@@ -743,7 +875,27 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   }),
   setShowSourceModal: (show) => set({ showSourceModal: show }),
   setShowSpeedModal: (show) => set({ showSpeedModal: show }),
+  setShowQualityModal: (show) => set({ showQualityModal: show }),
   setShowNextEpisodeOverlay: (show) => set({ showNextEpisodeOverlay: show }),
+
+  setVideoQuality: (quality) => {
+    const { videoRef, status } = get();
+    const detail = useDetailStore.getState().detail;
+
+    set({ currentQuality: quality });
+
+    // 记录视频质量变化事件
+    playerMonitor.recordQualityChange(quality);
+
+    // 这里可以根据质量设置不同的播放参数
+    // 例如：调整缓冲策略、分辨率等
+    logger.info(`[QUALITY] Set video quality to ${quality}`);
+
+    // 保存质量偏好
+    if (detail) {
+      PlayerSettingsManager.save(detail.source, detail.id.toString(), { videoQuality: quality });
+    }
+  },
 
   setPlaybackRate: async (rate) => {
     const { videoRef } = get();
@@ -859,8 +1011,87 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     return true;
   },
 
+  // 预加载下一集
+  preloadNextEpisode: () => {
+    const { currentEpisodeIndex, episodes, isPreloading, preloadingEpisodeIndex } = get();
+    const nextIndex = currentEpisodeIndex + 1;
+    
+    // 检查是否已经在预加载，或者已经是最后一集
+    if (isPreloading || preloadingEpisodeIndex === nextIndex || nextIndex >= episodes.length) {
+      return;
+    }
+    
+    const nextEpisode = episodes[nextIndex];
+    if (!nextEpisode || !nextEpisode.url) {
+      return;
+    }
+    
+    logger.info(`[PRELOAD] Starting preload for episode ${nextIndex + 1}: ${nextEpisode.title}`);
+    
+    set({ 
+      isPreloading: true, 
+      preloadingEpisodeIndex: nextIndex 
+    });
+    
+    // 模拟预加载过程，实际项目中可以根据需要实现真正的预加载逻辑
+    // 例如：预加载视频元数据、关键帧或部分视频内容
+    const preloadTimeout = setTimeout(() => {
+      logger.info(`[PRELOAD] Preload completed for episode ${nextIndex + 1}`);
+      set({ 
+        isPreloading: false, 
+        preloadingEpisodeIndex: null 
+      });
+    }, 2000);
+    
+    // 保存超时ID，以便可以取消预加载
+    set({ _preloadTimeout: preloadTimeout });
+  },
+  
+  // 取消预加载
+  cancelPreload: () => {
+    const { isPreloading, _preloadTimeout } = get();
+    if (isPreloading && _preloadTimeout) {
+      clearTimeout(_preloadTimeout);
+      logger.info(`[PRELOAD] Preload cancelled`);
+      set({ 
+        isPreloading: false, 
+        preloadingEpisodeIndex: null, 
+        _preloadTimeout: undefined 
+      });
+    }
+  },
+  
+  // 更新网络状态
+  updateNetworkStatus: (isConnected, connectionType) => {
+    const recommendedQuality = networkMonitor.getOptimalPlaybackQuality();
+    logger.info(`[NETWORK] Updated status: connected=${isConnected}, type=${connectionType}, recommendedQuality=${recommendedQuality}`);
+    
+    set({ 
+      isConnected, 
+      connectionType, 
+      recommendedQuality 
+    });
+    
+    // 网络状态变化时的处理逻辑
+    if (!isConnected) {
+      logger.warn(`[NETWORK] Network disconnected, playback may be affected`);
+      // 可以在这里添加网络断开时的处理逻辑
+    }
+  },
+  
+  // 获取推荐的播放质量
+  getRecommendedQuality: () => {
+    return get().recommendedQuality;
+  },
+
   reset: async () => {
-    const { videoRef } = get();
+    const { videoRef, _preloadTimeout } = get();
+    
+    // 取消预加载
+    if (_preloadTimeout) {
+      clearTimeout(_preloadTimeout);
+    }
+    
     try {
       if (videoRef?.current) {
         await videoRef.current.unloadAsync();
@@ -877,11 +1108,23 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       showEpisodeModal: false,
       showSourceModal: false,
       showSpeedModal: false,
+      showQualityModal: false,
       showNextEpisodeOverlay: false,
       initialPosition: 0,
       playbackRate: 1.0,
       introEndTime: undefined,
       outroStartTime: undefined,
+      // 重置缓冲状态
+      bufferProgress: 0,
+      isBuffering: false,
+      // 重置线路测试缓存
+      lineTestCache: new Map(),
+      // 重置预加载状态
+      preloadingEpisodeIndex: null,
+      isPreloading: false,
+      // 重置质量设置
+      currentQuality: networkMonitor.getOptimalPlaybackQuality(),
+      _preloadTimeout: undefined,
     });
   },
 
@@ -961,7 +1204,8 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     }
 
     const selectedSource = detail.play_sources[lineIndex];
-    const { currentEpisodeIndex } = get();
+    const { currentEpisodeIndex, currentPlaySourceIndex } = get();
+    const previousSource = detail.play_sources[currentPlaySourceIndex]?.name || "unknown";
 
     if (selectedSource.episodes && selectedSource.episodes.length > currentEpisodeIndex) {
       const mappedEpisodes = mapEpisodesForPlayback(selectedSource.episodes, detail.source);
@@ -970,6 +1214,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         episodes: mappedEpisodes,
         currentPlaySourceIndex: lineIndex,
       });
+
+      // 记录播放源变化事件
+      playerMonitor.recordSourceChange(previousSource, selectedSource.name || "unknown");
 
       logger.info(`[LINE_CHANGE] Switched to line ${lineIndex + 1}: ${selectedSource.name}`);
 
@@ -1015,3 +1262,8 @@ export const selectCurrentEpisode = (state: PlayerState) => {
   }
   return undefined;
 };
+
+// 设置网络状态监听器
+networkMonitor.addListener((isConnected, connectionType) => {
+  usePlayerStore.getState().updateNetworkStatus(isConnected, connectionType);
+});

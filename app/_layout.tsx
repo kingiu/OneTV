@@ -19,6 +19,7 @@ import { useRemoteControlStore } from "@/stores/remoteControlStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useUpdateStore, initUpdateStore } from "@/stores/updateStore";
 import Logger from "@/utils/Logger";
+import CacheManager from "@/utils/CacheManager";
 
 const logger = Logger.withTag("RootLayout");
 
@@ -48,6 +49,10 @@ export default function RootLayout() {
   useEffect(() => {
     const initializeApp = async () => {
       console.log('Starting initializeApp');
+      // 检查并清理缓存
+      console.log('Checking and cleaning cache');
+      await CacheManager.checkAndCleanCache();
+      console.log('Cache check completed');
       await loadSettings();
       console.log('loadSettings completed');
       setIsSettingsReady(true);
