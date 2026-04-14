@@ -3,7 +3,7 @@ export class APIError extends Error {
     message: string,
     public statusCode?: number,
     public code?: string,
-    public details?: any
+    public details?: unknown
   ) {
     super(message);
     this.name = 'APIError';
@@ -40,17 +40,17 @@ export function handleAPIError(error: unknown): Error {
 
   if (error instanceof Error) {
     const message = String(error.message).toLowerCase();
-    
+
     if (message.indexOf('network') !== -1 || message.indexOf('fetch') !== -1) {
       return new NetworkError();
     }
-    
+
     if (message.indexOf('unauthorized') !== -1 || message.indexOf('401') !== -1) {
       return new AuthenticationError();
     }
-    
 
-    
+
+
     return error;
   }
 
@@ -64,13 +64,13 @@ export function getErrorMessage(error: unknown): string {
 
 export function getErrorCode(error: unknown): string | undefined {
   const handledError = handleAPIError(error);
-  
+
   if (handledError instanceof APIError) {
     return handledError.code;
   }
-  
 
-  
+
+
   return undefined;
 }
 
@@ -86,31 +86,31 @@ export function isAuthError(error: unknown): boolean {
 
 export function shouldRetry(error: unknown): boolean {
   const handledError = handleAPIError(error);
-  
+
   if (handledError instanceof NetworkError) {
     return true;
   }
-  
+
   if (handledError instanceof APIError) {
     const retryableCodes = [408, 429, 500, 502, 503, 504];
     const statusCode = handledError.statusCode || 0;
     return retryableCodes.indexOf(statusCode) !== -1;
   }
-  
+
   return false;
 }
 
 export function getErrorSeverity(error: unknown): 'low' | 'medium' | 'high' {
   const handledError = handleAPIError(error);
-  
+
   if (handledError instanceof NetworkError) {
     return 'medium';
   }
-  
+
   if (handledError instanceof AuthenticationError) {
     return 'high';
   }
-  
+
   if (handledError instanceof APIError) {
     if (handledError.statusCode && handledError.statusCode >= 500) {
       return 'medium';
@@ -119,6 +119,6 @@ export function getErrorSeverity(error: unknown): 'low' | 'medium' | 'high' {
       return 'low';
     }
   }
-  
+
   return 'low';
 }

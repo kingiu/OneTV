@@ -14,6 +14,7 @@
     "test": "jest --watchAll",
     "test-ci": "jest --ci --coverage --no-cache",
     "lint": "expo lint",
+    "lint:fix": "eslint app/ components/ services/ stores/ utils/ --ext .ts,.tsx,.js,.jsx --fix",
     "typecheck": "tsc --noEmit",
     "clean": "expo r -c && yarn cache clean && cd android && ./gradlew clean",
     "clean-modules": "rm -rf node_modules && yarn install",
