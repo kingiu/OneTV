@@ -77,6 +77,60 @@ const isValidCache = (cacheItem: CacheItem) => {
   return Date.now() - cacheItem.timestamp < CACHE_EXPIRE_TIME;
 };
 
+/**
+ * 聚合相同标题的播放记录
+ * 将相同标题和年份的记录合并，显示源数量，使用最近观看的源
+ */
+const aggregatePlayRecords = (records: Record<string, PlayRecord>): RowItem[] => {
+  const titleMap = new Map<string, RowItem & { sourceCount: number; sources: string[] }>();
+
+  Object.entries(records).forEach(([key, record]) => {
+    const [source, id] = key.split("+");
+    const uniqueKey = `${record.title}_${record.year || ''}`;
+
+    const rowItem: RowItem & { sourceCount: number; sources: string[] } = {
+      ...record,
+      id,
+      source,
+      progress: record.play_time / record.total_time,
+      poster: record.cover,
+      sourceName: record.source_name,
+      episodeIndex: record.index,
+      totalEpisodes: record.total_episodes,
+      lastPlayed: record.save_time,
+      play_time: record.play_time,
+      sourceCount: 1,
+      sources: [source],
+    };
+
+    if (titleMap.has(uniqueKey)) {
+      // 如果标题 + 年份已存在，增加源数量并更新为最近观看的源
+      const existingItem = titleMap.get(uniqueKey)!;
+      existingItem.sourceCount += 1;
+      existingItem.sources.push(source);
+
+      // 如果当前记录的观看时间更晚，更新为当前记录
+      if (record.save_time > (existingItem.lastPlayed || 0)) {
+        existingItem.source = source;
+        existingItem.sourceName = record.source_name;
+        existingItem.episodeIndex = record.index;
+        existingItem.totalEpisodes = record.total_episodes;
+        existingItem.play_time = record.play_time;
+        existingItem.progress = record.play_time / record.total_time;
+      }
+    } else {
+      // 如果标题 + 年份不存在，创建新条目
+      titleMap.set(uniqueKey, rowItem);
+    }
+  });
+
+  // 转换为数组并按最近观看时间排序
+  const aggregatedArray = Array.from(titleMap.values());
+  const sortedResults = aggregatedArray.sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
+
+  return sortedResults;
+};
+
 interface HomeState {
   categories: Category[];
   selectedCategory: Category;
@@ -147,29 +201,18 @@ const useHomeStore = create<HomeState>((set, get) => ({
 
     try {
       if (selectedCategory.type === "record") {
-        console.log(`[DEBUG] homeStore.loadMoreData - fetching play records`);
         const records = await PlayRecordManager.getAll();
-        console.log(`[DEBUG] homeStore.loadMoreData - received ${Object.keys(records).length} play records`);
-        const rowItems = Object.entries(records)
-          .map(([key, record]) => {
-            const [source, id] = key.split("+");
-            return {
-              ...record,
-              id,
-              source,
-              progress: record.play_time / record.total_time,
-              poster: record.cover,
-              sourceName: record.source_name,
-              episodeIndex: record.index,
-              totalEpisodes: record.total_episodes,
-              lastPlayed: record.save_time,
-              play_time: record.play_time,
-            };
-          })
-          // .filter((record) => record.progress !== undefined && record.progress > 0 && record.progress < 1)
-          .sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
-        console.log(`[DEBUG] homeStore.loadMoreData - created ${rowItems.length} row items`);
-        set({ contentData: rowItems, hasMore: false, loading: false, loadingMore: false, error: null });
+
+        // 聚合相同标题的播放记录
+        const aggregatedRecords = aggregatePlayRecords(records);
+
+        set({
+          contentData: aggregatedRecords,
+          hasMore: false,
+          loading: false,
+          loadingMore: false,
+          error: null,
+        });
       } else if (selectedCategory.type && selectedCategory.tag) {
         const result = await api.getDoubanData(
           selectedCategory.type,
@@ -316,26 +359,26 @@ const useHomeStore = create<HomeState>((set, get) => ({
     // 只有当有播放记录时才显示最近播放分类
     const records = await PlayRecordManager.getAll();
     const hasRecords = Object.keys(records).length > 0;
-    
+
     set((state) => {
       const recordCategoryExists = state.categories.some((c) => c.type === "record");
-      
+
       // 如果有播放记录且分类不存在，则添加
       if (hasRecords && !recordCategoryExists) {
         const recordCategory = { title: "最近播放", type: "record" as const };
         return { categories: [recordCategory, ...state.categories] };
       }
-      
+
       // 如果没有播放记录且分类存在，则移除
       if (!hasRecords && recordCategoryExists) {
-        return { 
+        return {
           categories: state.filter((c) => c.type !== "record"),
-          selectedCategory: state.selectedCategory.type === "record" 
-            ? initialCategories[0] 
+          selectedCategory: state.selectedCategory.type === "record"
+            ? initialCategories[0]
             : state.selectedCategory
         };
       }
-      
+
       return {};
     });
 

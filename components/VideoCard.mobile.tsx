@@ -21,6 +21,7 @@ interface VideoCardMobileProps extends React.ComponentProps<typeof TouchableOpac
   year?: string;
   rate?: string;
   sourceName?: string;
+  sourceCount?: number;
   progress?: number;
   playTime?: number;
   episodeIndex?: number;
@@ -41,6 +42,7 @@ const VideoCardMobile = forwardRef<View, VideoCardMobileProps>(
       year,
       rate,
       sourceName,
+      sourceCount,
       progress,
       episodeIndex,
       totalEpisodes,
@@ -158,18 +160,27 @@ const VideoCardMobile = forwardRef<View, VideoCardMobileProps>(
               </View>
             )}
 
-            {/* 左上角显示集数（如果有总集数信息）*/}
-            {totalEpisodes !== undefined && totalEpisodes > 0 && (
-              <View style={styles.episodeBadge}>
-                <Text style={styles.badgeText}>共{totalEpisodes}集</Text>
-              </View>
-            )}
-            {/* 如果没有总集数，才显示源名称 */}
-            {totalEpisodes === undefined && sourceName && (
+            {/* 左上角只显示资源名称 */}
+            {sourceName && (
               <View style={styles.sourceNameBadge}>
                 <Text style={styles.badgeText}>{sourceName}</Text>
               </View>
             )}
+            {/* 右下角显示源数量（非最近播放）或总集数（最近播放） */}
+            <View style={styles.bottomRightBadges}>
+              {/* 搜索页面等显示源数量 */}
+              {!isContinueWatching && sourceCount && sourceCount > 1 && (
+                <View style={styles.sourceCountBadge}>
+                  <Text style={styles.badgeText}>{sourceCount} 源</Text>
+                </View>
+              )}
+              {/* 最近播放显示总集数 */}
+              {totalEpisodes !== undefined && totalEpisodes > 0 && (
+                <View style={styles.episodeBadge}>
+                  <Text style={styles.badgeText}>共{totalEpisodes}集</Text>
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={styles.infoContainer}>
@@ -264,20 +275,30 @@ const createMobileStyles = (cardWidth: number, cardHeight: number, spacing: numb
       paddingHorizontal: 4,
       paddingVertical: 2,
     },
-    episodeBadge: {
-      position: "absolute",
-      bottom: 6,
-      left: 6,
-      backgroundColor: "rgba(52, 199, 89, 0.9)",
-      borderRadius: 4,
-      paddingHorizontal: 4,
-      paddingVertical: 2,
-    },
     sourceNameBadge: {
       position: "absolute",
       bottom: 6,
       left: 6,
       backgroundColor: "rgba(0, 0, 0, 0.7)",
+      borderRadius: 4,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+    },
+    bottomRightBadges: {
+      position: "absolute",
+      bottom: 6,
+      right: 6,
+      flexDirection: "row",
+      gap: 3,
+    },
+    episodeBadge: {
+      backgroundColor: "rgba(52, 199, 89, 0.9)",
+      borderRadius: 4,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+    },
+    sourceCountBadge: {
+      backgroundColor: "rgba(52, 199, 89, 0.9)",
       borderRadius: 4,
       paddingHorizontal: 4,
       paddingVertical: 2,

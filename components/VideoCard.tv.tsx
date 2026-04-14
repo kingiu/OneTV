@@ -202,23 +202,27 @@ const VideoCard = forwardRef<View, VideoCardProps>(
                 <Text style={styles.badgeText}>{year}</Text>
               </View>
             )}
-            {/* 左上角显示集数（如果有总集数信息）*/}
-            {totalEpisodes !== undefined && totalEpisodes > 0 && (
-              <View style={styles.episodeBadge}>
-                <Text style={styles.badgeText}>共{totalEpisodes}集</Text>
-              </View>
-            )}
-            {/* 如果没有总集数，才显示源名称 */}
-            {totalEpisodes === undefined && sourceName && (
+            {/* 左上角只显示资源名称 */}
+            {sourceName && (
               <View style={styles.sourceNameBadge}>
                 <Text style={styles.badgeText}>{sourceName}</Text>
               </View>
             )}
-            {sourceCount && sourceCount > 1 && (
-              <View style={styles.sourceCountBadge}>
-                <Text style={styles.badgeText}>{sourceCount} 源</Text>
-              </View>
-            )}
+            {/* 右下角显示源数量（非最近播放）或总集数（最近播放） */}
+            <View style={styles.bottomRightBadges}>
+              {/* 搜索页面等显示源数量 */}
+              {!isContinueWatching && sourceCount && sourceCount > 1 && (
+                <View style={styles.sourceCountBadge}>
+                  <Text style={styles.badgeText}>{sourceCount} 源</Text>
+                </View>
+              )}
+              {/* 最近播放显示总集数 */}
+              {totalEpisodes !== undefined && totalEpisodes > 0 && (
+                <View style={styles.episodeBadge}>
+                  <Text style={styles.badgeText}>共{totalEpisodes}集</Text>
+                </View>
+              )}
+            </View>
           </View>
           <View style={styles.infoContainer}>
             <ThemedText numberOfLines={1}>{title}</ThemedText>
@@ -334,15 +338,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
-  episodeBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "rgba(52, 199, 89, 0.9)",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
   sourceNameBadge: {
     position: "absolute",
     top: 8,
@@ -352,10 +347,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
-  sourceCountBadge: {
+  bottomRightBadges: {
     position: "absolute",
     bottom: 8,
     right: 8,
+    flexDirection: "row",
+    gap: 4,
+  },
+  episodeBadge: {
+    backgroundColor: "rgba(52, 199, 89, 0.9)",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  sourceCountBadge: {
     backgroundColor: "rgba(52, 199, 89, 0.9)",
     borderRadius: 6,
     paddingHorizontal: 6,
