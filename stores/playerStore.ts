@@ -4,6 +4,7 @@ import Toast from "react-native-toast-message";
 import { create } from "zustand";
 
 import { getPlaybackUrlCandidates } from "@/services/m3u";
+import { getResolutionFromM3U8 } from "@/services/m3u8";
 import { type PlayRecord, PlayRecordManager, PlayerSettingsManager } from "@/services/storage";
 import { useSettingsStore } from "@/stores/settingsStore";
 import Logger from "@/utils/Logger";
@@ -469,6 +470,14 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       });
 
       logger.info(`[DEBUG] Loaded video with play_sources: ${detail.play_sources?.length || 0}, selected line: ${currentPlaySourceIndex + 1}`);
+
+      // 异步检测 M3U8 分辨率（不阻塞播放）
+      if (mappedEpisodes.length > 0) {
+        const firstEpisodeUrl = mappedEpisodes[0].url;
+        getResolutionFromM3U8(firstEpisodeUrl).catch((error) => {
+          logger.warn(`[RESOLUTION] Failed to detect resolution: ${error}`);
+        });
+      }
 
       const perfEnd = performance.now();
       logger.info(`[PERF] PlayerStore.loadVideo COMPLETE - total time: ${(perfEnd - perfStart).toFixed(2)}ms`);

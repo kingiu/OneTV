@@ -17,6 +17,7 @@ import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import { api, type SearchResult } from "@/services/api";
 import { useRemoteControlStore } from "@/stores/remoteControlStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useDetailStore } from "@/stores/detailStore";
 import { DeviceUtils } from "@/utils/DeviceUtils";
 import Logger from '@/utils/Logger';
 import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
@@ -84,30 +85,67 @@ export default function SearchScreen() {
     }
   };
 
-  // 聚合搜索结果，将相同标题和年份的结果合并并计算源数量
+  // 聚合搜索结果，将相同标题和年份的结果合并，使用最高权重源的 poster
   const aggregateSearchResults = (results: SearchResult[]): SearchResult[] => {
-    const titleMap = new Map<string, SearchResult & { sourceCount: number; sources: string[] }>();
+    const titleMap = new Map<string, SearchResult & { sourceCount: number; sources: string[]; bestPoster: string }>();
+    const { sourceWeights } = useSettingsStore.getState();
+    
+    // 安全获取后端权重，如果 store 未初始化则使用空对象
+    let resourceWeights: { [key: string]: number } = {};
+    try {
+      resourceWeights = useDetailStore.getState().resourceWeights || {};
+    } catch (error) {
+      logger.warn(`[SEARCH] Failed to get resourceWeights from detailStore, using empty object`);
+    }
 
     results.forEach(item => {
       const uniqueKey = `${item.title}_${item.year || ''}`;
+      // 优先使用后端权重，其次使用前端配置权重，最后使用默认值 50
+      const itemWeight = resourceWeights[item.source] ?? sourceWeights[item.source] ?? 50;
 
       if (titleMap.has(uniqueKey)) {
-        // 如果标题+年份已存在，增加源数量
+        // 如果标题 + 年份已存在，增加源数量
         const existingItem = titleMap.get(uniqueKey)!;
         existingItem.sourceCount += 1;
         existingItem.sources.push(item.source);
+        
+        // 如果当前源的权重更高，更新 poster
+        const existingWeight = resourceWeights[existingItem.source] ?? sourceWeights[existingItem.source] ?? 50;
+        if (itemWeight > existingWeight && item.poster) {
+          existingItem.poster = item.poster;
+          existingItem.source = item.source; // 同时更新为最高权重的源
+          existingItem.source_name = item.source_name;
+        }
       } else {
-        // 如果标题+年份不存在，创建新条目
+        // 如果标题 + 年份不存在，创建新条目
         titleMap.set(uniqueKey, {
           ...item,
           sourceCount: 1,
-          sources: [item.source]
+          sources: [item.source],
+          bestPoster: item.poster
         });
       }
     });
 
-    // 转换回数组并返回
-    return Array.from(titleMap.values());
+    // 转换为数组
+    const aggregatedArray = Array.from(titleMap.values());
+
+    // 按权重排序：权重高的排在前面
+    const sortedResults = aggregatedArray.sort((a, b) => {
+      // 优先使用后端权重，其次使用前端配置权重，最后使用默认值 50
+      const aSourceWeight = resourceWeights[a.source] ?? sourceWeights[a.source] ?? 50;
+      const bSourceWeight = resourceWeights[b.source] ?? sourceWeights[b.source] ?? 50;
+      
+      return bSourceWeight - aSourceWeight;
+    });
+
+    logger.info(`[SEARCH] Aggregated ${results.length} results to ${aggregatedArray.length}, sorted by weight`);
+    sortedResults.forEach((r, idx) => {
+      const weight = resourceWeights[r.source] ?? sourceWeights[r.source] ?? 50;
+      logger.info(`[SEARCH] #${idx + 1}: ${r.title} - source: ${r.source} (${r.source_name}), weight: ${weight}`);
+    });
+
+    return sortedResults;
   };
 
   const onSearchPress = () => handleSearch();

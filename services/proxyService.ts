@@ -14,6 +14,20 @@ class ProxyService {
   private baseURL: string;
   private cache: Map<string, CacheItem> = new Map();
   private readonly DEFAULT_CACHE_TTL = 3600;
+  private readonly VIDEO_REQUEST_TIMEOUT = 12000;   // 视频请求 12s
+  private readonly API_REQUEST_TIMEOUT = 8000;       // API 请求 8s
+  private readonly HEALTH_CHECK_TIMEOUT = 5000;     // 健康检查 5s
+
+  // 根据 URL 类型返回相应的超时时间
+  private _getTimeoutForUrl(url: string): number {
+    if (url.includes('/api/proxy-m3u8') || url.includes('.m3u8')) {
+      return this.VIDEO_REQUEST_TIMEOUT;
+    }
+    if (url.includes('/api/health')) {
+      return this.HEALTH_CHECK_TIMEOUT;
+    }
+    return this.API_REQUEST_TIMEOUT;
+  }
 
   constructor(baseURL?: string) {
     this.baseURL = baseURL || "";
@@ -152,7 +166,8 @@ class ProxyService {
 
         if (!typedFetchOptions.signal) {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 60000);
+          const timeoutMs = this._getTimeoutForUrl(requestUrl);
+          const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
           typedFetchOptions.signal = controller.signal;
           typedFetchOptions._timeoutId = timeoutId;
         }

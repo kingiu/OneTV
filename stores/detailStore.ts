@@ -91,29 +91,16 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
     const processAndSetResults = async (results: SearchResult[], merge = false) => {
       const resolutionStart = performance.now();
-      logger.info(`[PERF] Resolution detection START - processing ${results.length} sources`);
+      logger.info(`[PERF] Processing ${results.length} sources - skipping M3U8 resolution detection`);
 
-      const resultsWithResolution = await Promise.all(
-        results.map(async (searchResult) => {
-          let resolution;
-          const m3u8Start = performance.now();
-          try {
-            if (searchResult.episodes && searchResult.episodes.length > 0) {
-              // 不再传递 signal，避免被外部中止
-              resolution = await getResolutionFromM3U8(searchResult.episodes[0]);
-            }
-          } catch (e) {
-            // 捕获所有错误，不再区分 AbortError
-            logger.info(`Failed to get resolution for ${searchResult.source_name}`, e);
-          }
-          const m3u8End = performance.now();
-          logger.info(`[PERF] M3U8 resolution for ${searchResult.source_name}: ${(m3u8End - m3u8Start).toFixed(2)}ms (${resolution || 'failed'})`);
-          logger.info(`[DEBUG] Play sources for ${searchResult.source_name}: ${searchResult.play_sources?.length || 0}`);
-          logger.info(`[DEBUG] vod_play_from: ${searchResult.vod_play_from}`);
-          logger.info(`[DEBUG] vod_play_url: ${searchResult.vod_play_url}`);
-          return { ...searchResult, resolution };
-        })
-      );
+      // 直接返回搜索结果，不进行 M3U8 分辨率检测
+      // 分辨率检测将在播放时进行
+      const resultsWithResolution = results.map((searchResult) => {
+        logger.info(`[DEBUG] Play sources for ${searchResult.source_name}: ${searchResult.play_sources?.length || 0}`);
+        logger.info(`[DEBUG] vod_play_from: ${searchResult.vod_play_from}`);
+        logger.info(`[DEBUG] vod_play_url: ${searchResult.vod_play_url}`);
+        return { ...searchResult, resolution: undefined };
+      });
 
       const resolutionEnd = performance.now();
       logger.info(`[PERF] Resolution detection COMPLETE - took ${(resolutionEnd - resolutionStart).toFixed(2)}ms`);
@@ -142,13 +129,28 @@ const useDetailStore = create<DetailState>((set, get) => ({
           logger.warn(`[WARN] After initial dedup: ${deduplicatedResults.length} results exceeds limit of ${MAX_SOURCES}`);
         }
 
-        let processedResults = deduplicatedResults;
-        let finalDeduplicatedResults = deduplicatedResults;
+        // 根据设置过滤视频源
+        const { videoSource } = useSettingsStore.getState();
+        let filteredResults = deduplicatedResults;
 
-        // 不使用匹配引擎过滤，直接使用所有去重后的结果
+        if (!videoSource.enabledAll) {
+          filteredResults = deduplicatedResults.filter((r) => {
+            const isEnabled = videoSource.sources[r.source] === true;
+            if (!isEnabled) {
+              logger.info(`[FILTER] Filtering out disabled source: ${r.source} (${r.source_name})`);
+            }
+            return isEnabled;
+          });
+          logger.info(`[FILTER] After filtering: ${filteredResults.length} results`);
+        }
+
+        let processedResults = filteredResults;
+        let finalDeduplicatedResults = filteredResults;
+
+        // 不使用匹配引擎过滤，直接使用所有过滤后的结果
         // 这样可以确保获取到所有可用的视频源
-        logger.info(`[MATCHING] Using all deduplicated results: ${deduplicatedResults.length} results`);
-        processedResults = deduplicatedResults;
+        logger.info(`[MATCHING] Using all filtered results: ${filteredResults.length} results`);
+        processedResults = filteredResults;
 
         // 最终去重：使用 source_id 作为唯一键（参考 LunaTV）
         const seenFinal = new Set<string>();
@@ -175,7 +177,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
         if (!bestDetail) {
           // 首先尝试豆瓣 ID 匹配
           if (state.doubanId) {
-            // 从所有结果中查找，不考虑source_name去重
+            // 从所有结果中查找，不考虑 source_name 去重
             const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
             bestDetail = allResults.find((r) =>
               r.doubanId === state.doubanId
@@ -193,9 +195,20 @@ const useDetailStore = create<DetailState>((set, get) => ({
             }
           }
 
-          // 最后使用匹配引擎的结果
+          // 最后使用匹配引擎的结果，但按权重排序选择最高权重的源
           if (!bestDetail && finalDeduplicatedResults.length > 0) {
-            bestDetail = finalDeduplicatedResults[0];
+            const { sourceWeights } = useSettingsStore.getState();
+            
+            // 按权重排序，选择最高权重的源
+            // 优先使用后端权重，其次使用前端配置权重，最后使用默认值 50
+            const sortedResults = [...finalDeduplicatedResults].sort((a, b) => {
+              const aWeight = resourceWeights[a.source] ?? sourceWeights[a.source] ?? 50;
+              const bWeight = resourceWeights[b.source] ?? sourceWeights[b.source] ?? 50;
+              return bWeight - aWeight;
+            });
+            
+            bestDetail = sortedResults[0];
+            logger.info(`[MATCHING] Selected best source by weight: ${bestDetail.source} (${bestDetail.source_name})`);
           }
         }
 
@@ -245,15 +258,57 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
       // 保存后端返回的资源权重
       try {
-        const allResources = await api.getResources(signal);
+        logger.info(`[WEIGHT] Fetching resource weights from backend...`);
+        
+        // 使用 LunaTV API 端点获取权重
+        const backendWeights = await api.getSourceWeights(signal);
+        logger.info(`[WEIGHT] Got weights from /api/source-weights: ${JSON.stringify(backendWeights)}`);
+        
         const weights: { [key: string]: number } = {};
-        allResources.forEach(r => {
-          weights[r.key] = r.weight;
-        });
+        let hasBackendWeights = Object.keys(backendWeights).length > 0;
+        
+        // 如果后端返回了权重，直接使用
+        if (hasBackendWeights) {
+          Object.assign(weights, backendWeights);
+          logger.info(`[WEIGHT] ✓ Using backend weights from /api/source-weights`);
+          Object.entries(weights).forEach(([key, weight]) => {
+            logger.info(`[WEIGHT]   ${key}: ${weight}`);
+          });
+        }
+        
+        // 如果后端没有返回权重，使用前端默认权重
+        if (!hasBackendWeights) {
+          logger.info(`[WEIGHT] Backend did not return weights, using frontend default weights`);
+          
+          // 前端默认权重配置（可按需修改）
+          const defaultWeights: { [key: string]: number } = {
+            'aixuexi.com': 100,        // 官方高清站 - 最高优先级
+            'jszyapi.com': 50,         // 极速资源 - 中等优先级
+          };
+          
+          // 为每个资源分配默认权重
+          const allResources = await api.getResources(signal);
+          logger.info(`[WEIGHT] Got ${allResources.length} resources from /api/search/resources`);
+          
+          allResources.forEach(r => {
+            const resourceKey = r.key || r.source || 'unknown';
+            const defaultWeight = defaultWeights[resourceKey];
+            
+            if (defaultWeight !== undefined) {
+              weights[resourceKey] = defaultWeight;
+              logger.info(`[WEIGHT] ⚙️ ${resourceKey}: assigned default weight=${defaultWeight}`);
+            } else {
+              weights[resourceKey] = 50; // 未知资源使用默认值
+              logger.info(`[WEIGHT] ⚙️ ${resourceKey}: using default weight=50`);
+            }
+          });
+        }
+        
         set({ resourceWeights: weights });
-        logger.info(`[INFO] Resource weights from backend: ${JSON.stringify(weights)}`);
+        logger.info(`[WEIGHT] ✓ Final resource weights: ${JSON.stringify(weights)}`);
+        logger.info(`[WEIGHT] Total resources with weights: ${Object.keys(weights).length}`);
       } catch (resourceError) {
-        logger.warn(`[WARN] Failed to get resources (non-fatal):`, resourceError);
+        logger.warn(`[WEIGHT] Failed to get resources (non-fatal):`, resourceError);
       }
 
       // 旧的 preferredSource 逻辑已被替换，因为我们现在总是使用 searchVideos
@@ -422,13 +477,24 @@ const useDetailStore = create<DetailState>((set, get) => ({
     const { searchResults, failedSources, resourceWeights } = get();
     const { sourceWeights } = useSettingsStore.getState();
 
+    logger.info(`[BEST_SOURCE] === WEIGHT DEBUG START ===`);
     logger.info(`[BEST_SOURCE] Selecting best source for episode ${episodeIndex + 1}`);
     logger.info(`[BEST_SOURCE] Available sources: ${searchResults.length}`);
     logger.info(`[BEST_SOURCE] Failed sources: [${Array.from(failedSources).join(', ')}]`);
     logger.info(`[BEST_SOURCE] Backend resource weights: ${JSON.stringify(resourceWeights)}`);
     logger.info(`[BEST_SOURCE] Local source weights: ${JSON.stringify(sourceWeights)}`);
+    
+    // 调试：详细输出每个源的权重来源
+    logger.info(`[BEST_SOURCE] === SOURCE WEIGHT DETAILS ===`);
+    searchResults.forEach(source => {
+      const backendW = resourceWeights[source.source];
+      const localW = sourceWeights[source.source];
+      const finalW = backendW ?? localW ?? 50;
+      logger.info(`[BEST_SOURCE] ${source.source} (${source.source_name}): backend=${backendW}, local=${localW}, final=${finalW}`);
+    });
+    logger.info(`[BEST_SOURCE] === WEIGHT DEBUG END ===`);
 
-    // 过滤掉已失败的sources和没有对应剧集的sources
+    // 过滤掉已失败的 sources 和没有对应剧集的 sources
     const availableSources = searchResults.filter(result =>
       !failedSources.has(result.source) &&
       result.episodes &&
@@ -448,13 +514,16 @@ const useDetailStore = create<DetailState>((set, get) => ({
     // 对每个源进行评分
     const sourceScores = await Promise.all(
       availableSources.map(async (source) => {
-        // 1. 权重分数 (0-100) - 优先使用后端权重，其次使用本地配置
+        // 1. 权重分数 (0-100) - 后端权重优先，本地权重作为备份
         const backendWeight = resourceWeights[source.source];
         const localWeight = sourceWeights[source.source];
-        const weight = backendWeight ?? localWeight ?? 50;
+        
+        // 修复：后端权重不存在（undefined）时才使用本地权重
+        // 注意：backendWeight 可能为 0，此时应该使用 0 而不是 fallback
+        const weight = backendWeight !== undefined ? backendWeight : (localWeight ?? 50);
         const weightScore = weight;
 
-        logger.info(`[BEST_SOURCE] ${source.source_name} weight: backend=${backendWeight}, local=${localWeight}, using=${weight}`);
+        logger.info(`[BEST_SOURCE] ${source.source_name}: backend=${backendWeight}, local=${localWeight}, using=${weight}`);
 
         // 2. 清晰度分数 (0-40)
         let resolutionScore = 0;
@@ -504,9 +573,16 @@ const useDetailStore = create<DetailState>((set, get) => ({
     // 按总分排序
     sourceScores.sort((a, b) => b.totalScore - a.totalScore);
 
+    // 详细输出排序结果
+    logger.info(`[BEST_SOURCE] === FINAL RANKING ===`);
+    sourceScores.forEach((score, index) => {
+      logger.info(`[BEST_SOURCE] #${index + 1}: ${score.source.source_name} (total=${score.totalScore}, weight=${score.weightScore}, resolution=${score.resolutionScore}, speed=${score.speedScore})`);
+    });
+    logger.info(`[BEST_SOURCE] === END RANKING ===`);
+
     const bestSource = sourceScores[0].source;
     logger.info(
-      `[BEST_SOURCE] Selected best source: ${bestSource.source_name} (total score: ${sourceScores[0].totalScore})`
+      `[BEST_SOURCE] ✓ Selected best source: ${bestSource.source_name} (total score: ${sourceScores[0].totalScore})`
     );
 
     return bestSource;

@@ -60,51 +60,70 @@ export class Api {
             const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
             console.log('Saved credentials:', credentialsStr);
 
-            // 确保 username 和 password 不是 undefined，而是空字符串
-            let username = "admin";
-            let password = "admin123";
-
-            if (credentialsStr) {
+            // 只有在有保存的凭证时才尝试登录
+            if (!credentialsStr) {
+              console.warn('No saved credentials found, skipping auto-login');
+            } else {
               const authInfo = JSON.parse(credentialsStr);
-              username = authInfo.username || "admin";
-              password = authInfo.password || "admin123";
-            }
+              const username = authInfo.username;
+              const password = authInfo.password;
 
-            console.log('Attempting login with username:', username);
+              if (!username || !password) {
+                console.warn('Invalid saved credentials, skipping auto-login');
+              } else {
+                console.log('Attempting login with username:', username);
 
-            // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
-            const loginResponse = await fetch(`${this.baseURL}/api/login`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Login-Request": "true"
-              },
-              body: JSON.stringify({ username, password }),
-            });
+                // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
+                const loginResponse = await fetch(`${this.baseURL}/api/login`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Login-Request": "true"
+                  },
+                  body: JSON.stringify({ username, password }),
+                });
 
-            console.log('Login response status:', loginResponse.status);
+                console.log('Login response status:', loginResponse.status);
 
-            if (loginResponse.ok) {
-              // 保存认证 cookie
-              const loginSetCookie = loginResponse.headers.get('Set-Cookie');
-              console.log('Login Set-Cookie header:', loginSetCookie);
+                if (loginResponse.ok) {
+                  // 保存认证 cookie
+                  const loginSetCookie = loginResponse.headers.get('Set-Cookie');
+                  console.log('Login Set-Cookie header:', loginSetCookie);
 
-              if (loginSetCookie) {
-                // 提取 user_auth cookie
-                const cookieParts = loginSetCookie.split(';');
-                for (const part of cookieParts) {
-                  if (part.trim().startsWith('user_auth=')) {
-                    // 提取 user_auth 的值（不包含键名）
-                    authCookieValue = part.trim().substring('user_auth='.length);
-                    console.log('Extracted login user_auth value:', authCookieValue);
-                    break;
+                  if (loginSetCookie) {
+                    // 提取 user_auth cookie
+                    const cookieParts = loginSetCookie.split(';');
+                    for (const part of cookieParts) {
+                      if (part.trim().startsWith('user_auth=')) {
+                        // 提取 user_auth 的值（不包含键名）
+                        authCookieValue = part.trim().substring('user_auth='.length);
+                        console.log('Extracted login user_auth value:', authCookieValue);
+                        break;
+                      }
+                    }
+
+                    if (authCookieValue) {
+                      // 对后端返回的cookie进行解码，避免双重编码问题
+                      let decodedCookieValue = authCookieValue;
+                      try {
+                        // 尝试解码一次（处理双重编码的情况）
+                        decodedCookieValue = decodeURIComponent(authCookieValue);
+                        console.log('Decoded cookie value:', decodedCookieValue);
+
+                        // 再次尝试解码（确保处理双重编码）
+                        if (decodedCookieValue.startsWith('%')) {
+                          decodedCookieValue = decodeURIComponent(decodedCookieValue);
+                          console.log('Double decoded cookie value:', decodedCookieValue);
+                        }
+                      } catch (decodeError) {
+                        console.warn('Failed to decode cookie, using original value:', decodeError);
+                      }
+
+                      // 保存解码后的值
+                      await AsyncStorage.setItem("authCookies", decodedCookieValue);
+                      console.log('Auth cookie value saved successfully after login:', decodedCookieValue);
+                    }
                   }
-                }
-
-                if (authCookieValue) {
-                  // 保存解码后的值
-                  await AsyncStorage.setItem("authCookies", authCookieValue);
-                  console.log('Auth cookie value saved successfully after login:', authCookieValue);
                 }
               }
             }
@@ -204,11 +223,27 @@ export class Api {
             }
 
             if (userAuthValue) {
-              // 保存解码后的值
-              console.log('Attempting to save auth cookie to AsyncStorage:', userAuthValue);
+              // 对后端返回的cookie进行解码，避免双重编码问题
+              let decodedCookieValue = userAuthValue;
               try {
-                await AsyncStorage.setItem("authCookies", userAuthValue);
-                console.log('Auth cookie value saved successfully:', userAuthValue);
+                // 尝试解码一次（处理双重编码的情况）
+                decodedCookieValue = decodeURIComponent(userAuthValue);
+                console.log('Decoded cookie value:', decodedCookieValue);
+
+                // 再次尝试解码（确保处理双重编码）
+                if (decodedCookieValue.startsWith('%')) {
+                  decodedCookieValue = decodeURIComponent(decodedCookieValue);
+                  console.log('Double decoded cookie value:', decodedCookieValue);
+                }
+              } catch (decodeError) {
+                console.warn('Failed to decode cookie, using original value:', decodeError);
+              }
+
+              // 保存解码后的值
+              console.log('Attempting to save auth cookie to AsyncStorage:', decodedCookieValue);
+              try {
+                await AsyncStorage.setItem("authCookies", decodedCookieValue);
+                console.log('Auth cookie value saved successfully:', decodedCookieValue);
 
                 // 验证保存是否成功
                 const savedCookie = await AsyncStorage.getItem("authCookies");
@@ -242,62 +277,81 @@ export class Api {
             const credentialsStr = await AsyncStorage.getItem("mytv_login_credentials");
             console.log('Saved credentials:', credentialsStr);
 
-            // 确保 username 和 password 不是 undefined，而是空字符串
-            let username = "admin";
-            let password = "admin123";
-
-            if (credentialsStr) {
+            // 只有在有保存的凭证时才尝试重新登录
+            if (!credentialsStr) {
+              console.warn('No saved credentials found, skipping re-login');
+            } else {
               const authInfo = JSON.parse(credentialsStr);
-              username = authInfo.username || "admin";
-              password = authInfo.password || "admin123";
-            }
+              const username = authInfo.username;
+              const password = authInfo.password;
 
-            console.log('Attempting re-login with username:', username);
+              if (!username || !password) {
+                console.warn('Invalid saved credentials, skipping re-login');
+              } else {
+                console.log('Attempting re-login with username:', username);
 
-            // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
-            const loginResponse = await fetch(`${this.baseURL}/api/login`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Login-Request": "true"
-              },
-              body: JSON.stringify({ username, password }),
-            });
+                // 直接使用 fetch 发送登录请求，避免递归调用 _fetch
+                const loginResponse = await fetch(`${this.baseURL}/api/login`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Login-Request": "true"
+                  },
+                  body: JSON.stringify({ username, password }),
+                });
 
-            console.log('Re-login response status:', loginResponse.status);
+                console.log('Re-login response status:', loginResponse.status);
 
-            if (loginResponse.ok) {
-              // 保存认证 cookie
-              const loginSetCookie = loginResponse.headers.get('Set-Cookie');
-              console.log('Re-login Set-Cookie header:', loginSetCookie);
+                if (loginResponse.ok) {
+                  // 保存认证 cookie
+                  const loginSetCookie = loginResponse.headers.get('Set-Cookie');
+                  console.log('Re-login Set-Cookie header:', loginSetCookie);
 
-              if (loginSetCookie) {
-                try {
-                  // 提取 user_auth cookie
-                  const cookieParts = loginSetCookie.split(';');
-                  let userAuthValue = '';
-                  for (const part of cookieParts) {
-                    if (part.trim().startsWith('user_auth=')) {
-                      // 提取 user_auth 的值（不包含键名）
-                      userAuthValue = part.trim().substring('user_auth='.length);
-                      break;
+                  if (loginSetCookie) {
+                    try {
+                      // 提取 user_auth cookie
+                      const cookieParts = loginSetCookie.split(';');
+                      let userAuthValue = '';
+                      for (const part of cookieParts) {
+                        if (part.trim().startsWith('user_auth=')) {
+                          // 提取 user_auth 的值（不包含键名）
+                          userAuthValue = part.trim().substring('user_auth='.length);
+                          break;
+                        }
+                      }
+                      console.log('Extracted re-login user_auth value:', userAuthValue);
+
+                      if (userAuthValue) {
+                        // 对后端返回的cookie进行解码，避免双重编码问题
+                        let decodedCookieValue = userAuthValue;
+                        try {
+                          // 尝试解码一次（处理双重编码的情况）
+                          decodedCookieValue = decodeURIComponent(userAuthValue);
+                          console.log('Decoded cookie value:', decodedCookieValue);
+
+                          // 再次尝试解码（确保处理双重编码）
+                          if (decodedCookieValue.startsWith('%')) {
+                            decodedCookieValue = decodeURIComponent(decodedCookieValue);
+                            console.log('Double decoded cookie value:', decodedCookieValue);
+                          }
+                        } catch (decodeError) {
+                          console.warn('Failed to decode cookie, using original value:', decodeError);
+                        }
+
+                        // 保存解码后的值
+                        await AsyncStorage.setItem("authCookies", decodedCookieValue);
+                        console.log('Auth cookie value saved successfully after re-login:', decodedCookieValue);
+                      }
+                    } catch (storageError) {
+                      console.error('Failed to save auth cookies after re-login:', storageError);
                     }
                   }
-                  console.log('Extracted re-login user_auth value:', userAuthValue);
 
-                  if (userAuthValue) {
-                    // 保存解码后的值
-                    await AsyncStorage.setItem("authCookies", userAuthValue);
-                    console.log('Auth cookie value saved successfully after re-login:', userAuthValue);
-                  }
-                } catch (storageError) {
-                  console.error('Failed to save auth cookies after re-login:', storageError);
+                  console.log('重新登录成功，重试原请求...');
+                  // 重新尝试原请求
+                  return this._fetch(url, options, retryCount + 1);
                 }
               }
-
-              console.log('重新登录成功，重试原请求...');
-              // 重新尝试原请求
-              return this._fetch(url, options, retryCount + 1);
             }
           } catch (loginError) {
             console.warn("Auto re-login failed:", loginError);
@@ -403,10 +457,27 @@ export class Api {
           }
 
           if (userAuthValue) {
+            // 对后端返回的cookie进行解码，避免双重编码问题
+            // 后端可能返回双重编码的cookie，需要解码后再保存
+            let decodedCookieValue = userAuthValue;
+            try {
+              // 尝试解码一次（处理双重编码的情况）
+              decodedCookieValue = decodeURIComponent(userAuthValue);
+              console.log('Decoded cookie value:', decodedCookieValue);
+
+              // 再次尝试解码（确保处理双重编码）
+              if (decodedCookieValue.startsWith('%')) {
+                decodedCookieValue = decodeURIComponent(decodedCookieValue);
+                console.log('Double decoded cookie value:', decodedCookieValue);
+              }
+            } catch (decodeError) {
+              console.warn('Failed to decode cookie, using original value:', decodeError);
+            }
+
             // 保存解码后的值
-            console.log('Attempting to save login auth cookie to AsyncStorage:', userAuthValue);
-            await AsyncStorage.setItem("authCookies", userAuthValue);
-            console.log('Login auth cookie value saved successfully:', userAuthValue);
+            console.log('Attempting to save login auth cookie to AsyncStorage:', decodedCookieValue);
+            await AsyncStorage.setItem("authCookies", decodedCookieValue);
+            console.log('Login auth cookie value saved successfully:', decodedCookieValue);
 
             // 验证保存是否成功
             const savedCookie = await AsyncStorage.getItem("authCookies");
@@ -473,10 +544,26 @@ export class Api {
           }
 
           if (userAuthValue) {
+            // 对后端返回的cookie进行解码，避免双重编码问题
+            let decodedCookieValue = userAuthValue;
+            try {
+              // 尝试解码一次（处理双重编码的情况）
+              decodedCookieValue = decodeURIComponent(userAuthValue);
+              console.log('Decoded cookie value:', decodedCookieValue);
+
+              // 再次尝试解码（确保处理双重编码）
+              if (decodedCookieValue.startsWith('%')) {
+                decodedCookieValue = decodeURIComponent(decodedCookieValue);
+                console.log('Double decoded cookie value:', decodedCookieValue);
+              }
+            } catch (decodeError) {
+              console.warn('Failed to decode cookie, using original value:', decodeError);
+            }
+
             // 保存解码后的值
-            console.log('Attempting to save register auth cookie to AsyncStorage:', userAuthValue);
-            await AsyncStorage.setItem("authCookies", userAuthValue);
-            console.log('Register auth cookie value saved successfully:', userAuthValue);
+            console.log('Attempting to save register auth cookie to AsyncStorage:', decodedCookieValue);
+            await AsyncStorage.setItem("authCookies", decodedCookieValue);
+            console.log('Register auth cookie value saved successfully:', decodedCookieValue);
 
             // 验证保存是否成功
             const savedCookie = await AsyncStorage.getItem("authCookies");
@@ -830,6 +917,19 @@ export class Api {
     const url = `/api/search/resources`;
     const response = await this._fetch(url, { signal });
     return response.json();
+  }
+
+  // 获取视频源权重 - LunaTV API 端点
+  async getSourceWeights(signal?: AbortSignal): Promise<{ [key: string]: number }> {
+    const url = `/api/source-weights`;
+    try {
+      const response = await this._fetch(url, { signal });
+      const data = await response.json();
+      return data.weights || {};
+    } catch (error) {
+      logger.warn(`[API] getSourceWeights failed:`, error);
+      return {};
+    }
   }
 
   async getVideoDetail(source: string, id: string): Promise<VideoDetail> {
@@ -1254,6 +1354,39 @@ export class Api {
     const url = `/api/cron?password=${encodeURIComponent(password)}`;
     const response = await this._fetch(url);
     return response.json();
+  }
+
+  async updateVideoSource(enabledApis: string[]): Promise<{ ok: boolean }> {
+    try {
+      console.log('Updating video source with enabledApis:', enabledApis);
+
+      const url = `/api/admin/user`;
+      const response = await this._fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "updateUserApis",
+          enabledApis,
+        }),
+      });
+
+      console.log('Update video source response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.clone().text();
+        console.error('Update video source error response:', errorText);
+        throw new Error(`Failed to update video source: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Update video source result:', result);
+      return result;
+    } catch (error) {
+      console.error('Failed to update video source:', error);
+      throw error;
+    }
   }
 }
 

@@ -22,6 +22,7 @@ const AD_MARKER_TAGS = [
 ];
 
 const FILTER_CACHE_DIR = `${FileSystem.cacheDirectory}ad-filtered-m3u8/`;
+const FILTER_CACHE_MAX_AGE = 30 * 60 * 1000; // 30 分钟
 const filteredPlaylistCache = new Map<string, string>();
 
 export const parseM3U = (m3uText: string): Channel[] => {
@@ -261,9 +262,17 @@ export const createDiscontinuityFilteredM3u8Url = async (originalUrl: string): P
     try {
       const fileInfo = await FileSystem.getInfoAsync(cachedUrl);
       if (fileInfo.exists) {
-        return cachedUrl;
+        // 检查缓存年龄
+        const cacheAge = Date.now() - (fileInfo.modificationTime || 0) * 1000;
+        if (cacheAge < FILTER_CACHE_MAX_AGE) {
+          return cachedUrl;
+        }
+        // 缓存过期，删除
+        filteredPlaylistCache.delete(originalUrl);
+        await FileSystem.deleteAsync(cachedUrl, { idempotent: true });
+      } else {
+        filteredPlaylistCache.delete(originalUrl);
       }
-      filteredPlaylistCache.delete(originalUrl);
     } catch (error) {
       logger.warn(`[ADBLOCK] Failed to check cached playlist: ${cachedUrl}`);
       filteredPlaylistCache.delete(originalUrl);

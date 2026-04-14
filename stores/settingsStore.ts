@@ -1,10 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 
-import { api, type ServerConfig } from "@/services/api";
+import { api } from "@/services/api";
 import { proxyService } from "@/services/proxyService";
 import { SettingsManager } from "@/services/storage";
 import { storageConfig } from "@/services/storageConfig";
+import { type ServerConfig } from "@/services/types";
 import Logger from "@/utils/Logger";
 
 const logger = Logger.withTag("SettingsStore");
@@ -250,7 +251,32 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setVodProxyEnabled: (enabled) => set({ vodProxyEnabled: enabled, vodAdBlockEnabled: enabled }),
   setLiveAdBlockEnabled: (enabled) => set({ liveAdBlockEnabled: enabled }),
   setVodAdBlockEnabled: (enabled) => set({ vodAdBlockEnabled: enabled, vodProxyEnabled: enabled }),
-  setVideoSource: (config) => set({ videoSource: config }),
+  setVideoSource: async (config) => {
+    set({ videoSource: config });
+
+    // 同步视频源设置到后端
+    try {
+      const { enabledAll, sources } = config;
+
+      if (!enabledAll && Object.keys(sources).length > 0) {
+        // 如果不是启用所有源，则将启用的源转换为 enabledApis 数组
+        const enabledApis = Object.keys(sources).filter(key => sources[key] === true);
+        console.log('Syncing video source to backend, enabledApis:', enabledApis);
+
+        await api.updateVideoSource(enabledApis);
+        logger.info('Successfully synced video source to backend');
+      } else {
+        // 如果启用所有源，清空 enabledApis（表示无限制）
+        console.log('Syncing video source to backend, enabledAll=true, clearing enabledApis');
+
+        await api.updateVideoSource([]);
+        logger.info('Successfully synced video source to backend (all sources enabled)');
+      }
+    } catch (error) {
+      logger.error('Failed to sync video source to backend:', error);
+      // 不抛出错误，避免影响前端设置
+    }
+  },
   setSourceWeight: (sourceKey: string, weight: number) => {
     set((state) => ({
       sourceWeights: { ...state.sourceWeights, [sourceKey]: weight },

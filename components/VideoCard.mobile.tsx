@@ -43,6 +43,7 @@ const VideoCardMobile = forwardRef<View, VideoCardMobileProps>(
       sourceName,
       progress,
       episodeIndex,
+      totalEpisodes,
       doubanId,
       onFocus,
       onRecordDeleted,
@@ -157,8 +158,14 @@ const VideoCardMobile = forwardRef<View, VideoCardMobileProps>(
               </View>
             )}
 
-            {/* 来源 */}
-            {sourceName && (
+            {/* 左上角显示集数（如果有总集数信息）*/}
+            {totalEpisodes !== undefined && totalEpisodes > 0 && (
+              <View style={styles.episodeBadge}>
+                <Text style={styles.badgeText}>共{totalEpisodes}集</Text>
+              </View>
+            )}
+            {/* 如果没有总集数，才显示源名称 */}
+            {totalEpisodes === undefined && sourceName && (
               <View style={styles.sourceNameBadge}>
                 <Text style={styles.badgeText}>{sourceName}</Text>
               </View>
@@ -253,6 +260,15 @@ const createMobileStyles = (cardWidth: number, cardHeight: number, spacing: numb
       bottom: 24,
       right: 6,
       backgroundColor: "rgba(0, 0, 0, 0.7)",
+      borderRadius: 4,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+    },
+    episodeBadge: {
+      position: "absolute",
+      bottom: 6,
+      left: 6,
+      backgroundColor: "rgba(52, 199, 89, 0.9)",
       borderRadius: 4,
       paddingHorizontal: 4,
       paddingVertical: 2,

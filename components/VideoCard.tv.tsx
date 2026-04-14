@@ -44,6 +44,7 @@ const VideoCard = forwardRef<View, VideoCardProps>(
       sourceCount,
       progress,
       episodeIndex,
+      totalEpisodes,
       doubanId,
       onFocus,
       onRecordDeleted,
@@ -201,7 +202,14 @@ const VideoCard = forwardRef<View, VideoCardProps>(
                 <Text style={styles.badgeText}>{year}</Text>
               </View>
             )}
-            {sourceName && (
+            {/* 左上角显示集数（如果有总集数信息）*/}
+            {totalEpisodes !== undefined && totalEpisodes > 0 && (
+              <View style={styles.episodeBadge}>
+                <Text style={styles.badgeText}>共{totalEpisodes}集</Text>
+              </View>
+            )}
+            {/* 如果没有总集数，才显示源名称 */}
+            {totalEpisodes === undefined && sourceName && (
               <View style={styles.sourceNameBadge}>
                 <Text style={styles.badgeText}>{sourceName}</Text>
               </View>
@@ -322,6 +330,15 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  episodeBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(52, 199, 89, 0.9)",
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 3,

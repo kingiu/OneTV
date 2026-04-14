@@ -185,6 +185,11 @@ export const useVideoHandlers = ({
       posterSource: { uri: detail?.poster ?? "" },
       resizeMode: ResizeMode.CONTAIN,
       rate: playbackRate,
+      bufferConfig: {
+        minBufferMs: 15000,    // 至少缓冲 15s
+        maxBufferMs: 50000,   // 最多缓冲 50s
+        bufferSizeMs: 5000,   // 缓冲区大小 5s
+      },
       onPlaybackStatusUpdate: handlePlaybackStatusUpdate,
       onLoad,
       onLoadStart,

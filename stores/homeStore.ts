@@ -30,7 +30,6 @@ export interface Category {
 }
 
 const initialCategories: Category[] = [
-  { title: "最近播放", type: "record" },
   { title: "热门剧集", type: "tv", tag: "热门" },
   { title: "电视剧", type: "tv", tags: ["国产剧", "美剧", "英剧", "韩剧", "日剧", "港剧", "日本动画", "动画"] },
   {
@@ -314,12 +313,29 @@ const useHomeStore = create<HomeState>((set, get) => ({
   },
 
   refreshPlayRecords: async () => {
-    // 无论登录状态如何，始终显示最近播放分类
+    // 只有当有播放记录时才显示最近播放分类
+    const records = await PlayRecordManager.getAll();
+    const hasRecords = Object.keys(records).length > 0;
+    
     set((state) => {
       const recordCategoryExists = state.categories.some((c) => c.type === "record");
-      if (!recordCategoryExists) {
-        return { categories: [initialCategories[0], ...state.categories] };
+      
+      // 如果有播放记录且分类不存在，则添加
+      if (hasRecords && !recordCategoryExists) {
+        const recordCategory = { title: "最近播放", type: "record" as const };
+        return { categories: [recordCategory, ...state.categories] };
       }
+      
+      // 如果没有播放记录且分类存在，则移除
+      if (!hasRecords && recordCategoryExists) {
+        return { 
+          categories: state.filter((c) => c.type !== "record"),
+          selectedCategory: state.selectedCategory.type === "record" 
+            ? initialCategories[0] 
+            : state.selectedCategory
+        };
+      }
+      
       return {};
     });
 
