@@ -689,13 +689,10 @@ export class Api {
       return true;
     });
 
-    // 限制返回结果数量，确保不超过24个
-    const MAX_RESULTS = 24;
-    const limitedResults = deduplicatedResults.slice(0, MAX_RESULTS);
+    // 不再限制返回结果数量，后端会持续增加新的视频源
+    console.log(`Final results: ${deduplicatedResults.length} (no limit)`);
 
-    console.log(`Final results before deduplication: ${finalResults.length}, after deduplication: ${deduplicatedResults.length}, after limit: ${limitedResults.length}`);
-
-    return { results: limitedResults };
+    return { results: deduplicatedResults };
   }
 
   /**
@@ -905,12 +902,10 @@ export class Api {
       return true;
     });
 
-    // 限制结果数量为24个
-    const limitedResults = deduplicatedResults.slice(0, 24);
+    // 不再限制返回结果数量，后端会持续增加新的视频源
+    console.log(`Final results: ${deduplicatedResults.length} (no limit)`);
 
-    console.log(`Final results: ${limitedResults.length} (after dedup and limit)`);
-
-    return { results: limitedResults };
+    return { results: deduplicatedResults };
   }
 
   async getResources(signal?: AbortSignal): Promise<ApiSite[]> {

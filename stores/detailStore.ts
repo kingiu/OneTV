@@ -123,11 +123,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
         logger.info(`[MATCHING] Before dedup: ${allResults.length} results, After dedup: ${deduplicatedResults.length} results`);
 
-        // 检测去重后的视频源数量是否超过后端限制（24个）
-        const MAX_SOURCES = 24;
-        if (deduplicatedResults.length > MAX_SOURCES) {
-          logger.warn(`[WARN] After initial dedup: ${deduplicatedResults.length} results exceeds limit of ${MAX_SOURCES}`);
-        }
+        // 不再限制视频源数量，后端会持续增加新的视频源
+        logger.info(`[MATCHING] Total unique sources: ${deduplicatedResults.length}`);
 
         // 根据设置过滤视频源
         const { videoSource } = useSettingsStore.getState();
@@ -164,13 +161,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
         });
 
         logger.info(`[MATCHING] After final deduplication: ${finalDeduplicatedResults.length} results`);
-
-        // 检测最终视频源数量是否超过后端限制（24个）
-        if (finalDeduplicatedResults.length > MAX_SOURCES) {
-          logger.warn(`[WARN] Final results count (${finalDeduplicatedResults.length}) exceeds limit of ${MAX_SOURCES}`);
-        } else {
-          logger.info(`[INFO] Final results count: ${finalDeduplicatedResults.length} (limit: ${MAX_SOURCES})`);
-        }
+        logger.info(`[MATCHING] Total sources available: ${finalDeduplicatedResults.length} (no limit)`);
 
         // 优先选择最佳匹配的结果作为 detail
         let bestDetail = state.detail;
@@ -322,12 +313,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
         logger.error(`[ERROR] All search attempts completed but no results found for "${q}"`);
         set({ error: `未找到 "${q}" 的播放源，请检查标题拼写或稍后重试` });
       } else if (finalState.searchResults.length > 0) {
-        logger.info(`[SUCCESS] DetailStore.init completed successfully with ${finalState.searchResults.length} sources`);
-        if (finalState.searchResults.length > MAX_SOURCES) {
-          logger.warn(`[WARN] Total sources (${finalState.searchResults.length}) exceeds backend limit of ${MAX_SOURCES}`);
-        } else {
-          logger.info(`[INFO] Total sources: ${finalState.searchResults.length} (limit: ${MAX_SOURCES})`);
-        }
+        logger.info(`[SUCCESS] DetailStore.init completed successfully with ${finalState.searchResults.length} sources (no limit)`);
       }
 
       if (finalState.detail) {
