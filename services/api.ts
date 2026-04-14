@@ -1041,7 +1041,8 @@ export class Api {
     try {
       const response = await this._fetch(url, { signal });
       const data = await response.json();
-      return data.weights || {};
+      // 兼容两种格式：{ weights: {...} } 或直接返回 {...}
+      return typeof data === 'object' && data !== null && 'weights' in data ? data.weights : data;
     } catch (error) {
       logger.warn(`[API] getSourceWeights failed:`, error);
       return {};

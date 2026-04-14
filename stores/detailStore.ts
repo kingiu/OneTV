@@ -169,11 +169,12 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
         // 首先对所有结果按后端权重排序（确保官方资源站总是排在前面）
         const { sourceWeights } = useSettingsStore.getState();
-        const { resourceWeights: currentResourceWeights } = get(); // 获取当前状态中的 resourceWeights
+        const { resourceWeights: currentResourceWeights } = get(); // 重新获取最新的 resourceWeights
 
         // 按权重排序所有结果
         // 优先使用后端权重，其次使用前端配置权重，最后使用默认值 50
         const sortedResults = [...finalDeduplicatedResults].sort((a, b) => {
+          // 为每个源单独获取权重，确保使用最新值
           const aWeight = currentResourceWeights?.[a.source] ?? sourceWeights[a.source] ?? 50;
           const bWeight = currentResourceWeights?.[b.source] ?? sourceWeights[b.source] ?? 50;
           return bWeight - aWeight;
@@ -185,6 +186,15 @@ const useDetailStore = create<DetailState>((set, get) => ({
           const weight = currentResourceWeights?.[r.source] ?? sourceWeights[r.source] ?? 50;
           logger.info(`[MATCHING] #${index + 1}: ${r.source_name} (${r.source}) - weight: ${weight}`);
         });
+
+        // 特别检查官方资源站
+        const officialSource = sortedResults.find(r => r.source === 'aixuexi.com');
+        if (officialSource) {
+          const officialWeight = currentResourceWeights?.['aixuexi.com'] ?? sourceWeights['aixuexi.com'] ?? 50;
+          logger.info(`[MATCHING] ✅ 官方资源站 found: ${officialSource.source_name} (weight: ${officialWeight})`);
+        } else {
+          logger.warn(`[MATCHING] ❌ 官方资源站 NOT found in search results`);
+        }
 
         // 优先选择最佳匹配的结果作为 detail
         let bestDetail = state.detail;
