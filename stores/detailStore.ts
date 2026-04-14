@@ -59,7 +59,9 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
   init: async (q, preferredSource, id, year, doubanId) => {
     const perfStart = performance.now();
-    logger.info(`[PERF] DetailStore.init START - q: ${q}, preferredSource: ${preferredSource}, id: ${id}, year: ${year}, doubanId: ${doubanId}`);
+    // 清理搜索词，去除前后空格
+    const cleanedQ = q ? q.trim() : q;
+    logger.info(`[PERF] DetailStore.init START - q: "${q}", cleaned: "${cleanedQ}", preferredSource: ${preferredSource}, id: ${id}, year: ${year}, doubanId: ${doubanId}`);
 
     const { controller: oldController } = get();
     if (oldController) {
@@ -69,11 +71,11 @@ const useDetailStore = create<DetailState>((set, get) => ({
     const signal = newController.signal;
 
     // 构建带年份的查询字符串，用于搜索
-    const searchQuery = year ? `${q} ${year}` : q;
-    logger.info(`[MATCHING] Search query: "${searchQuery}" (original: "${q}", year: ${year})`);
+    const searchQuery = year ? `${cleanedQ} ${year}` : cleanedQ;
+    logger.info(`[MATCHING] Search query: "${searchQuery}" (original: "${q}", cleaned: "${cleanedQ}", year: ${year})`);
 
     set({
-      q,
+      q: cleanedQ,
       year: year || null,
       doubanId: doubanId || null,
       loading: true,
@@ -165,6 +167,25 @@ const useDetailStore = create<DetailState>((set, get) => ({
         logger.info(`[MATCHING] After final deduplication: ${finalDeduplicatedResults.length} results`);
         logger.info(`[MATCHING] Total sources available: ${finalDeduplicatedResults.length} (no limit)`);
 
+        // 首先对所有结果按后端权重排序（确保官方资源站总是排在前面）
+        const { sourceWeights } = useSettingsStore.getState();
+        const { resourceWeights: currentResourceWeights } = get(); // 获取当前状态中的 resourceWeights
+
+        // 按权重排序所有结果
+        // 优先使用后端权重，其次使用前端配置权重，最后使用默认值 50
+        const sortedResults = [...finalDeduplicatedResults].sort((a, b) => {
+          const aWeight = currentResourceWeights?.[a.source] ?? sourceWeights[a.source] ?? 50;
+          const bWeight = currentResourceWeights?.[b.source] ?? sourceWeights[b.source] ?? 50;
+          return bWeight - aWeight;
+        });
+
+        // 记录排序后的权重信息
+        logger.info(`[MATCHING] === SORTED RESULTS BY WEIGHT ===`);
+        sortedResults.forEach((r, index) => {
+          const weight = currentResourceWeights?.[r.source] ?? sourceWeights[r.source] ?? 50;
+          logger.info(`[MATCHING] #${index + 1}: ${r.source_name} (${r.source}) - weight: ${weight}`);
+        });
+
         // 优先选择最佳匹配的结果作为 detail
         let bestDetail = state.detail;
         if (!bestDetail) {
@@ -178,8 +199,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
           }
 
           // 然后尝试年份精确匹配
-          if (!bestDetail && state.year && finalDeduplicatedResults.length > 0) {
-            const yearMatch = finalDeduplicatedResults.find((r) =>
+          if (!bestDetail && state.year && sortedResults.length > 0) {
+            const yearMatch = sortedResults.find((r) =>
               r.year === state.year || r.year === String(state.year)
             );
             if (yearMatch) {
@@ -188,27 +209,16 @@ const useDetailStore = create<DetailState>((set, get) => ({
             }
           }
 
-          // 最后使用匹配引擎的结果，但按权重排序选择最高权重的源
-          if (!bestDetail && finalDeduplicatedResults.length > 0) {
-            const { sourceWeights } = useSettingsStore.getState();
-            const { resourceWeights: currentResourceWeights } = get(); // 获取当前状态中的 resourceWeights
-
-            // 按权重排序，选择最高权重的源
-            // 优先使用后端权重，其次使用前端配置权重，最后使用默认值 50
-            const sortedResults = [...finalDeduplicatedResults].sort((a, b) => {
-              const aWeight = currentResourceWeights?.[a.source] ?? sourceWeights[a.source] ?? 50;
-              const bWeight = currentResourceWeights?.[b.source] ?? sourceWeights[b.source] ?? 50;
-              return bWeight - aWeight;
-            });
-
+          // 最后使用排序后的第一个结果（已经按权重排好序）
+          if (!bestDetail && sortedResults.length > 0) {
             bestDetail = sortedResults[0];
             logger.info(`[MATCHING] Selected best source by weight: ${bestDetail.source} (${bestDetail.source_name})`);
           }
         }
 
         return {
-          searchResults: finalDeduplicatedResults,
-          sources: finalDeduplicatedResults.map((r) => ({
+          searchResults: sortedResults,
+          sources: sortedResults.map((r) => ({
             source: r.source,
             source_name: r.source_name,
             resolution: r.resolution,
@@ -219,46 +229,15 @@ const useDetailStore = create<DetailState>((set, get) => ({
     };
 
     try {
-      // 无论是否有 preferredSource，都使用 searchVideos 搜索所有源
-      // 这样可以确保获取到所有可用的视频源，而不仅仅是首选源
-      const searchStart = performance.now();
-      logger.info(`[PERF] API searchVideos (all sources) START - query: "${searchQuery}"`);
-
+      // 首先获取后端返回的资源权重，确保在搜索结果处理之前就有正确的权重
+      let weights: { [key: string]: number } = {};
       try {
-        const { results: allResults } = await api.searchVideos(searchQuery, doubanId);
-        const searchEnd = performance.now();
-        logger.info(`[PERF] API searchVideos (all sources) END - took ${(searchEnd - searchStart).toFixed(2)}ms, results: ${allResults.length}`);
-
-        if (signal.aborted) return;
-
-        if (allResults.length > 0) {
-          logger.info(`[SUCCESS] searchVideos found ${allResults.length} results for "${q}"`);
-          await processAndSetResults(allResults, false);
-          set({ loading: false }); // Stop loading indicator
-        } else {
-          logger.error(`[ERROR] searchVideos found no results for "${q}"`);
-          set({
-            error: `未找到 "${q}" 的播放源，请尝试其他关键词或稍后重试`,
-            loading: false
-          });
-        }
-      } catch (searchError) {
-        logger.error(`[ERROR] searchVideos failed:`, searchError);
-        set({
-          error: `搜索失败：${searchError instanceof Error ? searchError.message : '网络错误，请稍后重试'}`,
-          loading: false
-        });
-      }
-
-      // 保存后端返回的资源权重
-      try {
-        logger.info(`[WEIGHT] Fetching resource weights from backend...`);
+        logger.info(`[WEIGHT] Fetching resource weights from backend FIRST...`);
 
         // 使用 LunaTV API 端点获取权重
         const backendWeights = await api.getSourceWeights(signal);
         logger.info(`[WEIGHT] Got weights from /api/source-weights: ${JSON.stringify(backendWeights)}`);
 
-        const weights: { [key: string]: number } = {};
         const hasBackendWeights = Object.keys(backendWeights).length > 0;
 
         // 如果后端返回了权重，直接使用
@@ -298,11 +277,41 @@ const useDetailStore = create<DetailState>((set, get) => ({
           });
         }
 
+        // 立即保存权重，让 processAndSetResults 能够使用
         set({ resourceWeights: weights });
-        logger.info(`[WEIGHT] ✓ Final resource weights: ${JSON.stringify(weights)}`);
-        logger.info(`[WEIGHT] Total resources with weights: ${Object.keys(weights).length}`);
+        logger.info(`[WEIGHT] ✓ Final resource weights SAVED: ${JSON.stringify(weights)}`);
       } catch (resourceError) {
         logger.warn(`[WEIGHT] Failed to get resources (non-fatal):`, resourceError);
+      }
+
+      // 然后搜索视频源
+      const searchStart = performance.now();
+      logger.info(`[PERF] API searchVideos (all sources) START - query: "${searchQuery}"`);
+
+      try {
+        const { results: allResults } = await api.searchVideos(searchQuery, doubanId);
+        const searchEnd = performance.now();
+        logger.info(`[PERF] API searchVideos (all sources) END - took ${(searchEnd - searchStart).toFixed(2)}ms, results: ${allResults.length}`);
+
+        if (signal.aborted) return;
+
+        if (allResults.length > 0) {
+          logger.info(`[SUCCESS] searchVideos found ${allResults.length} results for "${cleanedQ}"`);
+          await processAndSetResults(allResults, false);
+          set({ loading: false }); // Stop loading indicator
+        } else {
+          logger.error(`[ERROR] searchVideos found no results for "${cleanedQ}"`);
+          set({
+            error: `未找到 "${cleanedQ}" 的播放源，请尝试其他关键词或稍后重试`,
+            loading: false
+          });
+        }
+      } catch (searchError) {
+        logger.error(`[ERROR] searchVideos failed:`, searchError);
+        set({
+          error: `搜索失败：${searchError instanceof Error ? searchError.message : '网络错误，请稍后重试'}`,
+          loading: false
+        });
       }
 
       // 旧的 preferredSource 逻辑已被替换，因为我们现在总是使用 searchVideos
@@ -313,8 +322,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
       // 最终检查：如果所有搜索都完成但仍然没有结果
       const MAX_SOURCES = 24;
       if (finalState.searchResults.length === 0 && !finalState.error) {
-        logger.error(`[ERROR] All search attempts completed but no results found for "${q}"`);
-        set({ error: `未找到 "${q}" 的播放源，请检查标题拼写或稍后重试` });
+        logger.error(`[ERROR] All search attempts completed but no results found for "${cleanedQ}"`);
+        set({ error: `未找到 "${cleanedQ}" 的播放源，请检查标题拼写或稍后重试` });
       } else if (finalState.searchResults.length > 0) {
         logger.info(`[SUCCESS] DetailStore.init completed successfully with ${finalState.searchResults.length} sources (no limit)`);
       }

@@ -235,10 +235,27 @@ export class ResourceMatcher {
         // 否则去除空格
         const noSpaces = trimmed.replace(/\s+/g, '');
         if (noSpaces !== trimmed) variants.push(noSpaces);
+
+        // 剧集特定：尝试不同的空格组合
+        if (keywords.length >= 3) {
+          // 组合前两个关键词作为主标题
+          const mainTitle = keywords.slice(0, 2).join('');
+          const rest = keywords.slice(2).join(' ');
+          const combinedMainTitle = rest ? `${mainTitle} ${rest}` : mainTitle;
+          if (combinedMainTitle !== trimmed) variants.push(combinedMainTitle);
+        }
       }
     }
 
-    // 4. 繁体检测：如果是繁体输入，添加简体变体
+    // 4. 剧集特定：添加常见剧集后缀变体
+    const episodeSuffixes = ['剧集', '电视剧', '连续剧', '剧'];
+    episodeSuffixes.forEach(suffix => {
+      if (!trimmed.includes(suffix)) {
+        variants.push(`${trimmed} ${suffix}`);
+      }
+    });
+
+    // 5. 繁体检测：如果是繁体输入，添加简体变体
     const detectedType = converter.detect(trimmed);
     if (detectedType !== ChineseType.SIMPLIFIED) {
       const simplified = converter.simplized(trimmed);
@@ -247,7 +264,7 @@ export class ResourceMatcher {
       }
     }
 
-    // 5. 年份处理：如果查询包含年份，添加不含年份的变体
+    // 6. 年份处理：如果查询包含年份，添加不含年份的变体
     const yearMatch = trimmed.match(/\s*(19|20)\d{2}\s*$/);
     if (yearMatch) {
       const withoutYear = trimmed.replace(/\s*(19|20)\d{2}\s*$/, '').trim();
@@ -256,7 +273,7 @@ export class ResourceMatcher {
       }
     }
 
-    // 6. 年份处理：如果查询不含年份，尝试添加常见年份变体（最近5年）
+    // 7. 年份处理：如果查询不含年份，尝试添加常见年份变体（最近5年）
     if (!yearMatch) {
       const currentYear = new Date().getFullYear();
       for (let i = 0; i < 5; i++) {
@@ -266,7 +283,24 @@ export class ResourceMatcher {
       }
     }
 
-    // 7. 移除重复变体
+    // 8. 剧集特定：尝试不同的季数格式
+    if (/第.*季/.test(trimmed)) {
+      // 尝试去除"第"字
+      const withoutDi = trimmed.replace(/第([0-9一二三四五六七八九十]+)季/, '$1季');
+      if (withoutDi !== trimmed) variants.push(withoutDi);
+      // 尝试英文格式
+      const seasonMatch = trimmed.match(/第([0-9一二三四五六七八九十]+)季/);
+      if (seasonMatch) {
+        const seasonNum = seasonMatch[1];
+        const arabicNum = /\d+/.test(seasonNum) ? seasonNum : this.chineseToArabic(seasonNum);
+        if (arabicNum) {
+          const englishFormat = trimmed.replace(/第([0-9一二三四五六七八九十]+)季/, `Season ${arabicNum}`);
+          if (englishFormat !== trimmed) variants.push(englishFormat);
+        }
+      }
+    }
+
+    // 9. 移除重复变体
     return Array.from(new Set(variants));
   }
 
@@ -341,6 +375,14 @@ export class ResourceMatcher {
   /**
    * 生成同义词变体
    */
+  private chineseToArabic(chineseNum: string): string | null {
+    const map: Record<string, string> = {
+      '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
+      '六': '6', '七': '7', '八': '8', '九': '9', '十': '10'
+    };
+    return map[chineseNum] || null;
+  }
+
   private generateSynonymVariant(query: string): string {
     let variant = query;
 
@@ -517,18 +559,20 @@ export class ResourceMatcher {
       };
     }).filter(result => result.score > 10) // 降低阈值，获取更多相关结果
       .filter(result => {
-        // 检查是否有剧集或播放源
+        // 检查是否有剧集或播放源 - 宽松的检查，只要有play_sources就保留，即使是空的
         interface PlaySource {
           episodes?: string[];
           [key: string]: unknown;
         }
 
         const hasEpisodes = result.result.episodes && result.result.episodes.length > 0;
-        const hasPlaySources = result.result.play_sources && result.result.play_sources.some((ps: PlaySource) =>
+        const hasPlaySources = result.result.play_sources && result.result.play_sources.length > 0;
+        const hasAnyPlaySourceWithEpisodes = result.result.play_sources && result.result.play_sources.some((ps: PlaySource) =>
           ps.episodes && ps.episodes.length > 0
         );
+        // 只要有播放源数组就保留，哪怕暂时没有剧集
         return hasEpisodes || hasPlaySources;
-      }) // 过滤掉无剧集和无播放源的结果
+      }) // 宽松过滤：有play_sources数组就保留
       .sort((a, b) => {
         // 首先按分数排序
         if (b.score !== a.score) {
@@ -560,17 +604,18 @@ export class ResourceMatcher {
   private getSourceScore(source: string): number {
     // 这里可以根据实际情况设置不同来源的可靠性分数
     const sourceScores: Record<string, number> = {
-      'jszyapi.com': 15, // 极速资源，优先级最高
-      'jsm3u8': 15, // 备用key，兼容其他配置
-      'ffzy': 10,
-      'ffzyapi.com': 10, // 备用key，兼容其他配置
-      'bilibili': 8,
-      'tencent': 8,
-      'iqiyi': 7,
-      'iqiyizyapi.com': 7, // 备用key，兼容其他配置
-      'youku': 7,
+      'aixuexi.com': 100, // 官方高清站 - 最高优先级（与后端保持一致）
+      'jszyapi.com': 50, // 极速资源（与后端保持一致）
+      'jsm3u8': 50, // 备用key，兼容其他配置
+      'ffzy': 30,
+      'ffzyapi.com': 30, // 备用key，兼容其他配置
+      'bilibili': 25,
+      'tencent': 25,
+      'iqiyi': 20,
+      'iqiyizyapi.com': 20, // 备用key，兼容其他配置
+      'youku': 20,
     };
-    return sourceScores[source] || 5;
+    return sourceScores[source] || 10;
   }
 
   /**

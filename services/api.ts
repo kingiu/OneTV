@@ -1,4 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Logger from "../utils/Logger";
+
+const logger = Logger.withTag("ApiService");
 
 import { resourceMatcher } from "./resourceMatcher";
 import {
@@ -655,6 +658,8 @@ export class Api {
   }
 
   async searchVideos(query: string, doubanId?: string): Promise<{ results: SearchResult[] }> {
+    console.log(`[SEARCH] Starting search for "${query}" with doubanId: ${doubanId || 'none'}`);
+    
     // 1. 生成搜索变体（参考 LunaTV 实现）
     const searchVariants = resourceMatcher.generateSearchVariants(query);
     console.log('Search variants (searchVideos):', searchVariants);
@@ -662,7 +667,7 @@ export class Api {
     // 2. 检查缓存（优化：添加搜索结果缓存）
     const cacheKey = `search:${query}:${doubanId || 'none'}`;
     const cached = this.searchCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) { // 30 分钟缓存
+    if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) { // 5 分钟缓存（缩短缓存时间）
       console.log(`[CACHE HIT] Returning cached results for "${query}"`);
       return { results: cached.results };
     }
@@ -671,8 +676,8 @@ export class Api {
     // 优化：限制并发数为 10，避免过多同时请求
     const MAX_CONCURRENT = 10;
     
-    // 创建带超时的请求函数
-    const fetchWithTimeout = async (variant: string, timeoutMs = 8000): Promise<SearchResult[]> => {
+    // 创建带超时的请求函数 - 增加超时时间到15秒，给官方资源站更多响应时间
+    const fetchWithTimeout = async (variant: string, timeoutMs = 15000): Promise<SearchResult[]> => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
@@ -761,16 +766,16 @@ export class Api {
 
     // 如果没有匹配结果，返回所有结果并去重
     if (allResults.length === 0) {
-      console.log('No results found');
+      console.log(`[SEARCH] No results found for "${query}" (doubanId: ${doubanId || 'none'})`);
       return { results: [] };
     }
 
-    console.log(`Total results from all variants: ${allResults.length}`);
+    console.log(`[SEARCH] Total results from all variants: ${allResults.length}`);
 
     // 使用智能匹配过滤所有结果（参考 LunaTV）
     const filteredResults = this.filterSearchResults(allResults, query, doubanId);
 
-    console.log(`After filterSearchResults: ${filteredResults.length}`);
+    console.log(`[SEARCH] After filterSearchResults: ${filteredResults.length} results`);
 
     // 如果有匹配结果，返回匹配结果；否则返回所有结果
     const finalResults = filteredResults.length > 0 ? filteredResults : allResults;
@@ -835,35 +840,16 @@ export class Api {
       if (doubanMatches.length > 0) {
         console.log(`Found ${doubanMatches.length} results with matching doubanId: ${doubanId}`);
         return doubanMatches;
+      } else {
+        console.log(`No exact doubanId matches found for ${doubanId}, falling back to smart matching`);
       }
     }
 
-    // 否则使用匹配引擎处理搜索结果
-    console.log('Before matching (filterSearchResults) - total unique results:', processedResults.length);
-    const processed = resourceMatcher.processSearchResults(query, processedResults);
-    console.log('After matching (filterSearchResults) - total matches:', processed.matches.length);
-    console.log('Match quality (filterSearchResults):', processed.quality);
-
-    // 如果有匹配结果，返回匹配结果；否则返回所有去重后的结果
-    if (processed.matches.length > 0) {
-      console.log(`Returning ${processed.matches.length} matched results`);
-      // 再次进行去重，确保没有重复的视频源
-      const matchedResults = processed.matches.map(match => match.result);
-      const seenMatchedIds = new Set<string>();
-      const deduplicatedMatchedResults = matchedResults.filter((result) => {
-        const uniqueKey = `${result.source}_${result.id}`;
-        if (seenMatchedIds.has(uniqueKey)) {
-          return false;
-        }
-        seenMatchedIds.add(uniqueKey);
-        return true;
-      });
-      console.log(`After final deduplication: ${deduplicatedMatchedResults.length} results`);
-      return deduplicatedMatchedResults;
-    } else {
-      console.log(`Returning ${processedResults.length} deduplicated results`);
-      return processedResults;
-    }
+    // 直接返回所有去重后的结果，不使用匹配引擎排序
+    // 因为匹配引擎无法访问后端权重，排序将在 detailStore 中使用后端权重进行
+    console.log(`Skipping resourceMatcher sorting - will sort with backend weights in detailStore`);
+    console.log(`Returning ${processedResults.length} deduplicated results`);
+    return processedResults;
   }
 
   async searchVideo(query: string, resourceId: string, signal?: AbortSignal): Promise<{ results: SearchResult[] }> {

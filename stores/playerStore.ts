@@ -1154,8 +1154,8 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       logger.error(`[VIDEO_ERROR] No fallback sources available for episode ${currentEpisodeIndex + 1}`);
       Toast.show({
         type: "error",
-        text1: "播放失败",
-        text2: "所有播放源都不可用，请稍后重试",
+        text1: "无法找到视频",
+        text2: "所有播放源都不可用，建议尝试以下操作：\n1. 检查网络连接\n2. 稍后再试\n3. 尝试搜索其他相似内容",
       });
       set({ isLoading: false });
       return;
