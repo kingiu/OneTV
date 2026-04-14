@@ -232,9 +232,12 @@ export interface SearchResult {
   title: string;
   type: string;
   cover: string;
+  poster?: string;
+  source_name?: string;
   rating?: number;
   year?: number | string;
   doubanId?: string;
+  douban_id?: number;
   imdbId?: string;
   tmdbId?: string;
   overview?: string;

@@ -645,7 +645,19 @@ export class Api {
     // 如果有匹配结果，返回匹配结果；否则返回所有去重后的结果
     if (processed.matches.length > 0) {
       console.log(`Returning ${processed.matches.length} matched results`);
-      return processed.matches.map(match => match.result);
+      // 再次进行去重，确保没有重复的视频源
+      const matchedResults = processed.matches.map(match => match.result);
+      const seenMatchedIds = new Set<string>();
+      const deduplicatedMatchedResults = matchedResults.filter((result) => {
+        const uniqueKey = `${result.source}_${result.id}`;
+        if (seenMatchedIds.has(uniqueKey)) {
+          return false;
+        }
+        seenMatchedIds.add(uniqueKey);
+        return true;
+      });
+      console.log(`After final deduplication: ${deduplicatedMatchedResults.length} results`);
+      return deduplicatedMatchedResults;
     } else {
       console.log(`Returning ${deduplicatedResults.length} deduplicated results`);
       return deduplicatedResults;

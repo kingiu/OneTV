@@ -53,6 +53,8 @@ export interface SearchResult {
   id: string;
   title: string;
   poster: string;
+  cover?: string;
+  type?: string;
   episodes: string[];
   episodes_titles: string[];
   source: string;
@@ -62,11 +64,11 @@ export interface SearchResult {
   desc?: string;
   type_name?: string;
   douban_id?: number;
+  doubanId?: string;
   remarks?: string;
   lines?: Array<{ name: string; episodes: string[]; episodes_titles: string[] }>;
   currentLineIndex?: number;
   play_sources?: Array<{ name: string; episodes: string[]; episodes_titles: string[] }>;
-  doubanId?: string;
 }
 
 // 匹配结果接口
