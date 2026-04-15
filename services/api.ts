@@ -932,11 +932,14 @@ export class Api {
       return result;
     });
 
-    // 如果有豆瓣 ID，优先返回匹配豆瓣 ID 的结果
+    // 如果有豆瓣 ID，优先返回匹配豆瓣 ID 的结果，但保留官方资源站
     if (doubanId) {
-      const doubanMatches = processedResults.filter(r => r.doubanId === doubanId || r.douban_id?.toString() === doubanId);
+      const doubanMatches = processedResults.filter(r => 
+        r.doubanId === doubanId || r.douban_id?.toString() === doubanId ||
+        r.source === 'aixuexi.com' // 保留官方资源站
+      );
       if (doubanMatches.length > 0) {
-        console.log(`Found ${doubanMatches.length} results with matching doubanId: ${doubanId}`);
+        console.log(`Found ${doubanMatches.length} results with matching doubanId: ${doubanId} (including official source)`);
         return doubanMatches;
       } else {
         console.log(`No exact doubanId matches found for ${doubanId}, falling back to smart matching`);
