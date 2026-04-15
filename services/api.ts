@@ -676,7 +676,7 @@ export class Api {
     // 优化：限制并发数为 10，避免过多同时请求
     const MAX_CONCURRENT = 10;
     
-    // 创建带超时的请求函数 - 增加超时时间到15秒，给官方资源站更多响应时间
+    // 创建带超时的请求函数 - 增加超时时间到15秒，给所有资源站更多响应时间
     const fetchWithTimeout = async (variant: string, timeoutMs = 15000): Promise<SearchResult[]> => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -755,111 +755,14 @@ export class Api {
       }
     };
 
-    // 4. 专门搜索官方资源站（aixuexi.com）
-    const fetchOfficialSource = async (): Promise<SearchResult[]> => {
-      try {
-        console.log('[SEARCH] Fetching official source (aixuexi.com) results...');
-        
-        // 获取资源列表，找到官方资源站的 resourceId
-        const resources = await this.getResources();
-        const officialResource = resources.find(r => r.key === 'aixuexi.com' || r.source === 'aixuexi.com');
-        
-        if (!officialResource) {
-          console.warn('[SEARCH] Official resource (aixuexi.com) not found in resources list');
-          return [];
-        }
-        
-        console.log(`[SEARCH] Found official resource: ${officialResource.name} (${officialResource.key || officialResource.source})`);
-        
-        // 为官方资源站创建搜索调用
-        const officialPromises = searchVariants.map(async (variant) => {
-          try {
-            const url = `/api/search/one?q=${encodeURIComponent(variant)}&resourceId=${encodeURIComponent(officialResource.id)}`;
-            const response = await this._fetch(url, { timeout: 20000 }); // 给官方资源站更长的超时时间
-            const { results } = await response.json();
-            
-            console.log(`[SEARCH] Official source variant "${variant}" found ${results.length} results`);
-            
-            // 处理结果
-            const processedResults = results.map((item: any) => {
-              // 优先使用 API 返回的 lines 字段（LunaTV 格式）
-              if (item.lines && Array.isArray(item.lines) && item.lines.length > 0) {
-                item.play_sources = item.lines.map((line: any) => ({
-                  name: line.name || '未知线路',
-                  episodes: line.episodes || [],
-                  episodes_titles: line.episodes_titles || [],
-                }));
-              } else if (item.vod_play_from && item.vod_play_url) {
-                const play_sources: { name: string; episodes: string[]; episodes_titles: string[] }[] = [];
-                const sources = item.vod_play_from.split('$$$');
-                const urls = item.vod_play_url.split('$$$');
-                
-                sources.forEach((source: string, index: number) => {
-                  if (urls[index]) {
-                    const sourceName = source.replace(/\(.*\)/, '').trim();
-                    const episodePairs = urls[index].split('#');
-                    const episodes: string[] = [];
-                    const episodes_titles: string[] = [];
-                    
-                    episodePairs.forEach((pair: string) => {
-                      const parts = pair.split('$');
-                      if (parts.length >= 2) {
-                        episodes_titles.push(parts[0].trim());
-                        episodes.push(parts[1].trim());
-                      }
-                    });
-                    
-                    // 即使没有剧集，也添加线路信息
-                    play_sources.push({ name: sourceName, episodes, episodes_titles });
-                  }
-                });
-                
-                if (play_sources.length > 0) {
-                  item.play_sources = play_sources;
-                }
-              }
-              
-              // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
-              if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
-                item.episodes = item.play_sources[0].episodes;
-                item.episodes_titles = item.play_sources[0].episodes_titles;
-              }
-              
-              return item;
-            });
-            
-            return processedResults;
-          } catch (error) {
-            console.warn(`[SEARCH] Official source variant "${variant}" failed:`, error);
-            return [];
-          }
-        });
-        
-        const officialResultsArray = await Promise.all(officialPromises);
-        const officialResults = officialResultsArray.flat();
-        
-        console.log(`[SEARCH] Official source found ${officialResults.length} total results`);
-        return officialResults;
-      } catch (error) {
-        console.warn('[SEARCH] Failed to fetch official source:', error);
-        return [];
-      }
-    };
-
     // 分批并发搜索（优化：限制搜索站点数量）
     const variantPromises = searchVariants.map((variant) => fetchWithTimeout(variant));
     
-    // 同时搜索官方资源站
-    const officialPromise = fetchOfficialSource();
-    
     // 等待所有搜索完成
-    const [variantResultsArray, officialResults] = await Promise.all([
-      Promise.all(variantPromises),
-      officialPromise
-    ]);
+    const variantResultsArray = await Promise.all(variantPromises);
 
-    // 合并所有结果，包括官方资源站的结果
-    const allResults = [...variantResultsArray.flat(), ...officialResults];
+    // 合并所有结果
+    const allResults = variantResultsArray.flat();
 
     // 如果没有匹配结果，返回所有结果并去重
     if (allResults.length === 0) {
@@ -868,7 +771,6 @@ export class Api {
     }
 
     console.log(`[SEARCH] Total results from all variants: ${allResults.length}`);
-    console.log(`[SEARCH] Official source results: ${officialResults.length}`);
 
     // 使用智能匹配过滤所有结果（参考 LunaTV）
     const filteredResults = this.filterSearchResults(allResults, query, doubanId);
