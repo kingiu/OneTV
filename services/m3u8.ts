@@ -10,7 +10,7 @@ interface CacheEntry {
 
 const resolutionCache: { [url: string]: CacheEntry } = {};
 const CACHE_DURATION = 30 * 60 * 1000; // 优化：延长缓存时间到 30 分钟（从 5 分钟增加）
-const FETCH_TIMEOUT = 8000; // 优化：缩短超时到 8 秒（从 15 秒减少）
+const FETCH_TIMEOUT = 10000; // 修复：增加超时到 10 秒（给资源站更多响应时间）
 
 export const getResolutionFromM3U8 = async (
   url: string

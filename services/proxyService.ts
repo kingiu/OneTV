@@ -12,9 +12,9 @@ class ProxyService {
   private baseURL: string;
   private cache: Map<string, CacheItem> = new Map();
   private readonly DEFAULT_CACHE_TTL = 3600;
-  private readonly VIDEO_REQUEST_TIMEOUT = 8000;    // 视频请求 8s（优化：从 12s 降至 8s）
-  private readonly API_REQUEST_TIMEOUT = 8000;       // API 请求 8s
-  private readonly HEALTH_CHECK_TIMEOUT = 5000;     // 健康检查 5s
+  private readonly VIDEO_REQUEST_TIMEOUT = 10000;    // 视频请求 10s（修复：增加超时时间）
+  private readonly API_REQUEST_TIMEOUT = 10000;      // API 请求 10s（修复：增加超时时间）
+  private readonly HEALTH_CHECK_TIMEOUT = 5000;      // 健康检查 5s
 
   // 根据 URL 类型返回相应的超时时间
   private _getTimeoutForUrl(url: string): number {
@@ -101,12 +101,12 @@ class ProxyService {
 
     if (errorMsg.includes("Network request failed")) {
       return "Possible causes:\n" +
-             "  1. Device is offline or network unstable\n" +
-             "  2. DNS resolution failed\n" +
-             "  3. Target server unreachable\n" +
-             "  4. SSL/TLS certificate invalid\n" +
-             "  5. Firewall or VPN blocking the request\n" +
-             "  6. Request timeout (server not responding)";
+        "  1. Device is offline or network unstable\n" +
+        "  2. DNS resolution failed\n" +
+        "  3. Target server unreachable\n" +
+        "  4. SSL/TLS certificate invalid\n" +
+        "  5. Firewall or VPN blocking the request\n" +
+        "  6. Request timeout (server not responding)";
     }
 
     if (errorMsg.includes("abort") || errorMsg.includes("AbortError") || errorMsg === "Aborted") {
