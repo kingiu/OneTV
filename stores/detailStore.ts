@@ -402,7 +402,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
             // 保留 preferredSource 信息，让用户知道我们在尝试哪个源
             detail: {
               source: preferredSource,
-              source_name: preferredSource,
+              source_name: preferredSource === 'douban' ? '豆瓣' : preferredSource,
               title: cleanedQ,
               episodes: [], // 空剧集列表，播放时会重新获取
             } as SearchResultWithResolution,
@@ -474,6 +474,21 @@ const useDetailStore = create<DetailState>((set, get) => ({
         set({ error: `搜索失败：${errorMessage}` });
       } else {
         logger.info(`[INFO] DetailStore.init aborted by user`);
+        // 关键修复：即使搜索被中止，如果有 preferredSource，也创建临时 detail 对象
+        if (preferredSource) {
+          logger.warn(`[WARN] Search aborted, but preferredSource is provided: ${preferredSource}`);
+          set({
+            loading: false,
+            allSourcesLoaded: true,
+            error: null,
+            detail: {
+              source: preferredSource,
+              source_name: preferredSource === 'douban' ? '豆瓣' : preferredSource,
+              title: cleanedQ,
+              episodes: [],
+            } as SearchResultWithResolution,
+          });
+        }
       }
     } finally {
       if (!signal.aborted) {
