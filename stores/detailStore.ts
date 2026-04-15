@@ -63,7 +63,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
     const perfStart = performance.now();
     // 清理搜索词，去除前后空格
     const cleanedQ = q ? q.trim() : q;
-    logger.info(`[PERF] DetailStore.init START - q: "${q}", cleaned: "${cleanedQ}", preferredSource: ${preferredSource}, id: ${id}, year: ${year}, doubanId: ${doubanId}`);
+    logger.info(`[PERF] DetailStore.init START - q: "${q}", cleaned: "${cleanedQ}", preferredSource: "${preferredSource}", id: ${id}, year: ${year}, doubanId: ${doubanId}`);
+    logger.info(`[DEBUG] preferredSource type: ${typeof preferredSource}, preferredSource truthy: ${!!preferredSource}`);
 
     // 检查详情页缓存
     const cacheKey = `detail:${cleanedQ}:${year || ''}:${doubanId || ''}`;
@@ -468,6 +469,8 @@ const useDetailStore = create<DetailState>((set, get) => ({
       logger.info(`[PERF] Favorite check took ${(favoriteCheckEnd - favoriteCheckStart).toFixed(2)}ms`);
 
     } catch (e) {
+      logger.info(`[DEBUG] Entering catch block, error: ${e instanceof Error ? e.name : e}`);
+      logger.info(`[DEBUG] preferredSource in catch: "${preferredSource}", type: ${typeof preferredSource}`);
       if ((e as Error).name !== "AbortError") {
         logger.error(`[ERROR] DetailStore.init caught unexpected error:`, e);
         const errorMessage = e instanceof Error ? e.message : "获取数据失败";
@@ -475,6 +478,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
       } else {
         logger.info(`[INFO] DetailStore.init aborted by user`);
         // 关键修复：即使搜索被中止，如果有 preferredSource，也创建临时 detail 对象
+        logger.info(`[DEBUG] Checking preferredSource: "${preferredSource}", truthy: ${!!preferredSource}`);
         if (preferredSource) {
           logger.warn(`[WARN] Search aborted, but preferredSource is provided: ${preferredSource}`);
           set({
@@ -488,6 +492,9 @@ const useDetailStore = create<DetailState>((set, get) => ({
               episodes: [],
             } as SearchResultWithResolution,
           });
+          logger.info(`[DEBUG] Temporary detail object created for preferredSource: ${preferredSource}`);
+        } else {
+          logger.warn(`[WARN] Search aborted and no preferredSource provided`);
         }
       }
     } finally {
