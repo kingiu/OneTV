@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Logger from "../utils/Logger";
 
-const logger = Logger.withTag("ApiService");
+import Logger from "../utils/Logger";
 
 import { resourceMatcher } from "./resourceMatcher";
 import {
@@ -23,10 +22,37 @@ import {
   type ServerConfig
 } from "./types";
 
+const logger = Logger.withTag("ApiService");
+
 // 主 API 类
 export class Api {
   private baseURL: string;
   private searchCache: Map<string, { results: SearchResult[]; timestamp: number }> = new Map(); // 搜索结果缓存
+
+  // 搜索配置（可通过参数调整）
+  private searchConfig = {
+    minResultsThreshold: 15,        // 提前返回阈值：主查询结果≥15 个时立即返回
+    maxVariants: 6,                 // 最大搜索变体数：确保能搜索到所有播放源
+    variantTimeout: 10000,          // 每个变体的超时时间（毫秒）：首次搜索需要更多时间
+    enableStrictFilter: false,      // 是否启用严格过滤
+    minTitleMatchLength: 2,         // 最小标题匹配长度
+  };
+
+  /**
+   * 更新搜索配置
+   * @param config 部分或完整的搜索配置
+   */
+  public updateSearchConfig(config: Partial<typeof this.searchConfig>) {
+    this.searchConfig = { ...this.searchConfig, ...config };
+    console.log('[SEARCH] Updated search config:', this.searchConfig);
+  }
+
+  /**
+   * 获取当前搜索配置
+   */
+  public getSearchConfig() {
+    return { ...this.searchConfig };
+  }
 
   constructor(baseURL?: string) {
     // 默认使用本地 LunaTV 后端服务
@@ -392,15 +418,15 @@ export class Api {
         return await handleResponse(response, false);
       } catch (directError) {
         console.error('Direct fetch failed:', directError);
-        
+
         // 网络错误重试逻辑
         if (retryCount < 2) { // 最多重试2次
-          const isNetworkError = directError instanceof TypeError && 
-            (directError.message.includes('network') || 
-             directError.message.includes('connect') || 
+          const isNetworkError = directError instanceof TypeError &&
+            (directError.message.includes('network') ||
+             directError.message.includes('connect') ||
              directError.message.includes('timeout') ||
              directError.name === 'AbortError');
-          
+
           if (isNetworkError) {
             console.log(`Network error detected, retrying (${retryCount + 1}/3)...`);
             // 指数退避策略
@@ -409,7 +435,7 @@ export class Api {
             return this._fetch(url, options, retryCount + 1, avoidReLogin);
           }
         }
-        
+
         throw directError;
       }
     } catch (error) {
@@ -658,96 +684,77 @@ export class Api {
   }
 
   async searchVideos(query: string, doubanId?: string): Promise<{ results: SearchResult[] }> {
+    const perfStart = performance.now();
     console.log(`[SEARCH] Starting search for "${query}" with doubanId: ${doubanId || 'none'}`);
-    
-    // 1. 生成搜索变体（参考 LunaTV 实现）
+
+    const variantStart = performance.now();
     const searchVariants = resourceMatcher.generateSearchVariants(query);
     console.log('Search variants (searchVideos):', searchVariants);
+    console.log(`[PERF] Variant generation took ${(performance.now() - variantStart).toFixed(2)}ms`);
 
-    // 2. 检查缓存（优化：添加搜索结果缓存）
     const cacheKey = `search:${query}:${doubanId || 'none'}`;
     const cached = this.searchCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < 5 * 60 * 1000) { // 5 分钟缓存（缩短缓存时间）
+    if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
       console.log(`[CACHE HIT] Returning cached results for "${query}"`);
+      console.log(`[PERF] Search completed from cache in ${(performance.now() - perfStart).toFixed(2)}ms`);
       return { results: cached.results };
     }
 
-    // 3. 并行搜索所有变体，合并所有结果（参考 LunaTV）
-    // 优化：限制并发数为 10，避免过多同时请求
-    const MAX_CONCURRENT = 10;
-    
-    // 创建带超时的请求函数 - 增加超时时间到15秒，给所有资源站更多响应时间
-    const fetchWithTimeout = async (variant: string, timeoutMs = 15000): Promise<SearchResult[]> => {
+    const processResults = (data: any): any[] => {
+      return (data.results || []).map((item: any) => {
+        if (item.lines && Array.isArray(item.lines) && item.lines.length > 0) {
+          item.play_sources = item.lines.map((line: any) => ({
+            name: line.name || '未知线路',
+            episodes: line.episodes || [],
+            episodes_titles: line.episodes_titles || [],
+          }));
+        } else if (item.vod_play_from && item.vod_play_url) {
+          const play_sources: Array<{ name: string; episodes: string[]; episodes_titles: string[] }> = [];
+          const sources = item.vod_play_from.split('$$$');
+          const urls = item.vod_play_url.split('$$$');
+
+          sources.forEach((source: string, index: number) => {
+            if (urls[index]) {
+              const sourceName = source.replace(/\(.*\)/, '').trim();
+              const episodePairs = urls[index].split('#');
+              const episodes: string[] = [];
+              const episodes_titles: string[] = [];
+
+              episodePairs.forEach((pair: string) => {
+                const parts = pair.split('$');
+                if (parts.length >= 2) {
+                  episodes_titles.push(parts[0].trim());
+                  episodes.push(parts[1].trim());
+                }
+              });
+
+              play_sources.push({ name: sourceName, episodes, episodes_titles });
+            }
+          });
+
+          if (play_sources.length > 0) {
+            item.play_sources = play_sources;
+          }
+        }
+
+        if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
+          item.episodes = item.play_sources[0].episodes;
+          item.episodes_titles = item.play_sources[0].episodes_titles;
+        }
+
+        return item;
+      });
+    };
+
+    const fetchVariant = async (variant: string, timeoutMs = this.searchConfig.variantTimeout): Promise<any[]> => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-      
+
       try {
         const url = `/api/search?q=${encodeURIComponent(variant)}`;
         const response = await this._fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
-        const data = await response.json();
-        const variantResults = data.results || [];
-
-        console.log(`Variant "${variant}" found ${variantResults.length} results`);
-        
-        // 处理 vod_play_from 和 vod_play_url 字段，转换为 play_sources
-        const processedResults = variantResults.map((item: any) => {
-          // 优先使用 API 返回的 lines 字段（LunaTV 格式）
-          if (item.lines && Array.isArray(item.lines) && item.lines.length > 0) {
-            console.log('Using lines from API:', item.lines.length);
-            item.play_sources = item.lines.map((line: any) => ({
-              name: line.name || '未知线路',
-              episodes: line.episodes || [],
-              episodes_titles: line.episodes_titles || [],
-            }));
-          } else if (item.vod_play_from && item.vod_play_url) {
-            const play_sources: { name: string; episodes: string[]; episodes_titles: string[] }[] = [];
-            const sources = item.vod_play_from.split('$$$');
-            const urls = item.vod_play_url.split('$$$');
-            
-            console.log('Processing sources:', sources);
-            console.log('Processing urls:', urls);
-            
-            sources.forEach((source: string, index: number) => {
-              if (urls[index]) {
-                const sourceName = source.replace(/\(.*\)/, '').trim();
-                const episodePairs = urls[index].split('#');
-                const episodes: string[] = [];
-                const episodes_titles: string[] = [];
-                
-                console.log('Processing source:', sourceName);
-                console.log('Processing episode pairs:', episodePairs.length);
-                
-                episodePairs.forEach((pair: string) => {
-                  const parts = pair.split('$');
-                  if (parts.length >= 2) {
-                    episodes_titles.push(parts[0].trim());
-                    episodes.push(parts[1].trim());
-                  }
-                });
-                
-                // 即使没有剧集，也添加线路信息
-                play_sources.push({ name: sourceName, episodes, episodes_titles });
-              }
-            });
-            
-            console.log('Parsed play_sources:', play_sources.length);
-            
-            if (play_sources.length > 0) {
-              item.play_sources = play_sources;
-            }
-          }
-          
-          // 如果没有 episodes 和 episodes_titles 字段，使用第一个播放源的内容
-          if ((!item.episodes || item.episodes.length === 0) && item.play_sources && item.play_sources.length > 0) {
-            item.episodes = item.play_sources[0].episodes;
-            item.episodes_titles = item.play_sources[0].episodes_titles;
-          }
-          
-          return item;
-        });
-        
-        return processedResults;
+        return processResults(await response.json());
       } catch (error) {
         clearTimeout(timeoutId);
         console.warn(`Search variant "${variant}" failed:`, error);
@@ -755,126 +762,240 @@ export class Api {
       }
     };
 
-    // 分批并发搜索（优化：限制搜索站点数量）
-    const variantPromises = searchVariants.map((variant) => fetchWithTimeout(variant));
-    
-    // 等待所有搜索完成
-    const variantResultsArray = await Promise.all(variantPromises);
+    const searchStart = performance.now();
 
-    // 合并所有结果
-    const allResults = variantResultsArray.flat();
+    // 策略：先搜索主查询词，如果结果足够多就立即返回
+    const mainResults = await fetchVariant(searchVariants[0]);
+    console.log(`[PERF] Main variant search took ${(performance.now() - searchStart).toFixed(2)}ms, got ${mainResults.length} results`);
 
-    // 如果没有匹配结果，返回所有结果并去重
-    if (allResults.length === 0) {
-      console.log(`[SEARCH] No results found for "${query}" (doubanId: ${doubanId || 'none'})`);
-      return { results: [] };
+    // 只有当主查询结果非常多（>=阈值）时，才跳过其他变体
+    if (mainResults.length >= this.searchConfig.minResultsThreshold) {
+      console.log(`[SEARCH] Got ${mainResults.length} results from main variant, skipping other variants`);
+      const finalResults = this.filterSearchResults(mainResults, query, doubanId, false);
+      this.searchCache.set(cacheKey, { results: finalResults, timestamp: Date.now() });
+      console.log(`[PERF] Search completed with ${finalResults.length} results in ${(performance.now() - perfStart).toFixed(2)}ms`);
+      return { results: finalResults };
     }
 
-    console.log(`[SEARCH] Total results from all variants: ${allResults.length}`);
+    // 结果不够，并行搜索其他变体
+    const otherVariants = searchVariants.slice(1, this.searchConfig.maxVariants);
+    console.log(`[SEARCH] Main results insufficient (${mainResults.length}), searching ${otherVariants.length} additional variants`);
 
-    // 使用智能匹配过滤所有结果（参考 LunaTV）
-    const filteredResults = this.filterSearchResults(allResults, query, doubanId);
+    try {
+      const otherResultsArrays = await Promise.all(otherVariants.map(v => fetchVariant(v)));
+      const allResults = [...mainResults, ...otherResultsArrays.flat()];
+      console.log(`[PERF] All searches took ${(performance.now() - searchStart).toFixed(2)}ms, total ${allResults.length} results`);
 
-    console.log(`[SEARCH] After filterSearchResults: ${filteredResults.length} results`);
+      // 如果没有匹配结果，返回所有结果并去重
+      if (allResults.length === 0) {
+        console.log(`[SEARCH] No results found for "${query}" (doubanId: ${doubanId || 'none'})`);
+        console.log(`[PERF] Search completed in ${(performance.now() - perfStart).toFixed(2)}ms`);
+        return { results: [] };
+      }
 
-    // 如果有匹配结果，返回匹配结果；否则返回所有结果
-    const finalResults = filteredResults.length > 0 ? filteredResults : allResults;
+      console.log(`[SEARCH] Total results from all variants: ${allResults.length}`);
 
-    // 对最终结果进行去重
-    const seenIds = new Set<string>();
-    const deduplicatedResults = finalResults.filter((result) => {
-      // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
-      let uniqueKey;
-      if (result.source && result.id) {
-        uniqueKey = `${result.source}_${result.id}`;
-      } else {
-        // 当 id 为空时，使用 title + year + source_name 作为唯一标识
-        const title = result.title || 'unknown';
-        const year = result.year || 'unknown';
-        const sourceName = result.source_name || 'unknown';
-        uniqueKey = `${result.source || 'unknown'}_${title}_${year}_${sourceName}`;
+      // 使用智能匹配过滤所有结果（参考 LunaTV）
+      const filterStart = performance.now();
+      const finalResults = this.filterSearchResults(allResults, query, doubanId, false);
+      console.log(`[SEARCH] After filterSearchResults: ${finalResults.length} results`);
+      console.log(`[PERF] Filtering took ${(performance.now() - filterStart).toFixed(2)}ms`);
+
+      // 保存到缓存
+      this.searchCache.set(cacheKey, {
+        results: finalResults,
+        timestamp: Date.now(),
+      });
+
+      console.log(`[PERF] Search completed in ${(performance.now() - perfStart).toFixed(2)}ms`);
+      return { results: finalResults };
+    } catch (error) {
+      // 如果并行搜索失败（如超时），但主查询有结果，返回主查询结果
+      if (mainResults.length > 0) {
+        console.warn(`[SEARCH] Parallel search failed (${error}), but returning main results (${mainResults.length})`);
+        const filterStart = performance.now();
+        const finalResults = this.filterSearchResults(mainResults, query, doubanId, false);
+        console.log(`[SEARCH] After filterSearchResults: ${finalResults.length} results (from main query only)`);
+        
+        this.searchCache.set(cacheKey, {
+          results: finalResults,
+          timestamp: Date.now(),
+        });
+        
+        console.log(`[PERF] Search completed in ${(performance.now() - perfStart).toFixed(2)}ms`);
+        return { results: finalResults };
       }
       
-      if (seenIds.has(uniqueKey)) {
-        return false;
-      }
-      seenIds.add(uniqueKey);
-      return true;
-    });
-
-    // 不再限制返回结果数量，后端会持续增加新的视频源
-    console.log(`Final results: ${deduplicatedResults.length} (no limit)`);
-
-    // 保存到缓存
-    this.searchCache.set(cacheKey, {
-      results: deduplicatedResults,
-      timestamp: Date.now(),
-    });
-
-    return { results: deduplicatedResults };
+      // 主查询也失败，抛出错误
+      console.error(`[SEARCH] All searches failed:`, error);
+      throw error;
+    }
   }
 
   /**
    * 智能过滤搜索结果（参考 LunaTV 实现）
+   * @param strictFilter 是否严格过滤（只保留完全匹配的结果）
    */
-  private filterSearchResults(results: SearchResult[], query: string, doubanId?: string): SearchResult[] {
-    // 首先对结果进行去重
-    const seenIds = new Set<string>();
-    const deduplicatedResults = results.filter((result) => {
-      // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
-      let uniqueKey;
-      if (result.source && result.id) {
-        uniqueKey = `${result.source}_${result.id}`;
-      } else {
-        // 当 id 为空时，使用 title + year + source_name 作为唯一标识
-        const title = result.title || 'unknown';
-        const year = result.year || 'unknown';
-        const sourceName = result.source_name || 'unknown';
-        uniqueKey = `${result.source || 'unknown'}_${title}_${year}_${sourceName}`;
-      }
-      
-      if (seenIds.has(uniqueKey)) {
-        return false;
-      }
-      seenIds.add(uniqueKey);
-      return true;
+  private filterSearchResults(results: SearchResult[], query: string, doubanId?: string, strictFilter: boolean = this.searchConfig.enableStrictFilter): SearchResult[] {
+    const filterStart = performance.now();
+    console.log(`[FILTER] Starting filter with ${results.length} results, query: "${query}", doubanId: ${doubanId || 'none'}, strict: ${strictFilter}`);
+
+    // 质量监控：记录各来源的分布
+    const sourceStats = new Map<string, number>();
+    results.forEach(r => {
+      const source = r.source || 'unknown';
+      sourceStats.set(source, (sourceStats.get(source) || 0) + 1);
     });
+    console.log(`[FILTER] Source distribution:`, Object.fromEntries(sourceStats));
 
-    console.log(`After deduplication: ${deduplicatedResults.length} results`);
+    // 1. 首先按源去重，确保每个源只保留一个最佳结果
+    const sourceMap = new Map<string, SearchResult>();
 
-    // 为每个结果创建 play_sources（如果没有的话）
-    const processedResults = deduplicatedResults.map((result) => {
-      // 如果没有 play_sources 但有 episodes，创建一个默认的播放源
-      if ((!result.play_sources || result.play_sources.length === 0) && result.episodes && result.episodes.length > 0) {
-        result.play_sources = [{
-          name: '默认线路',
-          episodes: result.episodes,
-          episodes_titles: result.episodes_titles || [],
-        }];
-        console.log(`[FALLBACK] Created default play_source for ${result.title} (${result.source_name})`);
-      }
-      return result;
-    });
+    for (const result of results) {
+      const sourceKey = result.source || 'unknown';
+      const existing = sourceMap.get(sourceKey);
 
-    // 如果有豆瓣 ID，优先返回匹配豆瓣 ID 的结果，但保留官方资源站
-    if (doubanId) {
-      const doubanMatches = processedResults.filter(r => 
-        r.doubanId === doubanId || r.douban_id?.toString() === doubanId ||
-        r.source === 'aixuexi.com' // 保留官方资源站
-      );
-      if (doubanMatches.length > 0) {
-        console.log(`Found ${doubanMatches.length} results with matching doubanId: ${doubanId} (including official source)`);
-        return doubanMatches;
+      if (!existing) {
+        sourceMap.set(sourceKey, result);
       } else {
-        console.log(`No exact doubanId matches found for ${doubanId}, falling back to smart matching`);
+        const shouldReplace = this.shouldReplaceResult(existing, result, query, doubanId);
+        if (shouldReplace) {
+          sourceMap.set(sourceKey, result);
+        }
       }
     }
 
-    // 直接返回所有去重后的结果，不使用匹配引擎排序
-    // 因为匹配引擎无法访问后端权重，排序将在 detailStore 中使用后端权重进行
-    console.log(`Skipping resourceMatcher sorting - will sort with backend weights in detailStore`);
-    console.log(`Returning ${processedResults.length} deduplicated results`);
-    return processedResults;
+    const deduplicatedResults = Array.from(sourceMap.values());
+    console.log(`[FILTER] After source deduplication: ${deduplicatedResults.length} results`);
+
+    // 2. 优化：不再强制创建 play_sources，延迟到播放时再生成
+    // 详情页只需要 episodes 数组，play_sources 会在 playerStore.loadVideo 时动态生成
+    const processedResults = deduplicatedResults.map((result) => {
+      // 保留已有的 play_sources（来自后端 API 的 lines 数据）
+      // 但不创建默认的 play_sources，减少数据处理开销
+      return result;
+    });
+
+    // 3. 如果有豆瓣 ID，优先返回匹配的结果，但也保留没有豆瓣 ID 的源
+    if (doubanId) {
+      const doubanMatches = processedResults.filter(r =>
+        r.doubanId === doubanId || r.douban_id?.toString() === doubanId
+      );
+
+      // 找出没有豆瓣 ID 的结果（可能是官方源或其他源）
+      const noDoubanResults = processedResults.filter(r =>
+        !r.doubanId && !r.douban_id
+      );
+
+      // 检查官方资源站
+      const officialSource = processedResults.find(r => r.source === 'aixuexi.com');
+      console.log(`[FILTER] Official source check: ${officialSource ? 'FOUND' : 'NOT FOUND'}`);
+      if (officialSource) {
+        console.log(`[FILTER]   - Title: ${officialSource.title}, ID: ${officialSource.id}, DoubanID: ${officialSource.doubanId || officialSource.douban_id || 'NONE'}`);
+        console.log(`[FILTER]   - In noDoubanResults: ${noDoubanResults.some(r => r.source === 'aixuexi.com') ? 'YES' : 'NO'}`);
+      }
+
+      if (doubanMatches.length > 0) {
+        // 有豆瓣 ID 匹配：返回匹配的结果 + 没有豆瓣 ID 的结果
+        const finalResults = [...doubanMatches, ...noDoubanResults];
+        console.log(`[FILTER] Found ${doubanMatches.length} results matching doubanId: ${doubanId}, + ${noDoubanResults.length} without doubanId`);
+        console.log(`[FILTER] Total final results: ${finalResults.length}`);
+        console.log(`[FILTER] Official source in final results: ${finalResults.some(r => r.source === 'aixuexi.com') ? 'YES' : 'NO'}`);
+        console.log(`[FILTER] Filter completed in ${(performance.now() - filterStart).toFixed(2)}ms`);
+        return finalResults;
+      }
+
+      // 如果没有豆瓣 ID 匹配，返回所有结果
+      console.log(`[FILTER] No doubanId matches, returning all ${processedResults.length} results`);
+      console.log(`[FILTER] Official source in results: ${processedResults.some(r => r.source === 'aixuexi.com') ? 'YES' : 'NO'}`);
+      console.log(`[FILTER] Filter completed in ${(performance.now() - filterStart).toFixed(2)}ms`);
+      return processedResults;
+    }
+
+    // 4. 非严格模式下，只过滤掉明显不匹配的结果
+    if (strictFilter) {
+      const normalizedQuery = query.toLowerCase().trim();
+      const filteredResults = processedResults.filter(r => {
+        const title = (r.title || '').toLowerCase();
+        const queryParts = normalizedQuery.split(/\s+/).filter(p => p.length > 0);
+        const mainQueryPart = queryParts[0];
+
+        // 严格模式：标题必须包含主要关键词
+        const titleContainsQuery = title.includes(mainQueryPart);
+
+        if (!titleContainsQuery) {
+          console.log(`[FILTER] Filtering out "${r.title}" - does not match query "${query}"`);
+          return false;
+        }
+
+        return true;
+      });
+
+      console.log(`[FILTER] After strict title filtering: ${filteredResults.length} results`);
+      console.log(`[FILTER] Filter completed in ${(performance.now() - filterStart).toFixed(2)}ms`);
+      return filteredResults;
+    }
+
+    // 非严格模式：只过滤掉标题完全无关的结果
+    const normalizedQuery = query.toLowerCase().trim();
+    const filteredResults = processedResults.filter(r => {
+      const title = (r.title || '').toLowerCase();
+      const queryParts = normalizedQuery.split(/\s+/).filter(p => p.length > 0);
+      const mainQueryPart = queryParts[0];
+
+      // 非严格模式：标题包含主要关键词，或者查询包含标题
+      const titleContainsQuery = title.includes(mainQueryPart) || normalizedQuery.includes(title);
+
+      // 只过滤掉完全不相关的（标题长度差异太大且不包含关键词）
+      const lengthDiff = Math.abs(title.length - mainQueryPart.length);
+      const isCompletelyUnrelated = lengthDiff > 10 && !title.includes(mainQueryPart);
+
+      if (isCompletelyUnrelated) {
+        console.log(`[FILTER] Filtering out "${r.title}" - completely unrelated to query "${query}"`);
+        return false;
+      }
+
+      return true;
+    });
+
+    console.log(`[FILTER] After loose title filtering: ${filteredResults.length} results`);
+    console.log(`[FILTER] Filter completed in ${(performance.now() - filterStart).toFixed(2)}ms`);
+    return filteredResults;
+  }
+
+  private shouldReplaceResult(
+    existing: SearchResult,
+    newResult: SearchResult,
+    query: string,
+    doubanId?: string
+  ): boolean {
+    if (doubanId) {
+      const existingMatches = existing.doubanId === doubanId || existing.douban_id?.toString() === doubanId;
+      const newMatches = newResult.doubanId === doubanId || newResult.douban_id?.toString() === doubanId;
+
+      if (newMatches && !existingMatches) return true;
+      if (existingMatches && !newMatches) return false;
+    }
+
+    if (newResult.source === 'aixuexi.com' && existing.source !== 'aixuexi.com') return true;
+    if (existing.source === 'aixuexi.com' && newResult.source !== 'aixuexi.com') return false;
+
+    const normalizedQuery = query.toLowerCase();
+    const existingTitle = (existing.title || '').toLowerCase();
+    const newTitle = (newResult.title || '').toLowerCase();
+
+    const existingMatch = existingTitle.includes(normalizedQuery);
+    const newMatch = newTitle.includes(normalizedQuery);
+
+    if (newMatch && !existingMatch) return true;
+    if (existingMatch && !newMatch) return false;
+
+    const existingEpisodes = existing.episodes?.length || 0;
+    const newEpisodes = newResult.episodes?.length || 0;
+
+    if (newEpisodes > existingEpisodes) return true;
+
+    return false;
   }
 
   async searchVideo(query: string, resourceId: string, signal?: AbortSignal): Promise<{ results: SearchResult[] }> {
@@ -1011,15 +1132,8 @@ export class Api {
             item.episodes_titles = item.play_sources[0].episodes_titles;
           }
 
-          // 如果没有 play_sources 但有 episodes，创建一个默认的播放源
-          if ((!item.play_sources || item.play_sources.length === 0) && item.episodes && item.episodes.length > 0) {
-            item.play_sources = [{
-              name: '默认线路',
-              episodes: item.episodes,
-              episodes_titles: item.episodes_titles || [],
-            }];
-            console.log(`[FALLBACK] Created default play_source from episodes for ${item.title}`);
-          }
+          // 优化：不再创建默认的 play_sources，延迟到播放时再生成
+          // 详情页只需要 episodes 数组，不需要 play_sources
 
           return item;
         });
@@ -1053,7 +1167,7 @@ export class Api {
         const sourceName = r.source_name || 'unknown';
         uniqueKey = `${r.source || 'unknown'}_${title}_${year}_${sourceName}`;
       }
-      
+
       if (seenIds.has(uniqueKey)) return false;
       seenIds.add(uniqueKey);
       return true;

@@ -11,7 +11,10 @@ import { ThemedView } from "@/components/ThemedView";
 import VideoLoadingAnimation from "@/components/VideoLoadingAnimation";
 import { useResponsiveLayout } from "@/hooks/useResponsiveLayout";
 import useDetailStore from "@/stores/detailStore";
+import Logger from "@/utils/Logger";
 import { getCommonResponsiveStyles } from "@/utils/ResponsiveStyles";
+
+const logger = Logger.withTag('DetailScreen');
 
 export default function DetailScreen() {
   const { q, source, id, year, doubanId } = useLocalSearchParams<{ q: string; source?: string; id?: string; year?: string; doubanId?: string }>();
@@ -35,9 +38,23 @@ export default function DetailScreen() {
 
   useEffect(() => {
     if (q) {
+      const currentState = useDetailStore.getState();
+      // 检查是否已经有相同参数的搜索正在进行
+      const isSameSearch = currentState.q === q && 
+                          currentState.year === (year || null) && 
+                          currentState.doubanId === (doubanId || null);
+      
+      // 如果已经有相同参数的搜索正在进行，就不要重复发起
+      if (isSameSearch && currentState.loading) {
+        logger.info(`[INFO] Skipping duplicate init() call - same search already in progress`);
+        return;
+      }
+      
+      logger.info(`[INFO] Initializing detail store - q: ${q}, source: ${source || 'none'}, year: ${year || 'none'}, doubanId: ${doubanId || 'none'}`);
       init(q, source, id, year, doubanId);
     }
     return () => {
+      // 组件卸载时取消搜索，避免内存泄漏
       abort();
     };
   }, [abort, init, q, source, id, year, doubanId]);
@@ -83,9 +100,15 @@ export default function DetailScreen() {
   }
 
   if (!detail) {
+    // 关键修复：只有在非 loading 状态下 detail 为 null 才显示错误
+    // 避免第一次打开时因为异步加载而显示"未找到详情信息"
+    logger.warn(`[WARN] Detail is null after loading completed - q: ${q}, source: ${source}`);
     const content = (
       <ThemedView style={[commonStyles.safeContainer, commonStyles.center]}>
         <ThemedText type="subtitle">未找到详情信息</ThemedText>
+        <ThemedText style={{ marginTop: 10, opacity: 0.7, fontSize: 12 }}>
+          请尝试更换数据源或搜索其他关键词
+        </ThemedText>
       </ThemedView>
     );
 
@@ -137,18 +160,6 @@ export default function DetailScreen() {
             <ThemedText style={dynamicStyles.description}>{detail.desc}</ThemedText>
           </View>
 
-          {/* 快速播放按钮 */}
-          <View style={dynamicStyles.quickPlayContainer}>
-            {!allSourcesLoaded && <ActivityIndicator style={{ marginRight: 10 }} />}
-            <StyledButton
-              text="开始播放"
-              onPress={() => handlePlay(0)}
-              disabled={detail.episodes.length === 0}
-              style={dynamicStyles.quickPlayButton}
-              textStyle={dynamicStyles.quickPlayButtonText}
-            />
-          </View>
-
           {/* 剧集列表 */}
           <View style={dynamicStyles.episodesContainer}>
             <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
@@ -197,17 +208,6 @@ export default function DetailScreen() {
           </View>
 
           <View style={dynamicStyles.bottomContainer}>
-            {/* 快速播放按钮 */}
-            <View style={dynamicStyles.quickPlayContainer}>
-              {!allSourcesLoaded && <ActivityIndicator style={{ marginRight: 10 }} />}
-              <StyledButton
-                text="开始播放"
-                onPress={() => handlePlay(0)}
-                disabled={detail.episodes.length === 0}
-                style={dynamicStyles.quickPlayButton}
-                textStyle={dynamicStyles.quickPlayButtonText}
-              />
-            </View>
             <View style={dynamicStyles.episodesContainer}>
               <ThemedText style={dynamicStyles.episodesTitle}>播放列表</ThemedText>
               <ScrollView contentContainerStyle={dynamicStyles.episodeList}>
@@ -334,26 +334,6 @@ const createResponsiveStyles = (deviceType: string, spacing: number) => {
     bottomContainer: {
       paddingHorizontal: spacing,
     },
-    quickPlayContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      marginTop: spacing,
-      marginBottom: spacing / 2,
-    },
-    quickPlayButton: {
-      minHeight: isMobile ? 40 : 48,
-      paddingHorizontal: isMobile ? 20 : 24,
-      paddingVertical: isMobile ? 10 : 12,
-      backgroundColor: "#34C759",
-      borderRadius: 8,
-    },
-    quickPlayButtonText: {
-      fontSize: isMobile ? 14 : 16,
-      color: "white",
-      fontWeight: "bold",
-    },
-
     episodesContainer: {
       marginTop: spacing,
       paddingBottom: spacing * 2,

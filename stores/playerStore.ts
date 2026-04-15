@@ -180,9 +180,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
   // 缓冲状态更新
   updateBufferStatus: (isBuffering, bufferProgress) => {
-    set({ 
+    set({
       isBuffering,
-      bufferProgress 
+      bufferProgress
     });
   },
 
@@ -259,12 +259,12 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
         const testUrl = source.episodes[0];
         let speedResult;
-        
+
         // 检查缓存
         const cacheKey = `line_test:${testUrl}`;
         const cached = get().lineTestCache.get(cacheKey);
         const now = Date.now();
-        
+
         if (cached && (now - cached.timestamp) < 5 * 60 * 1000) { // 5分钟缓存
           logger.info(`[LINE_SELECTION] Using cached test result for ${source.name}`);
           speedResult = cached.result;
@@ -273,16 +273,16 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒超时
-            
+
             speedResult = await Promise.race([
               get().testLineSpeed(testUrl),
               new Promise<{ latency: number; bandwidth: number }>((_, reject) => {
                 setTimeout(() => reject(new Error('Speed test timeout')), 8000);
               })
             ]);
-            
+
             clearTimeout(timeoutId);
-            
+
             // 缓存结果
             const updatedCache = new Map(get().lineTestCache);
             updatedCache.set(cacheKey, { result: speedResult, timestamp: now });
@@ -296,18 +296,18 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
         // 改进的质量评分：基于线路名称和其他因素
         let quality = 0;
         const sourceName = source.name ? source.name.toLowerCase() : '';
-        
+
         // 基于清晰度的评分
         if (sourceName.includes('1080') || sourceName.includes('fullhd')) quality = 4;
         else if (sourceName.includes('720') || sourceName.includes('hd')) quality = 3;
         else if (sourceName.includes('480') || sourceName.includes('sd')) quality = 2;
         else if (sourceName.includes('360')) quality = 1;
-        
+
         // 基于线路名称的可靠性评分
         let reliability = 0;
         if (sourceName.includes('官方') || sourceName.includes('original')) reliability = 2;
         else if (sourceName.includes('高清') || sourceName.includes('超清')) reliability = 1;
-        
+
         logger.info(`[LINE_SELECTION] Line ${index + 1} (${source.name}): latency = ${speedResult.latency.toFixed(2)}ms, bandwidth = ${speedResult.bandwidth.toFixed(2)}KB/s, quality = ${quality}`);
         return {
           index,
@@ -382,6 +382,9 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       const detailInitEnd = performance.now();
       logger.info(`[PERF] DetailStore.init END - took ${(detailInitEnd - detailInitStart).toFixed(2)}ms`);
 
+      // 关键修复：等待一小段时间确保状态已更新
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       detail = useDetailStore.getState().detail;
 
       if (!detail) {
@@ -389,17 +392,28 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
         // Check DetailStore error state.
         const detailStoreState = useDetailStore.getState();
-        if (detailStoreState.error) {
-          logger.error(`[ERROR] DetailStore error: ${detailStoreState.error}`);
-          set({
-            isLoading: false,
-            // PlayerStore has no dedicated error field.
-          });
-        } else {
-          logger.error(`[ERROR] DetailStore init completed but no detail found and no error reported`);
-          set({ isLoading: false });
+
+        // 如果有错误但还有 searchResults，尝试使用 searchResults 中的第一个源
+        if (detailStoreState.searchResults && detailStoreState.searchResults.length > 0) {
+          logger.warn(`[WARN] Detail is null but searchResults has ${detailStoreState.searchResults.length} items, using first result`);
+          detail = detailStoreState.searchResults[0];
+
+          if (detail) {
+            logger.info(`[INFO] Using fallback detail from searchResults: ${detail.source} (${detail.source_name})`);
+            // 更新 DetailStore 的 detail
+            await useDetailStore.getState().setDetail(detail);
+          }
         }
-        return;
+
+        if (!detail) {
+          if (detailStoreState.error) {
+            logger.error(`[ERROR] DetailStore error: ${detailStoreState.error}`);
+          } else {
+            logger.error(`[ERROR] DetailStore init completed but no detail found and no error reported`);
+          }
+          set({ isLoading: false });
+          return;
+        }
       }
 
       // Use actual source selected by DetailStore.
@@ -575,7 +589,13 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
       // 自动选择最佳线路
       let currentPlaySourceIndex = 0;
-      if (detail.play_sources && detail.play_sources.length > 1) {
+
+      // 如果没有 play_sources 但有 episodes，动态生成默认的 play_sources
+      if ((!detail.play_sources || detail.play_sources.length === 0) && episodes && episodes.length > 0) {
+        logger.info(`[LINE_SELECTION] No play_sources available, using default episodes`);
+        // 使用默认的 episodes 数组，不需要选择线路
+        currentPlaySourceIndex = 0;
+      } else if (detail.play_sources && detail.play_sources.length > 1) {
         currentPlaySourceIndex = await get().selectBestLine(detail.play_sources);
         // 如果选择了非默认线路，更新 episodes
         if (currentPlaySourceIndex > 0 && detail.play_sources[currentPlaySourceIndex].episodes) {
@@ -633,7 +653,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
       if (currentEpisodeIndex !== index) {
         playerMonitor.recordEpisodeChange(currentEpisodeIndex, index);
       }
-      
+
       set({
         currentEpisodeIndex: index,
         showNextEpisodeOverlay: false,
@@ -791,7 +811,7 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
   handlePlaybackStatusUpdate: (newStatus) => {
     const previousStatus = get().status;
-    
+
     if (!newStatus.isLoaded) {
       if ('error' in newStatus && newStatus.error) {
         logger.error(`[PLAYBACK_ERROR] ${newStatus.error}`);
@@ -817,10 +837,10 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
     // 先更新 status，确保 _savePlayRecord 能获取到最新的状态
     const progressPosition = newStatus.durationMillis ? newStatus.positionMillis / newStatus.durationMillis : 0;
     set({ status: newStatus, progressPosition });
-    
+
     // 处理播放状态更新，监控事件
     playerMonitor.handlePlaybackStatusUpdate(newStatus, previousStatus);
-    
+
     // 更新缓冲状态
     if (newStatus.isBuffering !== undefined) {
       const bufferProgress = 'bufferProgress' in newStatus ? (newStatus.bufferProgress as number) : 0;
@@ -847,12 +867,12 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
       const progress = newStatus.positionMillis / newStatus.durationMillis;
       const isNearEnd = progress > 0.95;
-      
+
       // 当播放到 80% 时开始预加载下一集
       if (progress > 0.8 && currentEpisodeIndex < episodes.length - 1) {
         get().preloadNextEpisode();
       }
-      
+
       if (isNearEnd && currentEpisodeIndex < episodes.length - 1 && !outroStartTime) {
         set({ showNextEpisodeOverlay: true });
       } else {
@@ -1015,70 +1035,70 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
   preloadNextEpisode: () => {
     const { currentEpisodeIndex, episodes, isPreloading, preloadingEpisodeIndex } = get();
     const nextIndex = currentEpisodeIndex + 1;
-    
+
     // 检查是否已经在预加载，或者已经是最后一集
     if (isPreloading || preloadingEpisodeIndex === nextIndex || nextIndex >= episodes.length) {
       return;
     }
-    
+
     const nextEpisode = episodes[nextIndex];
     if (!nextEpisode || !nextEpisode.url) {
       return;
     }
-    
+
     logger.info(`[PRELOAD] Starting preload for episode ${nextIndex + 1}: ${nextEpisode.title}`);
-    
-    set({ 
-      isPreloading: true, 
-      preloadingEpisodeIndex: nextIndex 
+
+    set({
+      isPreloading: true,
+      preloadingEpisodeIndex: nextIndex
     });
-    
+
     // 模拟预加载过程，实际项目中可以根据需要实现真正的预加载逻辑
     // 例如：预加载视频元数据、关键帧或部分视频内容
     const preloadTimeout = setTimeout(() => {
       logger.info(`[PRELOAD] Preload completed for episode ${nextIndex + 1}`);
-      set({ 
-        isPreloading: false, 
-        preloadingEpisodeIndex: null 
+      set({
+        isPreloading: false,
+        preloadingEpisodeIndex: null
       });
     }, 2000);
-    
+
     // 保存超时ID，以便可以取消预加载
     set({ _preloadTimeout: preloadTimeout });
   },
-  
+
   // 取消预加载
   cancelPreload: () => {
     const { isPreloading, _preloadTimeout } = get();
     if (isPreloading && _preloadTimeout) {
       clearTimeout(_preloadTimeout);
       logger.info(`[PRELOAD] Preload cancelled`);
-      set({ 
-        isPreloading: false, 
-        preloadingEpisodeIndex: null, 
-        _preloadTimeout: undefined 
+      set({
+        isPreloading: false,
+        preloadingEpisodeIndex: null,
+        _preloadTimeout: undefined
       });
     }
   },
-  
+
   // 更新网络状态
   updateNetworkStatus: (isConnected, connectionType) => {
     const recommendedQuality = networkMonitor.getOptimalPlaybackQuality();
     logger.info(`[NETWORK] Updated status: connected=${isConnected}, type=${connectionType}, recommendedQuality=${recommendedQuality}`);
-    
-    set({ 
-      isConnected, 
-      connectionType, 
-      recommendedQuality 
+
+    set({
+      isConnected,
+      connectionType,
+      recommendedQuality
     });
-    
+
     // 网络状态变化时的处理逻辑
     if (!isConnected) {
       logger.warn(`[NETWORK] Network disconnected, playback may be affected`);
       // 可以在这里添加网络断开时的处理逻辑
     }
   },
-  
+
   // 获取推荐的播放质量
   getRecommendedQuality: () => {
     return get().recommendedQuality;
@@ -1086,12 +1106,12 @@ const usePlayerStore = create<PlayerState>((set, get) => ({
 
   reset: async () => {
     const { videoRef, _preloadTimeout } = get();
-    
+
     // 取消预加载
     if (_preloadTimeout) {
       clearTimeout(_preloadTimeout);
     }
-    
+
     try {
       if (videoRef?.current) {
         await videoRef.current.unloadAsync();

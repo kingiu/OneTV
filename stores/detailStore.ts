@@ -31,6 +31,7 @@ interface DetailState {
   controller: AbortController | null;
   isFavorited: boolean;
   failedSources: Set<string>; // 记录失败的source列表
+  detailCache: Map<string, { data: SearchResultWithResolution; timestamp: number }>; // 详情页数据缓存
 
   init: (q: string, preferredSource?: string, id?: string, year?: string, doubanId?: string) => Promise<void>;
   setDetail: (detail: SearchResultWithResolution) => Promise<void>;
@@ -56,6 +57,7 @@ const useDetailStore = create<DetailState>((set, get) => ({
   controller: null,
   isFavorited: false,
   failedSources: new Set(),
+  detailCache: new Map(),
 
   init: async (q, preferredSource, id, year, doubanId) => {
     const perfStart = performance.now();
@@ -63,7 +65,44 @@ const useDetailStore = create<DetailState>((set, get) => ({
     const cleanedQ = q ? q.trim() : q;
     logger.info(`[PERF] DetailStore.init START - q: "${q}", cleaned: "${cleanedQ}", preferredSource: ${preferredSource}, id: ${id}, year: ${year}, doubanId: ${doubanId}`);
 
-    const { controller: oldController } = get();
+    // 检查详情页缓存
+    const cacheKey = `detail:${cleanedQ}:${year || ''}:${doubanId || ''}`;
+    const { detailCache } = get();
+    const cached = detailCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) { // 30分钟缓存
+      logger.info(`[CACHE HIT] Returning cached detail for "${cleanedQ}"`);
+      const { data: cachedDetail } = cached;
+      const cacheStart = performance.now();
+      set({
+        q: cleanedQ,
+        year: year || null,
+        doubanId: doubanId || null,
+        loading: false,
+        searchResults: [cachedDetail],
+        detail: cachedDetail,
+        error: null,
+        allSourcesLoaded: true,
+        controller: null,
+        failedSources: new Set(),
+      });
+      // 检查收藏状态
+      if (cachedDetail) {
+        const { source, id } = cachedDetail;
+        try {
+          const favStart = performance.now();
+          const isFavorited = await FavoriteManager.isFavorited(source, id.toString());
+          set({ isFavorited });
+          logger.info(`[PERF] Favorite check took ${(performance.now() - favStart).toFixed(2)}ms`);
+        } catch (favoriteError) {
+          logger.warn(`[WARN] Failed to check favorite status:`, favoriteError);
+        }
+      }
+      logger.info(`[PERF] DetailStore.init COMPLETE from cache - total time: ${(performance.now() - perfStart).toFixed(2)}ms`);
+      logger.info(`[PERF] Cache processing took ${(performance.now() - cacheStart).toFixed(2)}ms`);
+      return;
+    }
+
+    const { controller: oldController, searchResults: existingSearchResults } = get();
     if (oldController) {
       oldController.abort();
     }
@@ -74,18 +113,23 @@ const useDetailStore = create<DetailState>((set, get) => ({
     const searchQuery = year ? `${cleanedQ} ${year}` : cleanedQ;
     logger.info(`[MATCHING] Search query: "${searchQuery}" (original: "${q}", cleaned: "${cleanedQ}", year: ${year})`);
 
+    // 关键修复：不要立即清空 searchResults，保留旧数据直到新数据准备好
+    // 这样可以避免在异步搜索完成前，playerStore 读取到空数据
     set({
       q: cleanedQ,
       year: year || null,
       doubanId: doubanId || null,
       loading: true,
-      searchResults: [],
+      // 保留现有的 searchResults，避免竞态条件
+      // searchResults: [],  // ❌ 旧代码：立即清空会导致 playerStore 读取到空数据
       detail: null,
       error: null,
       allSourcesLoaded: false,
       controller: newController,
       failedSources: new Set(),
     });
+    
+    logger.info(`[STATE] Keeping existing searchResults (${existingSearchResults?.length || 0} items) during loading to prevent race conditions`);
 
     const { videoSource } = useSettingsStore.getState();
 
@@ -98,11 +142,6 @@ const useDetailStore = create<DetailState>((set, get) => ({
       // 直接返回搜索结果，不进行 M3U8 分辨率检测
       // 分辨率检测将在播放时进行
       const resultsWithResolution = results.map((searchResult) => {
-        logger.info(`[DEBUG] Play sources for ${searchResult.source_name}: ${searchResult.play_sources?.length || 0}`);
-        logger.info(`[DEBUG] vod_play_from: ${searchResult.vod_play_from}`);
-        logger.info(`[DEBUG] vod_play_url: ${searchResult.vod_play_url}`);
-        logger.info(`[DEBUG] episodes: ${searchResult.episodes?.length || 0}`);
-        logger.info(`[DEBUG] Raw searchResult keys:`, Object.keys(searchResult));
         return { ...searchResult, resolution: undefined };
       });
 
@@ -116,19 +155,20 @@ const useDetailStore = create<DetailState>((set, get) => ({
         const seenKeys = new Set<string>();
         const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
 
-        const deduplicatedResults = allResults.filter((r) => {
-          // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
-          let uniqueKey;
+        // 生成唯一键的辅助函数
+        const generateUniqueKey = (r: SearchResultWithResolution) => {
           if (r.source && r.id) {
-            uniqueKey = `${r.source}_${r.id}`;
+            return `${r.source}_${r.id}`;
           } else {
-            // 当 id 为空时，使用 title + year + source_name 作为唯一标识
             const title = r.title || 'unknown';
             const year = r.year || 'unknown';
             const sourceName = r.source_name || 'unknown';
-            uniqueKey = `${r.source || 'unknown'}_${title}_${year}_${sourceName}`;
+            return `${r.source || 'unknown'}_${title}_${year}_${sourceName}`;
           }
-          
+        };
+
+        const deduplicatedResults = allResults.filter((r) => {
+          const uniqueKey = generateUniqueKey(r);
           if (seenKeys.has(uniqueKey)) {
             return false;
           }
@@ -137,6 +177,13 @@ const useDetailStore = create<DetailState>((set, get) => ({
         });
 
         logger.info(`[MATCHING] Before dedup: ${allResults.length} results, After dedup: ${deduplicatedResults.length} results`);
+
+        // 检查官方资源站是否在去重前
+        const officialBeforeDedup = allResults.find(r => r.source === 'aixuexi.com');
+        logger.info(`[MATCHING] Official source before dedup: ${officialBeforeDedup ? 'FOUND' : 'NOT FOUND'}`);
+        if (officialBeforeDedup) {
+          logger.info(`[MATCHING]   - Title: ${officialBeforeDedup.title}, ID: ${officialBeforeDedup.id}, DoubanID: ${officialBeforeDedup.doubanId || officialBeforeDedup.douban_id}`);
+        }
 
         // 不再限制视频源数量，后端会持续增加新的视频源
         logger.info(`[MATCHING] Total unique sources: ${deduplicatedResults.length}`);
@@ -154,40 +201,17 @@ const useDetailStore = create<DetailState>((set, get) => ({
             return isEnabled;
           });
           logger.info(`[FILTER] After filtering: ${filteredResults.length} results`);
+        } else {
+          logger.info(`[FILTER] All video sources enabled`);
         }
 
-        let processedResults = filteredResults;
-        let finalDeduplicatedResults = filteredResults;
+        // 检查官方资源站是否在过滤后
+        const officialAfterFilter = filteredResults.find(r => r.source === 'aixuexi.com');
+        logger.info(`[MATCHING] Official source after filter: ${officialAfterFilter ? 'FOUND' : 'NOT FOUND'}`);
 
         // 不使用匹配引擎过滤，直接使用所有过滤后的结果
         // 这样可以确保获取到所有可用的视频源
         logger.info(`[MATCHING] Using all filtered results: ${filteredResults.length} results`);
-        processedResults = filteredResults;
-
-        // 最终去重：使用 source_id 作为唯一键（参考 LunaTV）
-        const seenFinal = new Set<string>();
-        finalDeduplicatedResults = processedResults.filter((r) => {
-          // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
-          let uniqueKey;
-          if (r.source && r.id) {
-            uniqueKey = `${r.source}_${r.id}`;
-          } else {
-            // 当 id 为空时，使用 title + year + source_name 作为唯一标识
-            const title = r.title || 'unknown';
-            const year = r.year || 'unknown';
-            const sourceName = r.source_name || 'unknown';
-            uniqueKey = `${r.source || 'unknown'}_${title}_${year}_${sourceName}`;
-          }
-          
-          if (seenFinal.has(uniqueKey)) {
-            return false;
-          }
-          seenFinal.add(uniqueKey);
-          return true;
-        });
-
-        logger.info(`[MATCHING] After final deduplication: ${finalDeduplicatedResults.length} results`);
-        logger.info(`[MATCHING] Total sources available: ${finalDeduplicatedResults.length} (no limit)`);
 
         // 首先对所有结果按后端权重排序（确保官方资源站总是排在前面）
         const { sourceWeights } = useSettingsStore.getState();
@@ -195,16 +219,16 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
         // 按权重排序所有结果
         // 优先使用后端权重，其次使用前端配置权重，最后使用默认值 50
-        const sortedResults = [...finalDeduplicatedResults].sort((a, b) => {
+        const sortedResults = [...filteredResults].sort((a, b) => {
           // 为每个源单独获取权重，确保使用最新值
           const aWeight = currentResourceWeights?.[a.source] ?? sourceWeights[a.source] ?? 50;
           const bWeight = currentResourceWeights?.[b.source] ?? sourceWeights[b.source] ?? 50;
           return bWeight - aWeight;
         });
 
-        // 记录排序后的权重信息
-        logger.info(`[MATCHING] === SORTED RESULTS BY WEIGHT ===`);
-        sortedResults.forEach((r, index) => {
+        // 记录排序后的权重信息（只记录前5个结果，避免日志过多）
+        logger.info(`[MATCHING] === TOP 5 SORTED RESULTS BY WEIGHT ===`);
+        sortedResults.slice(0, 5).forEach((r, index) => {
           const weight = currentResourceWeights?.[r.source] ?? sourceWeights[r.source] ?? 50;
           logger.info(`[MATCHING] #${index + 1}: ${r.source_name} (${r.source}) - weight: ${weight}`);
         });
@@ -220,32 +244,46 @@ const useDetailStore = create<DetailState>((set, get) => ({
 
         // 优先选择最佳匹配的结果作为 detail
         let bestDetail = state.detail;
-        if (!bestDetail) {
-          // 首先尝试豆瓣 ID 匹配
-          if (state.doubanId) {
-            // 从所有结果中查找，不考虑 source_name 去重
-            const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
-            bestDetail = allResults.find((r) =>
-              r.doubanId === state.doubanId
-            );
+        
+        // 1. 如果有 preferredSource（从 playerStore 传入），优先使用它
+        if (preferredSource && !bestDetail) {
+          bestDetail = sortedResults.find((r) => r.source === preferredSource);
+          if (bestDetail) {
+            logger.info(`[MATCHING] Using preferred source: ${preferredSource} (${bestDetail.source_name})`);
           }
+        }
+        
+        // 2. 豆瓣 ID 匹配 - 从去重后的结果中查找
+        if (!bestDetail && doubanId) {
+          bestDetail = sortedResults.find((r) =>
+            r.doubanId === doubanId || r.douban_id?.toString() === doubanId
+          );
+          if (bestDetail) {
+            logger.info(`[MATCHING] Found doubanId match: ${bestDetail.title} (${bestDetail.doubanId || bestDetail.douban_id})`);
+          }
+        }
 
-          // 然后尝试年份精确匹配
-          if (!bestDetail && state.year && sortedResults.length > 0) {
-            const yearMatch = sortedResults.find((r) =>
-              r.year === state.year || r.year === String(state.year)
-            );
-            if (yearMatch) {
-              logger.info(`[MATCHING] Found year exact match: ${yearMatch.title} (${yearMatch.year})`);
-              bestDetail = yearMatch;
-            }
+        // 3. 年份精确匹配
+        if (!bestDetail && year && sortedResults.length > 0) {
+          const yearMatch = sortedResults.find((r) =>
+            r.year === year || r.year === String(year)
+          );
+          if (yearMatch) {
+            logger.info(`[MATCHING] Found year exact match: ${yearMatch.title} (${yearMatch.year})`);
+            bestDetail = yearMatch;
           }
+        }
 
-          // 最后使用排序后的第一个结果（已经按权重排好序）
-          if (!bestDetail && sortedResults.length > 0) {
-            bestDetail = sortedResults[0];
-            logger.info(`[MATCHING] Selected best source by weight: ${bestDetail.source} (${bestDetail.source_name})`);
-          }
+        // 4. 最后使用排序后的第一个结果（已经按权重排好序）
+        if (!bestDetail && sortedResults.length > 0) {
+          bestDetail = sortedResults[0];
+          logger.info(`[MATCHING] Selected best source by weight: ${bestDetail.source} (${bestDetail.source_name})`);
+        }
+        
+        // 5. 如果还是没有 detail，使用 state 中已有的 detail（保留旧数据）
+        if (!bestDetail && state.detail) {
+          bestDetail = state.detail;
+          logger.info(`[MATCHING] Keeping existing detail from state: ${bestDetail.source} (${bestDetail.source_name})`);
         }
 
         return {
@@ -261,89 +299,124 @@ const useDetailStore = create<DetailState>((set, get) => ({
     };
 
     try {
-      // 首先获取后端返回的资源权重，确保在搜索结果处理之前就有正确的权重
-      let weights: { [key: string]: number } = {};
-      try {
-        logger.info(`[WEIGHT] Fetching resource weights from backend FIRST...`);
-
-        // 使用 LunaTV API 端点获取权重
-        const backendWeights = await api.getSourceWeights(signal);
-        logger.info(`[WEIGHT] Got weights from /api/source-weights: ${JSON.stringify(backendWeights)}`);
-
-        const hasBackendWeights = Object.keys(backendWeights).length > 0;
-
-        // 如果后端返回了权重，直接使用
-        if (hasBackendWeights) {
-          Object.assign(weights, backendWeights);
-          logger.info(`[WEIGHT] ✓ Using backend weights from /api/source-weights`);
-          Object.entries(weights).forEach(([key, weight]) => {
-            logger.info(`[WEIGHT]   ${key}: ${weight}`);
-          });
-        }
-
-        // 如果后端没有返回权重，使用前端默认权重
-        if (!hasBackendWeights) {
-          logger.info(`[WEIGHT] Backend did not return weights, using frontend default weights`);
-
-          // 前端默认权重配置（可按需修改）
+      // 关键性能优化：增加超时时间，避免首次搜索被提前中止
+      const INIT_TIMEOUT = 15000; // 15 秒超时（首次搜索可能需要更多时间）
+      const initController = new AbortController();
+      const initTimeoutId = setTimeout(() => {
+        initController.abort();
+        logger.warn(`[TIMEOUT] DetailStore.init exceeded ${INIT_TIMEOUT}ms, aborting all operations`);
+      }, INIT_TIMEOUT);
+      
+      // 合并信号，确保超时时能取消所有操作
+      const combinedSignal = initController.signal;
+      
+      // 并行执行权重获取和视频搜索，减少总加载时间
+      const [weights, searchResults] = await Promise.all([
+        // 并行任务 1：获取资源权重（优化：直接使用默认权重，避免额外 API 调用）
+        (async () => {
+          const perfStart = performance.now();
+          logger.info(`[WEIGHT] Using default resource weights (optimized for speed)`);
+          
+          // 前端默认权重配置（已覆盖所有已知资源）
           const defaultWeights: { [key: string]: number } = {
-            'aixuexi.com': 100,        // 官方高清站 - 最高优先级
-            'jszyapi.com': 50,         // 极速资源 - 中等优先级
+            // 官方资源站 - 最高优先级
+            'aixuexi.com': 100,
+            'lunatv.com': 100,
+            
+            // 高速资源 - 高优先级
+            'jszyapi.com': 80,
+            'bfzyapi.com': 80,
+            
+            // 普通资源 - 中等优先级
+            'tyjszy.com': 60,
+            'haohzy.com': 60,
+            'huozui.com': 60,
+            
+            // 备用资源 - 低优先级
+            'wolongzy.com': 40,
+            '1080zy.com': 40,
+            'ffzyapi.com': 40,
+            
+            // 其他资源 - 默认优先级
+            'default': 50,
           };
+          
+          logger.info(`[PERF] Weight initialization took ${(performance.now() - perfStart).toFixed(2)}ms`);
+          return defaultWeights;
+        })(),
 
-          // 为每个资源分配默认权重
-          const allResources = await api.getResources(signal);
-          logger.info(`[WEIGHT] Got ${allResources.length} resources from /api/search/resources`);
+        // 并行任务 2：搜索视频源
+        (async () => {
+          const searchStart = performance.now();
+          logger.info(`[PERF] API searchVideos START - query: "${searchQuery}"`);
 
-          allResources.forEach(r => {
-            const resourceKey = r.key || r.source || 'unknown';
-            const defaultWeight = defaultWeights[resourceKey];
+          try {
+            const { results: allResults } = await api.searchVideos(searchQuery, doubanId);
+            const searchEnd = performance.now();
+            logger.info(`[PERF] API searchVideos END - took ${(searchEnd - searchStart).toFixed(2)}ms, results: ${allResults.length}`);
 
-            if (defaultWeight !== undefined) {
-              weights[resourceKey] = defaultWeight;
-              logger.info(`[WEIGHT] ⚙️ ${resourceKey}: assigned default weight=${defaultWeight}`);
-            } else {
-              weights[resourceKey] = 50; // 未知资源使用默认值
-              logger.info(`[WEIGHT] ⚙️ ${resourceKey}: using default weight=50`);
-            }
+            if (signal.aborted || combinedSignal.aborted) return null;
+            return allResults;
+          } catch (searchError) {
+            logger.error(`[ERROR] searchVideos failed:`, searchError);
+            throw searchError;
+          }
+        })()
+      ]);
+      
+      // 清除超时定时器
+      clearTimeout(initTimeoutId);
+
+      // 保存权重
+      set({ resourceWeights: weights });
+      logger.info(`[WEIGHT] ✓ Final resource weights SAVED: ${JSON.stringify(weights)}`);
+
+      // 处理搜索结果
+      if (signal.aborted) return;
+
+      if (searchResults && searchResults.length > 0) {
+        logger.info(`[SUCCESS] searchVideos found ${searchResults.length} results for "${cleanedQ}"`);
+        await processAndSetResults(searchResults, false);
+        set({ loading: false }); // Stop loading indicator
+      } else {
+        // 关键修复：搜索失败时的处理逻辑
+        const currentState = get();
+        
+        // 1. 如果有旧数据，保留旧数据
+        if (currentState.searchResults && currentState.searchResults.length > 0) {
+          logger.warn(`[WARN] searchVideos found no new results, but keeping existing ${currentState.searchResults.length} results from cache/previous search`);
+          set({ 
+            loading: false,
+            allSourcesLoaded: true,
+            error: null // 清除错误，因为还有旧数据可用
+          });
+        } 
+        // 2. 如果有 preferredSource（从 VideoCard 传入），尝试直接获取该源的详情
+        else if (preferredSource) {
+          logger.warn(`[WARN] searchVideos found no results, but preferredSource is provided: ${preferredSource}`);
+          // 创建一个临时的 detail 对象，让用户可以尝试播放
+          set({
+            loading: false,
+            allSourcesLoaded: true,
+            error: null,
+            // 保留 preferredSource 信息，让用户知道我们在尝试哪个源
+            detail: {
+              source: preferredSource,
+              source_name: preferredSource,
+              title: cleanedQ,
+              episodes: [], // 空剧集列表，播放时会重新获取
+            } as SearchResultWithResolution,
           });
         }
-
-        // 立即保存权重，让 processAndSetResults 能够使用
-        set({ resourceWeights: weights });
-        logger.info(`[WEIGHT] ✓ Final resource weights SAVED: ${JSON.stringify(weights)}`);
-      } catch (resourceError) {
-        logger.warn(`[WEIGHT] Failed to get resources (non-fatal):`, resourceError);
-      }
-
-      // 然后搜索视频源
-      const searchStart = performance.now();
-      logger.info(`[PERF] API searchVideos (all sources) START - query: "${searchQuery}"`);
-
-      try {
-        const { results: allResults } = await api.searchVideos(searchQuery, doubanId);
-        const searchEnd = performance.now();
-        logger.info(`[PERF] API searchVideos (all sources) END - took ${(searchEnd - searchStart).toFixed(2)}ms, results: ${allResults.length}`);
-
-        if (signal.aborted) return;
-
-        if (allResults.length > 0) {
-          logger.info(`[SUCCESS] searchVideos found ${allResults.length} results for "${cleanedQ}"`);
-          await processAndSetResults(allResults, false);
-          set({ loading: false }); // Stop loading indicator
-        } else {
-          logger.error(`[ERROR] searchVideos found no results for "${cleanedQ}"`);
+        // 3. 完全没有数据，显示错误
+        else {
+          logger.error(`[ERROR] searchVideos found no results for "${cleanedQ}" and no cached data available`);
           set({
             error: `未找到 "${cleanedQ}" 的播放源，请尝试其他关键词或稍后重试`,
-            loading: false
+            loading: false,
+            allSourcesLoaded: true
           });
         }
-      } catch (searchError) {
-        logger.error(`[ERROR] searchVideos failed:`, searchError);
-        set({
-          error: `搜索失败：${searchError instanceof Error ? searchError.message : '网络错误，请稍后重试'}`,
-          loading: false
-        });
       }
 
       // 旧的 preferredSource 逻辑已被替换，因为我们现在总是使用 searchVideos
@@ -369,6 +442,24 @@ const useDetailStore = create<DetailState>((set, get) => ({
           logger.info(`[INFO] Favorite status: ${isFavorited}`);
         } catch (favoriteError) {
           logger.warn(`[WARN] Failed to check favorite status:`, favoriteError);
+        }
+
+        // 缓存详情页数据
+        const cacheKey = `detail:${cleanedQ}:${year || ''}:${doubanId || ''}`;
+        const { detailCache } = get();
+        detailCache.set(cacheKey, {
+          data: finalState.detail,
+          timestamp: Date.now()
+        });
+        logger.info(`[CACHE] Saved detail to cache: ${cacheKey}`);
+
+        // 限制缓存大小，最多缓存20个详情页数据
+        if (detailCache.size > 20) {
+          // 按时间戳排序，删除最旧的缓存
+          const oldestKey = Array.from(detailCache.entries())
+            .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+          detailCache.delete(oldestKey);
+          logger.info(`[CACHE] Removed oldest cache: ${oldestKey}`);
         }
       }
       // 移除重复警告：如果 searchResults.length === 0，上面已经记录了错误
