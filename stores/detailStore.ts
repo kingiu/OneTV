@@ -117,7 +117,18 @@ const useDetailStore = create<DetailState>((set, get) => ({
         const allResults = merge ? [...state.searchResults, ...resultsWithResolution] : resultsWithResolution;
 
         const deduplicatedResults = allResults.filter((r) => {
-          const uniqueKey = `${r.source}_${r.id}`;
+          // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
+          let uniqueKey;
+          if (r.source && r.id) {
+            uniqueKey = `${r.source}_${r.id}`;
+          } else {
+            // 当 id 为空时，使用 title + year + source_name 作为唯一标识
+            const title = r.title || 'unknown';
+            const year = r.year || 'unknown';
+            const sourceName = r.source_name || 'unknown';
+            uniqueKey = `${r.source || 'unknown'}_${title}_${year}_${sourceName}`;
+          }
+          
           if (seenKeys.has(uniqueKey)) {
             return false;
           }
@@ -156,7 +167,18 @@ const useDetailStore = create<DetailState>((set, get) => ({
         // 最终去重：使用 source_id 作为唯一键（参考 LunaTV）
         const seenFinal = new Set<string>();
         finalDeduplicatedResults = processedResults.filter((r) => {
-          const uniqueKey = `${r.source}_${r.id}`;
+          // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
+          let uniqueKey;
+          if (r.source && r.id) {
+            uniqueKey = `${r.source}_${r.id}`;
+          } else {
+            // 当 id 为空时，使用 title + year + source_name 作为唯一标识
+            const title = r.title || 'unknown';
+            const year = r.year || 'unknown';
+            const sourceName = r.source_name || 'unknown';
+            uniqueKey = `${r.source || 'unknown'}_${title}_${year}_${sourceName}`;
+          }
+          
           if (seenFinal.has(uniqueKey)) {
             return false;
           }
@@ -518,64 +540,47 @@ const useDetailStore = create<DetailState>((set, get) => ({
       return availableSources[0];
     }
 
-    // 对每个源进行评分
-    const sourceScores = await Promise.all(
-      availableSources.map(async (source) => {
-        // 1. 权重分数 (0-100) - 后端权重优先，本地权重作为备份
-        const backendWeight = resourceWeights[source.source];
-        const localWeight = sourceWeights[source.source];
+    // 对每个源进行评分（不进行速度测试，避免网络请求导致的循环）
+    const sourceScores = availableSources.map((source) => {
+      // 1. 权重分数 (0-100) - 后端权重优先，本地权重作为备份
+      const backendWeight = resourceWeights[source.source];
+      const localWeight = sourceWeights[source.source];
 
-        // 修复：后端权重不存在（undefined）时才使用本地权重
-        // 注意：backendWeight 可能为 0，此时应该使用 0 而不是 fallback
-        const weight = backendWeight !== undefined ? backendWeight : (localWeight ?? 50);
-        const weightScore = weight;
+      // 修复：后端权重不存在（undefined）时才使用本地权重
+      // 注意：backendWeight 可能为 0，此时应该使用 0 而不是 fallback
+      const weight = backendWeight !== undefined ? backendWeight : (localWeight ?? 50);
+      const weightScore = weight;
 
-        logger.info(`[BEST_SOURCE] ${source.source_name}: backend=${backendWeight}, local=${localWeight}, using=${weight}`);
+      logger.info(`[BEST_SOURCE] ${source.source_name}: backend=${backendWeight}, local=${localWeight}, using=${weight}`);
 
-        // 2. 清晰度分数 (0-40)
-        let resolutionScore = 0;
-        const resolution = source.resolution || '';
-        if (resolution.includes('4K') || resolution.includes('2160')) resolutionScore = 40;
-        else if (resolution.includes('1080')) resolutionScore = 35;
-        else if (resolution.includes('720')) resolutionScore = 25;
-        else if (resolution.includes('480')) resolutionScore = 15;
-        else if (resolution.includes('360')) resolutionScore = 10;
-        else resolutionScore = 20; // 未知分辨率给中等分数
+      // 2. 清晰度分数 (0-40)
+      let resolutionScore = 0;
+      const resolution = source.resolution || '';
+      if (resolution.includes('4K') || resolution.includes('2160')) resolutionScore = 40;
+      else if (resolution.includes('1080')) resolutionScore = 35;
+      else if (resolution.includes('720')) resolutionScore = 25;
+      else if (resolution.includes('480')) resolutionScore = 15;
+      else if (resolution.includes('360')) resolutionScore = 10;
+      else resolutionScore = 20; // 未知分辨率给中等分数
 
-        // 3. 速度分数 (0-30) - 测试第一个剧集URL
-        let speedScore = 15; // 默认中等分数
-        if (source.episodes && source.episodes.length > 0) {
-          try {
-            const latency = await get().testSourceSpeed(source.episodes[0]);
-            if (latency < 500) speedScore = 30;
-            else if (latency < 1000) speedScore = 25;
-            else if (latency < 2000) speedScore = 20;
-            else if (latency < 3000) speedScore = 15;
-            else if (latency < 5000) speedScore = 10;
-            else speedScore = 5;
+      // 3. 速度分数 (0-30) - 不进行速度测试，使用默认分数
+      const speedScore = 15; // 默认中等分数
 
-            logger.info(`[BEST_SOURCE] Speed test for ${source.source_name}: ${latency.toFixed(0)}ms (score: ${speedScore})`);
-          } catch (e) {
-            logger.warn(`[BEST_SOURCE] Speed test failed for ${source.source_name}`);
-          }
-        }
+      // 总分 = 权重分数 + 清晰度分数 + 速度分数
+      const totalScore = weightScore + resolutionScore + speedScore;
 
-        // 总分 = 权重分数 + 清晰度分数 + 速度分数
-        const totalScore = weightScore + resolutionScore + speedScore;
+      logger.info(
+        `[BEST_SOURCE] ${source.source_name}: weight=${weightScore}, resolution=${resolutionScore}, speed=${speedScore}, total=${totalScore}`
+      );
 
-        logger.info(
-          `[BEST_SOURCE] ${source.source_name}: weight=${weightScore}, resolution=${resolutionScore}, speed=${speedScore}, total=${totalScore}`
-        );
-
-        return {
-          source,
-          totalScore,
-          weightScore,
-          resolutionScore,
-          speedScore,
-        };
-      })
-    );
+      return {
+        source,
+        totalScore,
+        weightScore,
+        resolutionScore,
+        speedScore,
+      };
+    });
 
     // 按总分排序
     sourceScores.sort((a, b) => b.totalScore - a.totalScore);

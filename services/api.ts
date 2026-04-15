@@ -783,7 +783,18 @@ export class Api {
     // 对最终结果进行去重
     const seenIds = new Set<string>();
     const deduplicatedResults = finalResults.filter((result) => {
-      const uniqueKey = `${result.source}_${result.id}`;
+      // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
+      let uniqueKey;
+      if (result.source && result.id) {
+        uniqueKey = `${result.source}_${result.id}`;
+      } else {
+        // 当 id 为空时，使用 title + year + source_name 作为唯一标识
+        const title = result.title || 'unknown';
+        const year = result.year || 'unknown';
+        const sourceName = result.source_name || 'unknown';
+        uniqueKey = `${result.source || 'unknown'}_${title}_${year}_${sourceName}`;
+      }
+      
       if (seenIds.has(uniqueKey)) {
         return false;
       }
@@ -810,7 +821,18 @@ export class Api {
     // 首先对结果进行去重
     const seenIds = new Set<string>();
     const deduplicatedResults = results.filter((result) => {
-      const uniqueKey = `${result.source}_${result.id}`;
+      // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
+      let uniqueKey;
+      if (result.source && result.id) {
+        uniqueKey = `${result.source}_${result.id}`;
+      } else {
+        // 当 id 为空时，使用 title + year + source_name 作为唯一标识
+        const title = result.title || 'unknown';
+        const year = result.year || 'unknown';
+        const sourceName = result.source_name || 'unknown';
+        uniqueKey = `${result.source || 'unknown'}_${title}_${year}_${sourceName}`;
+      }
+      
       if (seenIds.has(uniqueKey)) {
         return false;
       }
@@ -1020,7 +1042,18 @@ export class Api {
     // 对最终结果进行去重
     const seenIds = new Set<string>();
     const deduplicatedResults = finalResults.filter((r) => {
-      const uniqueKey = `${r.source}_${r.id}`;
+      // 生成唯一键：优先使用 source + id，如果 id 为空则使用 title + year + source_name
+      let uniqueKey;
+      if (r.source && r.id) {
+        uniqueKey = `${r.source}_${r.id}`;
+      } else {
+        // 当 id 为空时，使用 title + year + source_name 作为唯一标识
+        const title = r.title || 'unknown';
+        const year = r.year || 'unknown';
+        const sourceName = r.source_name || 'unknown';
+        uniqueKey = `${r.source || 'unknown'}_${title}_${year}_${sourceName}`;
+      }
+      
       if (seenIds.has(uniqueKey)) return false;
       seenIds.add(uniqueKey);
       return true;
